@@ -1,63 +1,80 @@
--- Enable pgvector
-create extension if not exists vector;
+-- Enable Required Extensions
+create extension if not exists "uuid-ossp";
+create extension if not exists "vector";
 
--- Items Table
-create table public.items (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  description text,
-  category text,
-  office_id text not null default 'BCPIO',
-  status text not null default 'found' check (status in ('found', 'lost', 'claimed', 'archived')),
-  photo_url text,
-  embedding vector(512),
-  created_at timestamptz default now()
+-- 1. Offices Table
+create table public.offices (
+    id text primary key,
+    name text not null,
+    address text not null,
+    counter_hours text not null,
+    auth_user_id uuid references auth.users(id) on delete set null,
+    created_at timestamptz default timezone('utc'::text, now()) not null
 );
 
--- Enable RLS
-alter table public.items enable row level security;
+-- 2. Items Table
+create table public.items (
+    id uuid primary key default gen_random_uuid(),
+    ref_code text unique not null,
+    title text not null,
+    description text not null,
+    category text not null,
+    status text not null default 'held' check (
+        status in ('held', 'pending_verification', 'claimed', 'released', 'transferred', 'disposed')
+    ),
+    image_url text,
+    is_cash boolean default false not null,
+    cash_amount numeric(10, 2) default 0.00,
+    holding_office_id text not null references public.offices(id) on delete restrict,
+    logging_office_id text not null references public.offices(id) on delete restrict,
+    embedding vector(512),
+    ai_caption text,
+    created_at timestamptz default timezone('utc'::text, now()) not null,
+    updated_at timestamptz default timezone('utc'::text, now()) not null
+);
 
--- Public read access for found items
-create policy "Allow public read access to found items"
-on public.items
-for select
-to anon, authenticated
-using (status = 'found');
+create index items_embedding_hnsw_idx 
+on public.items using hnsw (embedding vector_cosine_ops);
 
--- Authenticated staff insert/update access
-create policy "Allow authenticated staff to manage items"
-on public.items
-for all
-to authenticated
-using (true)
-with check (true);
+create index items_status_idx on public.items (status);
+create index items_holding_office_idx on public.items (holding_office_id);
 
--- Vector Search RPC Function
-create or replace function match_items (
-  query_embedding vector(512),
-  match_threshold float default 0.23,
-  match_count int default 5
+-- 3. Match Items Function
+create or replace function public.match_items (
+    query_embedding vector(512),
+    match_threshold float default 0.20,
+    match_count int default 10
 )
 returns table (
-  id uuid,
-  title text,
-  description text,
-  category text,
-  photo_url text,
-  similarity float
+    id uuid,
+    ref_code text,
+    title text,
+    description text,
+    category text,
+    status text,
+    image_url text,
+    holding_office_id text,
+    created_at timestamptz,
+    similarity float
 )
 language sql stable
 as $$
-  select
-    items.id,
-    items.title,
-    items.description,
-    items.category,
-    items.photo_url,
-    1 - (items.embedding <=> query_embedding) as similarity
-  from items
-  where items.status = 'found'
-    and 1 - (items.embedding <=> query_embedding) > match_threshold
-  order by items.embedding <=> query_embedding
-  limit match_count;
+    select
+        items.id,
+        items.ref_code,
+        items.title,
+        items.description,
+        items.category,
+        items.status,
+        items.image_url,
+        items.holding_office_id,
+        items.created_at,
+        1 - (items.embedding <=> query_embedding) as similarity
+    from public.items
+    where 
+        items.status not in ('released', 'disposed', 'claimed')
+        and items.embedding is not null
+        and (1 - (items.embedding <=> query_embedding)) > match_threshold
+    order by similarity desc
+    limit match_count;
 $$;
