@@ -323,12 +323,13 @@ begin
 end;
 $$;
 
-
 -- ============================================================================
 -- 10. STAFF ACTION VIEW
 -- Aggregates approaching 6-month statutory deadlines for currency items.
 -- ============================================================================
-create or replace view public.staff_reminders_view as
+create or replace view public.staff_reminders_view
+with (security_invoker = true)
+as
 select 
     id,
     ref_code,
@@ -355,6 +356,9 @@ where is_cash = true
   and status = 'held' 
   and reward_date between current_date and (current_date + interval '21 days');
 
+-- Restrict reminders to authenticated counter staff
+revoke all on public.staff_reminders_view from anon, public;
+grant select on public.staff_reminders_view to authenticated;
 
 -- ============================================================================
 -- 11. RPC: CENTRAL ADMINISTRATIVE USAGE REPORT
