@@ -5,7 +5,7 @@ Items are held and released at participating city office counters. The site help
 citizens find where an item is held and report lost or found items. It does not
 support peer-to-peer exchange, in-app messaging, or online claims.
 
-**Status:** landing page only. Other routes render a placeholder.
+**Status:** landing page and search results are built. The report and staff routes render a placeholder.
 
 ## Getting started
 
@@ -51,12 +51,41 @@ src/
 - Spacing, type scale, elevation and layout tokens are in section 1 of `styles.css`.
 - Light and dark follow `prefers-color-scheme`.
 
+## Environment
+
+Copy `.env.example` to `.env` and set:
+
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+VITE_AI_SERVICE_URL=http://localhost:8000
+```
+
+Restart `npm run dev` after changing `.env`. The AI service must allow CORS from the
+web origin (for example `http://localhost:5173`).
+
+## Search flow (`/search`)
+
+`src/lib/searchItems.js` embeds the text and/or photo through the AI service, averages
+the vectors if both are given, then calls the `match_items` RPC. `src/lib/aiService.js`
+holds the assumed service contract:
+
+- `POST /embed/text` with form field `text` returns `{ "vector": number[512] }`
+- `POST /embed/image` with form field `file` returns `{ "vector": number[512] }`
+
+The service does not translate Filipino yet. If `/embed/text` starts returning
+`translated_text`, the results page shows it.
+
+The color filter is prepended to the text before embedding. `MATCH_THRESHOLD` and
+`MATCH_COUNT` live in `searchItems.js`. The page has loading, empty, error (with retry)
+and no-query states.
+
 ## Routes and the search hand-off
 
 | Path | Status |
 |---|---|
 | `/` | Landing page (built) |
-| `/search` | Placeholder |
+| `/search` | Search results (built) |
 | `/report/lost` | Placeholder |
 | `/report/found` | Placeholder |
 | `/staff/login` | Placeholder |
