@@ -557,3 +557,38 @@ $$;
 
 revoke all on function public.submit_found_report(text, text, date, text, text, vector) from public;
 grant execute on function public.submit_found_report(text, text, date, text, text, vector) to anon, authenticated;
+
+
+-- ============================================================================
+-- 14. STORAGE: ITEM PHOTO BUCKET
+-- The public bucket behind the found-item report photo upload
+-- (web/src/lib/storage.js). A citizen uploads without an account, the returned
+-- public URL is stored on found_reports, and counter staff read it back. WebP
+-- only, 2 MB, because the client re-encodes and downscales every upload.
+--
+-- The storage.objects policies below are what make anonymous upload and public
+-- read possible: the Storage API evaluates them per request, keyed by bucket_id.
+-- RLS is already enabled on storage.objects by Supabase; these policies scope it
+-- to this bucket. (Idempotent: safe to re-run.)
+-- ============================================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('item-photos', 'item-photos', true, 2097152, array['image/webp'])
+on conflict (id) do nothing;
+
+-- Citizens upload photos with the anon key, so INSERT is open to `public`.
+drop policy if exists "Anyone can upload photos" on storage.objects;
+create policy "Anyone can upload photos"
+on storage.objects for insert to public
+with check (bucket_id = 'item-photos');
+
+-- The bucket is public; the URL is embedded in reports and result cards.
+drop policy if exists "Public can view item photos" on storage.objects;
+create policy "Public can view item photos"
+on storage.objects for select to public
+using (bucket_id = 'item-photos');
+
+-- Only authenticated counter staff may remove a photo.
+drop policy if exists "Staff can delete photos" on storage.objects;
+create policy "Staff can delete photos"
+on storage.objects for delete to authenticated
+using (bucket_id = 'item-photos');
