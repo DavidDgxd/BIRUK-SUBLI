@@ -75,7 +75,7 @@ def create_office(data: CreateOfficeRequest):
         office_record = supabase.table("offices").insert({
             "user_id": auth_user.user.id,
             "office_name": data.office_name,
-            "email": data.email
+            
         }).execute()
 
         return {
