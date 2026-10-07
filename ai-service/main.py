@@ -1,18 +1,19 @@
 import io
 import os
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from sentence_transformers import SentenceTransformer
-from PIL import Image
-from pydantic import BaseModel, EmailStr
-from supabase import create_client, Client
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from PIL import Image
+from sentence_transformers import SentenceTransformer
 
+app = FastAPI(
+    title="Biruk Subli AI Inference Engine",
+    description="Stateless CLIP text and image embedding worker",
+    version="1.0.0"
+)
 
-
-app = FastAPI(title="Biruk Subli CLIP Service")
-
-# Allow requests from React dev server (localhost:5173)
+# Enable CORS for local web client communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,72 +22,69 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://vwegcexuyznfsbgzurxa.supabase.co")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3ZWdjZXh1eXpuZnNiZ3p1cnhhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDc1NzAwMiwiZXhwIjoyMTA2MzMzMDAyfQ.W0HmwsnBOv35_wB-2xUUbaRShxP_kwWVVvKEQbYsFEk")
-
-# Initialize the Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-print("Loading CLIP ViT-B-32 model...")
-model = SentenceTransformer("clip-ViT-B-32", device="cpu")
-print("Model loaded successfully.")
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-@app.post("/embed/text")
-async def embed_text(text: str = Form(...)):
-    """Encodes a typed search query into a 512-dim vector"""
-    vector = model.encode(text).tolist()
-    return {"vector": vector}
-
-@app.post("/embed/image")
-async def embed_image(file: UploadFile = File(...)):
-    """Encodes an uploaded photo query or intake photo into a 512-dim vector"""
-    contents = await file.read()
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
-    vector = model.encode(image).tolist()
-    return {"vector": vector}
+# Load CLIP Model (SentenceTransformers implementation of ViT-B/32)
+# Environment variable check without hardcoded credential fallbacks
+MODEL_NAME = os.getenv("CLIP_MODEL_NAME", "clip-ViT-B-32")
+try:
+    model = SentenceTransformer(MODEL_NAME)
+except Exception as err:
+    raise RuntimeError(f"Failed to load CLIP model '{MODEL_NAME}': {str(err)}")
 
 
-# US-01: Provision and Office Login
-# Pydantic schema for the request
-class CreateOfficeRequest(BaseModel):
-    office_name: str
-    email: EmailStr
-    password: str
+class TextEmbeddingRequest(BaseModel):
+    text: str
 
-# US-1: Central Admin Provisioning Endpoint
-@app.post("/admin/create-office")
-def create_office(data: CreateOfficeRequest):
-    try:
-        # 1. Create account in Supabase Auth
-        auth_user = supabase.auth.admin.create_user({
-            "email": data.email,
-            "password": data.password,
-            "email_confirm": True,
-            "user_metadata": {
-                "role": "office",
-                "office_name": data.office_name
-            }
-        })
 
-        # 2. Add record to 'offices' table
-        office_record = supabase.table("offices").insert({
-            "user_id": auth_user.user.id,
-            "office_name": data.office_name
-        }).execute()
+class EmbeddingResponse(BaseModel):
+    embedding: list[float]
+    dimension: int
 
-        return {
-            "status": "success",
-            "message": f"Account for '{data.office_name}' created successfully!",
-            "data": office_record.data
-        }
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def root():
+    """Redirect root traffic directly to interactive Swagger API docs."""
     return RedirectResponse(url="/docs")
+
+
+@app.get("/health", tags=["Health"])
+def health_check():
+    """Health check endpoint to confirm AI service status."""
+    return {
+        "status": "online",
+        "service": "ai-service",
+        "model": MODEL_NAME
+    }
+
+
+@app.post("/embed/text", response_model=EmbeddingResponse, tags=["Embeddings"])
+def embed_text(payload: TextEmbeddingRequest):
+    """Generates a 512-dimensional vector embedding for text descriptions."""
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Text input cannot be empty.")
+
+    try:
+        vector = model.encode(payload.text).tolist()
+        return EmbeddingResponse(
+            embedding=vector,
+            dimension=len(vector)
+        )
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Text embedding generation failed: {str(err)}")
+
+
+@app.post("/embed/image", response_model=EmbeddingResponse, tags=["Embeddings"])
+async def embed_image(file: UploadFile = File(...)):
+    """Generates a 512-dimensional vector embedding for uploaded item photos."""
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File uploaded must be a valid image.")
+
+    try:
+        image_bytes = await file.read()
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        vector = model.encode(image).tolist()
+        return EmbeddingResponse(
+            embedding=vector,
+            dimension=len(vector)
+        )
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Image processing failed: {str(err)}")
