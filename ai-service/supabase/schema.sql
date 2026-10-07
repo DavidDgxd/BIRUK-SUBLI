@@ -126,11 +126,15 @@ create table if not exists public.found_reports (
     found_location text not null,
     found_date date not null,
     finder_contact text,                               -- Optional citizen phone or email
+    embedding vector(512),                             -- Optional note/location/photo vector for reverse matching
     status text not null default 'pending' check (
         status in ('pending', 'converted_at_intake', 'no_show')
     ),
     created_at timestamptz default timezone('utc'::text, now()) not null
 );
+
+create index if not exists found_reports_embedding_hnsw_idx
+on public.found_reports using hnsw (embedding vector_cosine_ops);
 
 create index if not exists found_reports_status_idx on public.found_reports (status);
 
@@ -492,3 +496,64 @@ $$;
 
 revoke all on function public.submit_lost_report(text, text, date, text, text, vector) from public;
 grant execute on function public.submit_lost_report(text, text, date, text, text, vector) to anon, authenticated;
+
+
+-- ============================================================================
+-- 13. PUBLIC FOUND-REPORT SUBMISSION RPC
+--
+-- Mirrors submit_lost_report for the same reason: found_reports has an INSERT
+-- policy for `anon` but no SELECT policy (finder_contact is staff-visible PII),
+-- so PostgREST cannot return the inserted row and an anonymous client can never
+-- read back the generated ref_code. This SECURITY DEFINER function inserts and
+-- returns only that code. image_url is required — the finder's photo is uploaded
+-- to the item-photos bucket first and stored with the report.
+-- ============================================================================
+create or replace function public.submit_found_report(
+    p_short_note     text,
+    p_found_location text,
+    p_found_date     date,
+    p_image_url      text,
+    p_finder_contact text default null,
+    p_embedding      vector(512) default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code text;
+begin
+    if p_short_note is null or btrim(p_short_note) = '' then
+        raise exception 'A short note is required.' using errcode = '22023';
+    end if;
+    if p_found_location is null or btrim(p_found_location) = '' then
+        raise exception 'A found location is required.' using errcode = '22023';
+    end if;
+    if p_found_date is null then
+        raise exception 'A date is required.' using errcode = '22023';
+    end if;
+    if p_found_date > current_date then
+        raise exception 'The date cannot be in the future.' using errcode = '22023';
+    end if;
+    if p_image_url is null or btrim(p_image_url) = '' then
+        raise exception 'A photo is required.' using errcode = '22023';
+    end if;
+
+    insert into public.found_reports
+        (short_note, found_location, found_date, image_url, finder_contact, embedding)
+    values
+        (btrim(p_short_note),
+         btrim(p_found_location),
+         p_found_date,
+         btrim(p_image_url),
+         nullif(btrim(coalesce(p_finder_contact, '')), ''),
+         p_embedding)
+    returning ref_code into v_ref_code;
+
+    return v_ref_code;
+end;
+$$;
+
+revoke all on function public.submit_found_report(text, text, date, text, text, vector) from public;
+grant execute on function public.submit_found_report(text, text, date, text, text, vector) to anon, authenticated;

@@ -5,7 +5,7 @@ Items are held and released at participating city office counters. The site help
 citizens find where an item is held and report lost or found items. It does not
 support peer-to-peer exchange, in-app messaging, or online claims.
 
-**Status:** landing page, search results and the lost-item report are built. The found-report and staff routes render a placeholder.
+**Status:** landing page, search results, and the lost- and found-item reports are built. The staff routes render a placeholder.
 
 ## Getting started
 
@@ -87,7 +87,7 @@ and no-query states.
 | `/` | Landing page (built) |
 | `/search` | Search results (built) |
 | `/report/lost` | Lost-item report form (built) |
-| `/report/found` | Placeholder |
+| `/report/found` | Found-item report form (built) |
 | `/staff/login` | Placeholder |
 | `*` | Not-found placeholder |
 
@@ -116,9 +116,29 @@ row, so a plain insert can never hand back the `ref_code`. The SECURITY DEFINER
 function inserts and returns only that code.
 
 The photo is used for matching only — it is never uploaded and `image_url` is
-inserted as null, because there is still no Storage bucket. If the photo cannot
-be embedded within 8 seconds, the report is filed on text alone rather than
-failing.
+inserted as null. If the photo cannot be embedded within 8 seconds, the report is
+filed on text alone rather than failing.
+
+## Found-item reports (`/report/found`)
+
+`FoundReportForm` submits through `src/lib/foundReport.js`. Unlike a lost report,
+the photo is **required and stored**: `src/lib/storage.js` re-encodes it to WebP
+(downscaling until it fits) and uploads it to the public `item-photos` bucket,
+which accepts WebP only, up to 2 MB. The bucket already has an `anon` INSERT
+policy and a public SELECT policy, so no account is needed and the resulting
+public URL is stored on the report.
+
+The note and found location, plus the photo, are embedded concurrently with
+`Promise.all`; the 512-dim vectors are averaged with `combineEmbeddings` and
+stored in `found_reports.embedding`, so a find can later be reverse-matched
+against open lost reports. The row is written through the `submit_found_report`
+RPC, which exists for the same reason as `submit_lost_report`: anon can INSERT but
+cannot SELECT (`finder_contact` is PII), so a plain insert could not return the
+`ref_code`. If the photo cannot be embedded within 8 seconds the report is still
+filed and the photo still stored — it simply matches on text alone.
+
+`found_reports.embedding` is nullable, so rows logged by hand without a vector
+remain valid.
 
 ## Notes
 
