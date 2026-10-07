@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 from PIL import Image
 from pydantic import BaseModel, EmailStr
 from supabase import create_client, Client
+from fastapi.responses import RedirectResponse
 
 
 
@@ -85,3 +86,7 @@ def create_office(data: CreateOfficeRequest):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/docs")
