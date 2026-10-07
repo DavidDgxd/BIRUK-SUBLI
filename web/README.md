@@ -5,7 +5,7 @@ Items are held and released at participating city office counters. The site help
 citizens find where an item is held and report lost or found items. It does not
 support peer-to-peer exchange, in-app messaging, or online claims.
 
-**Status:** landing page and search results are built. The report and staff routes render a placeholder.
+**Status:** landing page, search results and the lost-item report are built. The found-report and staff routes render a placeholder.
 
 ## Getting started
 
@@ -86,7 +86,7 @@ and no-query states.
 |---|---|
 | `/` | Landing page (built) |
 | `/search` | Search results (built) |
-| `/report/lost` | Placeholder |
+| `/report/lost` | Lost-item report form (built) |
 | `/report/found` | Placeholder |
 | `/staff/login` | Placeholder |
 | `*` | Not-found placeholder |
@@ -101,6 +101,24 @@ and no-query states.
   lost on a hard reload, so the results page should handle it being absent.
 
 A search needs text or a photo. Otherwise the form shows an inline error.
+
+## Lost-item reports (`/report/lost`)
+
+`LostReportForm` submits through `src/lib/lostReport.js`. It embeds the description
+and an optional photo concurrently with `Promise.all`, averages the two 512-dim
+vectors using the same `combineEmbeddings` the search flow uses, then calls the
+`submit_lost_report` RPC and shows the returned `ref_code` as the receipt.
+
+The RPC exists because `lost_reports` has an INSERT policy for `anon` but **no
+SELECT policy** (`contact_info` is staff-visible PII, so an anon SELECT policy
+would leak every report). Without SELECT, PostgREST cannot return the inserted
+row, so a plain insert can never hand back the `ref_code`. The SECURITY DEFINER
+function inserts and returns only that code.
+
+The photo is used for matching only — it is never uploaded and `image_url` is
+inserted as null, because there is still no Storage bucket. If the photo cannot
+be embedded within 8 seconds, the report is filed on text alone rather than
+failing.
 
 ## Notes
 
@@ -123,4 +141,4 @@ A search needs text or a photo. Otherwise the form shows an inline error.
 - [x] Error state (empty search, wrong file type, file too large)
 - [x] Keyboard: skip link, Tab order, Enter to submit, focus returns to the field after Clear
 - [x] Reduced-motion respected
-- [ ] Loading and empty states: belong to the results page, which is not built yet
+- [x] Loading and empty states (results page: skeleton, empty, error with retry, no-query)

@@ -24,10 +24,12 @@ function normalize(vector) {
  * Scales each vector to unit length and averages them, so a text query and a photo
  * count equally. A single vector is returned as is (cosine search ignores its length).
  */
-function combineEmbeddings(vectors) {
+export function combineEmbeddings(vectors) {
   if (vectors.length === 1) return vectors[0];
   const units = vectors.map(normalize);
-  return normalize(units[0].map((_, i) => units.reduce((total, v) => total + v[i], 0)));
+  return normalize(
+    units[0].map((_, i) => units.reduce((total, v) => total + v[i], 0)),
+  );
 }
 
 /**
@@ -39,8 +41,11 @@ function combineEmbeddings(vectors) {
  */
 export async function searchItems({ text, color, photo, signal }) {
   const trimmed = (text ?? '').trim();
-  const needsColor = color && !trimmed.toLowerCase().includes(color.toLowerCase());
-  const queryText = [needsColor ? color : '', trimmed].filter(Boolean).join(' ');
+  const needsColor =
+    color && !trimmed.toLowerCase().includes(color.toLowerCase());
+  const queryText = [needsColor ? color : '', trimmed]
+    .filter(Boolean)
+    .join(' ');
 
   const [textResult, imageResult] = await Promise.all([
     queryText ? embedText(queryText, signal) : null,

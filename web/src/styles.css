@@ -38,7 +38,11 @@
   --tap-target: 48px;
 
   /* Elevation */
-  --shadow-color: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent);
+  --shadow-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) 14%,
+    transparent
+  );
   --shadow-1: 0 1px 3px var(--shadow-color);
   --shadow-2: 0 2px 12px var(--shadow-color);
 
@@ -224,7 +228,9 @@ img {
   text-decoration: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--motion-fast), box-shadow var(--motion-fast);
+  transition:
+    background-color var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .btn:hover {
@@ -243,12 +249,20 @@ img {
 }
 
 .btn--filled:hover {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 92%, var(--md-sys-color-on-primary));
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-primary) 92%,
+    var(--md-sys-color-on-primary)
+  );
   box-shadow: var(--shadow-2);
 }
 
 .btn--filled:active {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 86%, var(--md-sys-color-on-primary));
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-primary) 86%,
+    var(--md-sys-color-on-primary)
+  );
 }
 
 .btn--tonal {
@@ -257,11 +271,21 @@ img {
 }
 
 .btn--tonal:hover {
-  background: color-mix(in srgb, var(--md-sys-color-secondary-container) 88%, var(--md-sys-color-on-secondary-container));
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-secondary-container) 88%,
+    var(--md-sys-color-on-secondary-container)
+  );
 }
 
 .btn--block {
   width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
 }
 
 .btn__label {
@@ -524,7 +548,11 @@ img {
 }
 
 .chip:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) 8%,
+    transparent
+  );
 }
 
 .chip[aria-pressed='true'] {
@@ -588,7 +616,9 @@ img {
   padding: var(--space-3) var(--space-2) var(--space-2);
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container-lowest);
-  box-shadow: var(--shadow-2), 0 0 0 1px var(--md-sys-color-outline-variant);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 1px var(--md-sys-color-outline-variant);
 }
 
 .report-card__top {
@@ -859,7 +889,9 @@ img {
   overflow: hidden;
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container-lowest);
-  box-shadow: var(--shadow-2), 0 0 0 1px var(--md-sys-color-outline-variant);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 1px var(--md-sys-color-outline-variant);
 }
 
 .result-card__media {
@@ -989,7 +1021,9 @@ img {
   padding: var(--space-3) var(--space-2);
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container-lowest);
-  box-shadow: var(--shadow-1), 0 0 0 1px var(--md-sys-color-outline-variant);
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 1px var(--md-sys-color-outline-variant);
 }
 
 .state-card--error {
@@ -1029,6 +1063,137 @@ img {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1-5);
+}
+
+/* ======================= 13. Lost report form ======================= */
+.report-page {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-2);
+  padding-top: clamp(64px, 12vw, 96px);
+  padding-bottom: var(--space-5);
+}
+
+.report-page__lead {
+  max-width: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-lg);
+}
+
+.report-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  max-width: 640px;
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--md-sys-color-surface-container-lowest);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 1px var(--md-sys-color-outline-variant);
+}
+
+.field {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+.field__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--type-title-sm);
+  font-weight: 600;
+}
+
+.field__optional {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-label);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field__control {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: var(--type-body-lg);
+}
+
+.field__control::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.field__control:focus-visible {
+  border-color: var(--md-sys-color-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+}
+
+.field__control[aria-invalid='true'] {
+  border-color: var(--md-sys-color-error);
+  box-shadow: 0 0 0 1px var(--md-sys-color-error);
+}
+
+.field__control--area {
+  min-height: 120px;
+  padding-top: var(--space-1-5);
+  resize: vertical;
+}
+
+.field__hint {
+  max-width: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.report-form__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-1-5);
+}
+
+/* The reference code is the one thing a citizen must keep, so it stays legible
+   and selects in one gesture when tapped. */
+.receipt {
+  padding: var(--space-1-5) var(--space-3);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--type-title-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  user-select: all;
+}
+
+.state-card--success {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: none;
+}
+
+.state-card--success .state-card__title,
+.state-card--success .state-card__text {
+  color: inherit;
+}
+
+.state-card--success .receipt {
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-on-primary-container) 12%,
+    transparent
+  );
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

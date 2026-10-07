@@ -431,3 +431,64 @@ on public.lost_reports for all to authenticated using (true);
 -- Dismissed Matches: Authenticated counter staff only
 create policy "Staff can manage dismissed matches" 
 on public.dismissed_matches for all to authenticated using (true);
+
+
+-- ============================================================================
+-- 10. PUBLIC LOST-REPORT SUBMISSION RPC
+--
+-- Why this exists: lost_reports has an INSERT policy for `anon` but no SELECT
+-- policy (contact_info is staff-visible PII, so an anon SELECT policy would
+-- leak every report). Without SELECT, PostgREST cannot return the inserted
+-- row, so an anonymous client can never read back the generated ref_code.
+-- This SECURITY DEFINER function inserts and returns only the ref_code, so a
+-- citizen gets a receipt without any row-level read access.
+-- ============================================================================
+create or replace function public.submit_lost_report(
+    p_description  text,
+    p_area_route   text,
+    p_date_lost    date,
+    p_contact_info text default null,
+    p_image_url    text default null,
+    p_embedding    vector(512) default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code text;
+begin
+    if p_description is null or btrim(p_description) = '' then
+        raise exception 'A description is required.' using errcode = '22023';
+    end if;
+    if p_area_route is null or btrim(p_area_route) = '' then
+        raise exception 'An area or route is required.' using errcode = '22023';
+    end if;
+    if p_date_lost is null then
+        raise exception 'A date is required.' using errcode = '22023';
+    end if;
+    if p_date_lost > current_date then
+        raise exception 'The date cannot be in the future.' using errcode = '22023';
+    end if;
+    if p_embedding is null then
+        raise exception 'An embedding is required.' using errcode = '22023';
+    end if;
+
+    insert into public.lost_reports
+        (description, area_route, date_lost, contact_info, image_url, embedding)
+    values
+        (btrim(p_description),
+         btrim(p_area_route),
+         p_date_lost,
+         nullif(btrim(coalesce(p_contact_info, '')), ''),
+         nullif(btrim(coalesce(p_image_url, '')), ''),
+         p_embedding)
+    returning ref_code into v_ref_code;
+
+    return v_ref_code;
+end;
+$$;
+
+revoke all on function public.submit_lost_report(text, text, date, text, text, vector) from public;
+grant execute on function public.submit_lost_report(text, text, date, text, text, vector) to anon, authenticated;
