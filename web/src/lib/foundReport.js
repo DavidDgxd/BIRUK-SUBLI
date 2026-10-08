@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { embedImage, embedText, SearchError } from './aiService.js';
+import { embedImageOrNull, embedText, SearchError } from './aiService.js';
 import { combineEmbeddings } from './searchItems.js';
 import { uploadItemImage } from './storage.js';
 
@@ -21,53 +21,13 @@ import { uploadItemImage } from './storage.js';
  * generated ref_code. The RPC is SECURITY DEFINER and returns only that code.
  */
 
-/** A photo embedding is best-effort and must not hold a submission open forever. */
-const IMAGE_TIMEOUT_MS = 8000;
-
-/**
- * Embeds the photo, or resolves to null if that fails.
- *
- * The photo itself is still uploaded and stored — this only governs whether it
- * also contributes to the matching vector. Any photo-side problem (unreachable
- * service, bad response, timeout) drops the report back to matching on text
- * alone rather than blocking the finder. A genuine cancel propagates instead.
- */
-async function embedPhotoOrNull(file, signal) {
-  const controller = new AbortController();
-  const timer = setTimeout(
-    () =>
-      controller.abort(
-        new DOMException('Photo embedding timed out', 'TimeoutError'),
-      ),
-    IMAGE_TIMEOUT_MS,
-  );
-  const forwardAbort = () => controller.abort(signal?.reason);
-  if (signal) {
-    if (signal.aborted) controller.abort(signal.reason);
-    else signal.addEventListener('abort', forwardAbort, { once: true });
-  }
-
-  try {
-    const { embedding } = await embedImage(file, controller.signal);
-    return embedding;
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[foundReport] photo embedding failed, matching on text only:',
-        error.message,
-      );
-    }
-    return null;
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener('abort', forwardAbort);
-  }
-}
-
 /**
  * Uploads the photo, embeds the note/location and photo concurrently, averages
  * the vectors, and stores the report.
+ *
+ * The photo is embedded best-effort (see embedImageOrNull in aiService): the
+ * photo is still uploaded and stored either way, but if it cannot be read for
+ * matching the report falls back to the note/location text alone.
  *
  * Resolves to { refCode, imageUrl, usedPhoto }. Throws SearchError with code
  * 'ai-unreachable' | 'ai-failed' | 'ai-bad-response' | 'db', or a StorageError
@@ -87,7 +47,7 @@ export async function submitFoundReport({
   const [imageUrl, textResult, photoEmbedding] = await Promise.all([
     uploadItemImage(photo, signal),
     embedText(`${note} ${location}`, signal),
-    embedPhotoOrNull(photo, signal),
+    embedImageOrNull(photo, signal, { label: 'foundReport' }),
   ]);
 
   const embedding = combineEmbeddings(

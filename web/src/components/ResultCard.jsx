@@ -40,7 +40,18 @@ export default function ResultCard({ item }) {
           {import.meta.env.DEV &&
             ` · score ${item.similarity.toFixed(3)} (dev only)`}
         </p>
-        <p className="result-card__desc">{item.description}</p>
+        <p className="result-card__category">
+          <Icon name="category" />
+          {item.category}
+        </p>
+
+        <p className="result-card__verify">
+          <Icon name="verified_user" />
+          <span>
+            Verification required at the desk: bring a valid ID and be ready to
+            describe unique marks, serial numbers, or condition.
+          </span>
+        </p>
 
         <div className="result-card__office">
           <p className="result-card__office-name">
@@ -57,9 +68,6 @@ export default function ResultCard({ item }) {
           <p className="result-card__office-line">
             <Icon name="schedule" />
             <span>{item.counter_hours}</span>
-          </p>
-          <p className="result-card__claim">
-            Claim in person. Bring a valid ID and be ready to describe the item.
           </p>
         </div>
       </div>

@@ -138,27 +138,30 @@ export async function prepareItemImage(file, signal) {
   );
 }
 
-function storagePath() {
+function storagePath(prefix) {
   const id =
     globalThis.crypto?.randomUUID?.() ??
     `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `found-reports/${id}.webp`;
+  return `${prefix}/${id}.webp`;
 }
 
 /**
  * Converts the photo to WebP and uploads it, resolving to its public URL.
  *
+ * `prefix` namespaces the object inside the bucket — reports and staff intake
+ * keep their own folders so they can be told apart and listed separately.
+ *
  * Throws StorageError with code 'image-convert' or 'image-upload', or the
  * signal's abort reason if the caller cancels. Storage uploads cannot be
  * aborted mid-flight, so the signal is checked before and after.
  */
-export async function uploadItemImage(file, signal) {
+export async function uploadItemImage(file, signal, prefix = 'found-reports') {
   throwIfAborted(signal);
 
   const blob = await prepareItemImage(file, signal);
   throwIfAborted(signal);
 
-  const path = storagePath();
+  const path = storagePath(prefix);
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     contentType: 'image/webp',
     cacheControl: '31536000',
