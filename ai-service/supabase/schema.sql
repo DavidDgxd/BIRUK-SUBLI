@@ -56,6 +56,10 @@ create table if not exists public.items (
     image_url text,
     date_received date not null default current_date,
 
+    -- Physical slot the item sits in at the holding counter (e.g. "Locker 2,
+    -- Bin B"). Staff-internal: deliberately not returned by match_items.
+    storage_location text,
+
     -- Multi-Office Custody Relationships:
     -- holding_office_id represents where the item is physically stored right now.
     -- logging_office_id records the original intake location for tracking history.
@@ -600,3 +604,124 @@ drop policy if exists "Staff can delete photos" on storage.objects;
 create policy "Staff can delete photos"
 on storage.objects for delete to authenticated
 using (bucket_id = 'item-photos');
+
+
+-- ============================================================================
+-- 15. STAFF CUSTODY INTAKE RPC
+--
+-- The counter page (web/src/pages/StaffIntake.jsx) calls this once the intake
+-- photo is in the item-photos bucket and the title/category/description has
+-- been embedded. It opens the custody record as 'held' — the status is not a
+-- parameter — and stamps the office as both the current holder and the logging
+-- desk. Returns the generated ref_code, which the counter quotes as the
+-- custody receipt reference.
+--
+-- Cash is the one category with a statutory rule: the trigger
+-- calculate_cash_reward_date() sets reward_date to receipt date + 6 months
+-- whenever is_cash is true, so a 'Cash' category is normalised and flagged here.
+-- ============================================================================
+create or replace function public.submit_staff_custody(
+    p_office_id        text,
+    p_title            text,
+    p_description      text,
+    p_storage_location text,
+    p_image_url        text,
+    p_category         text default 'General',
+    p_embedding        vector(512) default null,
+    p_date_received    date default current_date,
+    p_cash_amount      numeric default null,
+    p_finder_name      text default null,
+    p_finder_contact   text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code text;
+    v_category text;
+    v_is_cash  boolean := false;
+    v_amount   numeric(10, 2) := 0.00;
+begin
+    if p_office_id is null or btrim(p_office_id) = '' then
+        raise exception 'An intake office is required.' using errcode = '22023';
+    end if;
+    if not exists (
+        select 1 from public.offices
+        where id = p_office_id and status = 'active'
+    ) then
+        raise exception 'Unknown or inactive office: %', p_office_id
+            using errcode = '22023';
+    end if;
+    if p_title is null or btrim(p_title) = '' then
+        raise exception 'An item title is required.' using errcode = '22023';
+    end if;
+    if p_description is null or btrim(p_description) = '' then
+        raise exception 'A description is required.' using errcode = '22023';
+    end if;
+    if p_storage_location is null or btrim(p_storage_location) = '' then
+        raise exception 'A storage location is required.' using errcode = '22023';
+    end if;
+    if p_image_url is null or btrim(p_image_url) = '' then
+        raise exception 'A photo is required.' using errcode = '22023';
+    end if;
+    if p_date_received is null then
+        raise exception 'A receipt date is required.' using errcode = '22023';
+    end if;
+    if p_date_received > current_date then
+        raise exception 'The receipt date cannot be in the future.'
+            using errcode = '22023';
+    end if;
+
+    v_category := coalesce(nullif(btrim(p_category), ''), 'General');
+    if lower(v_category) = 'cash' then
+        v_is_cash := true;
+        v_category := 'Cash';
+        v_amount := coalesce(p_cash_amount, 0.00);
+        if v_amount < 0 then
+            raise exception 'A cash amount cannot be negative.'
+                using errcode = '22023';
+        end if;
+    end if;
+
+    insert into public.items (
+        title, description, category, status,
+        image_url, date_received,
+        holding_office_id, logging_office_id,
+        storage_location, embedding,
+        is_cash, cash_amount, finder_name, finder_contact
+    ) values (
+        btrim(p_title),
+        btrim(p_description),
+        v_category,
+        'held',                                   -- intake always opens as held
+        btrim(p_image_url),
+        p_date_received,
+        p_office_id,                              -- holds it now
+        p_office_id,                              -- took it in
+        btrim(p_storage_location),
+        p_embedding,
+        v_is_cash,
+        v_amount,
+        nullif(btrim(coalesce(p_finder_name, '')), ''),
+        nullif(btrim(coalesce(p_finder_contact, '')), '')
+    )
+    returning ref_code into v_ref_code;
+
+    return v_ref_code;
+end;
+$$;
+
+revoke all on function public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text
+) from public;
+
+-- TEMPORARY (dev mock auth): the web client runs on the anon key because real
+-- Supabase Auth / staff provisioning is not wired up yet (see
+-- web/src/context/StaffAuthContext.jsx). This grant is what lets that mock
+-- session log intake. Revoke the `anon` grant and keep only `authenticated`
+-- once the staff provider signs in for real.
+grant execute on function public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text
+) to anon, authenticated;
