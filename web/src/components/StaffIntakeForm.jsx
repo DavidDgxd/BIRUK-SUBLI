@@ -646,6 +646,14 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           the item, and so it contributes to matching. Avoid photographing
           people or personal details.
         </p>
+        <p className="photo-tip">
+          <Icon name="lightbulb" />
+          <span>
+            Tip: Photograph the item as a whole. Avoid photographing private
+            identifiers like ID cards, serial number stickers, or passcode
+            screens.
+          </span>
+        </p>
       </div>
 
       {photo && (

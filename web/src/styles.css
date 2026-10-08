@@ -1372,3 +1372,21 @@ img {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Photo guidance shown under the intake upload control. */
+.photo-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  max-width: 60ch;
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.photo-tip .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
