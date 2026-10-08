@@ -947,11 +947,24 @@ img {
   flex: none;
   padding: var(--space-0-5) var(--space-1-5);
   border-radius: var(--radius-pill);
-  background: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
   font-size: var(--type-label);
   font-weight: 500;
   white-space: nowrap;
+}
+
+.result-card__badge--strong {
+  background: var(--bs-match-strong-container);
+  color: var(--bs-match-strong-on-container);
+}
+
+.result-card__badge--moderate {
+  background: var(--bs-match-moderate-container);
+  color: var(--bs-match-moderate-on-container);
+}
+
+.result-card__badge--weak {
+  background: var(--bs-match-weak-container);
+  color: var(--bs-match-weak-on-container);
 }
 
 .result-card__ref {

@@ -3,17 +3,41 @@ import { embedImage, embedText, SearchError } from './aiService.js';
 
 // Cosine similarity floor and page size passed to match_items.
 //
-// These numbers only make sense for text-to-PHOTO search: CLIP scores a text query
-// against an item photo at roughly 0.20 to 0.35. Text-to-text scores run much higher
-// (0.5 to 0.8 even for unrelated phrases), so items seeded from text alone, without
-// --image, will look like strong matches for everything. Tune against photo-based items.
-// In `npm run dev` each result card shows its raw score to help with this.
-export const MATCH_THRESHOLD = 0.2;
+// Scores are tightly compressed in this setup: an unrelated item (a wallet,
+// for a bottle query) sits below 0.24, a semantic synonym ("flask") lands near
+// 0.255, and a near-exact text match tops out around 0.29-0.30. The floor is
+// therefore 0.24 — anything below it is noise — and calibrateMatchScore()
+// stretches [0.24, 0.30] across the badge range so the percentage is meaningful
+// instead of a flat 24-30%.
+export const MATCH_THRESHOLD = 0.24;
 export const MATCH_COUNT = 12;
 
-// Score cutoffs for the labels on result cards.
-export const STRONG_MATCH = 0.3;
-export const GOOD_MATCH = 0.25;
+/**
+ * Stretches the compressed raw similarity range [0.24, 0.30] onto [65%, 98%]
+ * and picks the badge tier from the rounded percentage, so a synonym and a
+ * near-exact match read as clearly different rather than both showing "25%".
+ *
+ *   0.24  -> 65%   (weak; the MATCH_THRESHOLD floor)
+ *   0.255 -> 73%
+ *   0.29  -> 93%
+ *   0.30+ -> 98%   (strong)
+ */
+export function calibrateMatchScore(similarity) {
+  const MIN_SCORE = 0.24;
+  const MAX_SCORE = 0.3;
+
+  const clamped = Math.min(Math.max(similarity, MIN_SCORE), MAX_SCORE);
+  const normalized = (clamped - MIN_SCORE) / (MAX_SCORE - MIN_SCORE);
+
+  // Maps 0.24 -> 65%, 0.255 -> 73%, 0.29 -> 93%, 0.30 -> 98%.
+  const percent = Math.round(65 + normalized * 33);
+
+  let tier = 'weak';
+  if (percent >= 85) tier = 'strong';
+  else if (percent >= 70) tier = 'moderate';
+
+  return { percent, tier };
+}
 
 function normalize(vector) {
   const norm = Math.sqrt(vector.reduce((total, x) => total + x * x, 0)) || 1;
@@ -66,8 +90,14 @@ export async function searchItems({ text, color, photo, signal }) {
 
   if (error) throw new SearchError('db', error.message);
 
+  // The RPC already applies the floor; re-checking here keeps the guarantee
+  // even if an older match_items is still deployed.
+  const items = (data ?? []).filter(
+    (item) => item.similarity >= MATCH_THRESHOLD,
+  );
+
   return {
-    items: data ?? [],
+    items,
     queryText,
     translatedText: textResult?.translatedText ?? null,
   };
