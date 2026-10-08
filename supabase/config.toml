@@ -1,0 +1,10 @@
+# Supabase CLI configuration.
+#
+# project_id is the reference from the project's Supabase URL
+# (https://vwegcexuyznfsbgzurxa.supabase.co). It is public, not a secret.
+project_id = "vwegcexuyznfsbgzurxa"
+
+# provision-office runs with the service_role key (set via `supabase secrets set`),
+# so the anon-invoked function can mint shared office logins and insert offices.
+[functions.provision-office]
+verify_jwt = true

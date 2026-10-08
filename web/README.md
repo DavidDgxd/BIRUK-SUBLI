@@ -88,6 +88,7 @@ and no-query states.
 | `/search` | Search results (built) |
 | `/report/lost` | Lost-item report form (built) |
 | `/report/found` | Found-item report form (built) |
+| `/admin/offices` | Central admin — participating offices & logins (built) |
 | `/staff/login` | Placeholder |
 | `*` | Not-found placeholder |
 
@@ -139,6 +140,27 @@ filed and the photo still stored — it simply matches on text alone.
 
 `found_reports.embedding` is nullable, so rows logged by hand without a vector
 remain valid.
+
+## Office provisioning (`/admin/offices`)
+
+US-01: the central admin creates a participating office and its shared login.
+The page lists `offices` (the table is readable by everyone) and the
+"+ ADD AN OFFICE" dialog submits to the `provision-office` Edge Function, which
+mints the shared Supabase Auth user with the service_role key and inserts the
+`offices` row (`auth_user_id` = the new user). The browser never sees the
+service_role key.
+
+To enable it:
+
+```bash
+supabase functions deploy provision-office --project-ref vwegcexuyznfsbgzurxa
+supabase secrets set SUPABASE_URL=https://vwegcexuyznfsbgzurxa.supabase.co \
+  SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
+```
+
+The function is at `supabase/functions/provision-office/index.ts`. Real
+central-admin authorization is still a TODO (mirroring the dev mock-auth seam in
+`src/context/StaffAuthContext.jsx`).
 
 ## Notes
 
