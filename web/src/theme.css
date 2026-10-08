@@ -66,6 +66,14 @@
   --bs-mist-far: #c9dccf;
   --bs-mist-near: #a9c6b4;
   --bs-pine: #8fb09c;
+  /* Search match-confidence badges: green / amber / slate. M3 has no amber or
+   * neutral-accent container role, so these live here as extension tokens. */
+  --bs-match-strong-container: #b0f1cd;
+  --bs-match-strong-on-container: #002115;
+  --bs-match-moderate-container: #ffe08a;
+  --bs-match-moderate-on-container: #3f2e00;
+  --bs-match-weak-container: #dfe4de;
+  --bs-match-weak-on-container: #3c4540;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -108,5 +116,11 @@
     --bs-mist-far: #24362b;
     --bs-mist-near: #1d2d23;
     --bs-pine: #2f4a3a;
+    --bs-match-strong-container: #0e513a;
+    --bs-match-strong-on-container: #b0f1cd;
+    --bs-match-moderate-container: #6a4e12;
+    --bs-match-moderate-on-container: #ffe08a;
+    --bs-match-weak-container: #363d38;
+    --bs-match-weak-on-container: #c9d2cb;
   }
 }

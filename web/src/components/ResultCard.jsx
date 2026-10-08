@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import Icon from './Icon.jsx';
-import { GOOD_MATCH, STRONG_MATCH } from '../lib/searchItems.js';
-
-// CLIP cosine scores are not percentages, so show a plain-language label instead.
-function matchLabel(similarity) {
-  if (similarity >= STRONG_MATCH) return 'Strong match';
-  if (similarity >= GOOD_MATCH) return 'Good match';
-  return 'Possible match';
-}
+import { calibrateMatchScore } from '../lib/searchItems.js';
 
 export default function ResultCard({ item }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = item.image_url && !imageFailed;
+  const { percent, tier } = calibrateMatchScore(item.similarity);
 
   return (
     <article className="result-card">
@@ -24,7 +18,11 @@ export default function ResultCard({ item }) {
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="result-card__no-photo" role="img" aria-label="No photo available">
+          <div
+            className="result-card__no-photo"
+            role="img"
+            aria-label="No photo available"
+          >
             <Icon name="hide_image" />
           </div>
         )}
@@ -33,11 +31,14 @@ export default function ResultCard({ item }) {
       <div className="result-card__body">
         <div className="result-card__head">
           <h3 className="result-card__title">{item.title}</h3>
-          <span className="result-card__badge">{matchLabel(item.similarity)}</span>
+          <span className={`result-card__badge result-card__badge--${tier}`}>
+            {percent}% Match
+          </span>
         </div>
         <p className="result-card__ref">
           Ref {item.ref_code}
-          {import.meta.env.DEV && ` · score ${item.similarity.toFixed(3)} (dev only)`}
+          {import.meta.env.DEV &&
+            ` · score ${item.similarity.toFixed(3)} (dev only)`}
         </p>
         <p className="result-card__desc">{item.description}</p>
 

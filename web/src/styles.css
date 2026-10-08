@@ -882,6 +882,46 @@ img {
   }
 }
 
+/* Low-confidence alternatives shown when nothing clears the 0.24 cutoff. */
+.results__secondary-note {
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-field);
+  background: var(--bs-match-moderate-container);
+  color: var(--bs-match-moderate-on-container);
+  font-size: var(--type-body-md);
+}
+
+.search-secondary {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-card);
+  background: var(--md-sys-color-surface-container);
+}
+
+.search-secondary__summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  padding: var(--space-2);
+  border-radius: var(--radius-card);
+  font-size: var(--type-title-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.search-secondary__summary:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.search-secondary__caption {
+  padding: 0 var(--space-2) var(--space-2);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-label);
+}
+
+.search-secondary .results__list {
+  padding: 0 var(--space-2) var(--space-2);
+}
+
 .result-card {
   display: flex;
   flex-direction: column;
@@ -947,11 +987,24 @@ img {
   flex: none;
   padding: var(--space-0-5) var(--space-1-5);
   border-radius: var(--radius-pill);
-  background: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
   font-size: var(--type-label);
   font-weight: 500;
   white-space: nowrap;
+}
+
+.result-card__badge--strong {
+  background: var(--bs-match-strong-container);
+  color: var(--bs-match-strong-on-container);
+}
+
+.result-card__badge--moderate {
+  background: var(--bs-match-moderate-container);
+  color: var(--bs-match-moderate-on-container);
+}
+
+.result-card__badge--weak {
+  background: var(--bs-match-weak-container);
+  color: var(--bs-match-weak-on-container);
 }
 
 .result-card__ref {

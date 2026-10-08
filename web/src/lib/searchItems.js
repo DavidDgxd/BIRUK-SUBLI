@@ -1,19 +1,56 @@
 import { supabase } from './supabase.js';
 import { embedImage, embedText, SearchError } from './aiService.js';
 
-// Cosine similarity floor and page size passed to match_items.
+// Score bands passed to match_items, plus the primary/secondary split.
 //
-// These numbers only make sense for text-to-PHOTO search: CLIP scores a text query
-// against an item photo at roughly 0.20 to 0.35. Text-to-text scores run much higher
-// (0.5 to 0.8 even for unrelated phrases), so items seeded from text alone, without
-// --image, will look like strong matches for everything. Tune against photo-based items.
-// In `npm run dev` each result card shows its raw score to help with this.
-export const MATCH_THRESHOLD = 0.2;
-export const MATCH_COUNT = 12;
+// Scores are tightly compressed in this setup: an unrelated item (a wallet,
+// for a bottle query) sits below 0.24, a semantic synonym ("flask") lands near
+// 0.255, and a near-exact text match tops out around 0.29-0.30. So 0.24 is the
+// confidence cutoff between results we show up front and the low-confidence
+// "other possible matches" drawer, and 0.18 is how far below that we reach to
+// fill the drawer. calibrateMatchScore() maps both bands onto readable
+// percentages so nothing shows a flat "25%".
+export const MATCH_THRESHOLD = 0.18;
+export const PRIMARY_THRESHOLD = 0.24;
+export const MATCH_COUNT = 15;
 
-// Score cutoffs for the labels on result cards.
-export const STRONG_MATCH = 0.3;
-export const GOOD_MATCH = 0.25;
+/**
+ * Turns a raw cosine similarity into the percentage shown on a result card and
+ * the tier that colours it.
+ *
+ * Confident band, [0.24, 0.30] -> [65%, 98%]:
+ *   0.24  -> 65%   (weak)
+ *   0.255 -> 73%   (moderate)
+ *   0.29  -> 93%   (strong)
+ *   0.30+ -> 98%   (strong)
+ *
+ * Low-confidence band, [0.18, 0.24) -> [40%, 64%], always 'weak':
+ *   0.18  -> 40%
+ *   0.21  -> 52%
+ *   0.239 -> 64%
+ */
+export function calibrateMatchScore(similarity) {
+  const CONFIDENT_MIN = 0.24;
+  const CONFIDENT_MAX = 0.3;
+  const LOW_MIN = 0.18;
+
+  if (similarity < CONFIDENT_MIN) {
+    const low = Math.min(Math.max(similarity, LOW_MIN), CONFIDENT_MIN);
+    const normalized = (low - LOW_MIN) / (CONFIDENT_MIN - LOW_MIN);
+    return { percent: Math.round(40 + normalized * 24), tier: 'weak' };
+  }
+
+  const clamped = Math.min(similarity, CONFIDENT_MAX);
+  const normalized =
+    (clamped - CONFIDENT_MIN) / (CONFIDENT_MAX - CONFIDENT_MIN);
+  const percent = Math.round(65 + normalized * 33);
+
+  let tier = 'weak';
+  if (percent >= 85) tier = 'strong';
+  else if (percent >= 70) tier = 'moderate';
+
+  return { percent, tier };
+}
 
 function normalize(vector) {
   const norm = Math.sqrt(vector.reduce((total, x) => total + x * x, 0)) || 1;
@@ -37,7 +74,10 @@ export function combineEmbeddings(vectors) {
  * the match_items RPC. The color filter is added to the text so it is embedded
  * with the rest of the description.
  *
- * Resolves to { items, queryText, translatedText }.
+ * Resolves to { primary, secondary, all, queryText, translatedText }, where
+ * primary holds the confident matches and secondary the low-confidence ones
+ * kept for the "other possible matches" drawer. Both keep the RPC's descending
+ * score order.
  */
 export async function searchItems({ text, color, photo, signal }) {
   const trimmed = (text ?? '').trim();
@@ -66,8 +106,14 @@ export async function searchItems({ text, color, photo, signal }) {
 
   if (error) throw new SearchError('db', error.message);
 
+  // The RPC already applies the floor; re-checking here keeps the guarantee
+  // even if an older match_items is still deployed.
+  const all = (data ?? []).filter((item) => item.similarity >= MATCH_THRESHOLD);
+
   return {
-    items: data ?? [],
+    primary: all.filter((item) => item.similarity >= PRIMARY_THRESHOLD),
+    secondary: all.filter((item) => item.similarity < PRIMARY_THRESHOLD),
+    all,
     queryText,
     translatedText: textResult?.translatedText ?? null,
   };

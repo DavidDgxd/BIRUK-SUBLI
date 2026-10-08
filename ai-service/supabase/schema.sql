@@ -179,11 +179,18 @@ create table if not exists public.dismissed_matches (
 -- 6. RPC: CITIZEN VECTOR SEARCH
 -- Computes cosine similarity between a user query vector and held inventory.
 -- Joins with offices to provide physical counter details and supports metadata filters.
+--
+-- Similarity in this setup is tightly compressed: unrelated items score below
+-- 0.24, a semantic synonym lands near 0.255 and a near-exact match tops out
+-- around 0.30. The default floor of 0.18 deliberately reaches below the 0.24
+-- noise cutoff so the client can separate confident results from low-confidence
+-- "other possible matches"; callers that only want confident results pass a
+-- higher threshold (the web client passes 0.18 and splits the two bands).
 -- ============================================================================
 create or replace function public.match_items (
     query_embedding vector(512),
-    match_threshold float default 0.20,
-    match_count int default 10,
+    match_threshold float default 0.18,
+    match_count int default 15,
     filter_office text default null,
     date_from date default null
 )
@@ -225,7 +232,8 @@ as $$
         and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
-        and (1 - (items.embedding <=> query_embedding)) > match_threshold
+        -- Hard floor: callers may raise the bar but never drop below 0.18.
+        and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.18)
     order by similarity desc
     limit match_count;
 $$;

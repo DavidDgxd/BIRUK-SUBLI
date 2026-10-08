@@ -9,14 +9,17 @@ import { searchItems } from '../lib/searchItems.js';
 const SKELETON_COUNT = 3;
 
 const ERROR_COPY = {
-  'ai-unreachable': 'Search is temporarily unavailable. Please try again in a moment.',
+  'ai-unreachable':
+    'Search is temporarily unavailable. Please try again in a moment.',
   'ai-failed': 'Search ran into a problem. Please try again.',
   'ai-bad-response': 'Search ran into a problem. Please try again.',
   db: 'We could not load results right now. Please try again.',
 };
 
 function requestKey(q, color, photo, attempt) {
-  return [q, color, photo ? `${photo.name}:${photo.size}` : '', attempt].join('|');
+  return [q, color, photo ? `${photo.name}:${photo.size}` : '', attempt].join(
+    '|',
+  );
 }
 
 export default function SearchResults() {
@@ -48,9 +51,19 @@ export default function SearchResults() {
     return () => controller.abort();
   }, [hasQuery, q, color, photo, attempt]);
 
-  const loading = hasQuery && outcome?.key !== requestKey(q, color, photo, attempt);
+  const loading =
+    hasQuery && outcome?.key !== requestKey(q, color, photo, attempt);
   const error = !loading && outcome?.error;
-  const items = !loading && !error && outcome?.items ? outcome.items : null;
+  const primary =
+    !loading && !error && outcome?.primary ? outcome.primary : null;
+  const secondary =
+    !loading && !error && outcome?.secondary ? outcome.secondary : null;
+  const noMatches =
+    primary && secondary && primary.length === 0 && secondary.length === 0;
+  // Nothing cleared the confidence cutoff, but the drawer has candidates: lead
+  // with the drawer open so the user is not shown an empty page.
+  const onlySecondary =
+    primary && secondary && primary.length === 0 && secondary.length > 0;
 
   // Move focus to the heading when the page opens so screen readers start at the results.
   useEffect(() => {
@@ -103,7 +116,8 @@ export default function SearchResults() {
 
           {translated && (
             <p className="results__translated">
-              Searching for &ldquo;{translated}&rdquo; (translated from your Filipino text).
+              Searching for &ldquo;{translated}&rdquo; (translated from your
+              Filipino text).
             </p>
           )}
 
@@ -111,7 +125,8 @@ export default function SearchResults() {
             <section className="state-card">
               <h3 className="state-card__title">Nothing to search yet</h3>
               <p className="state-card__text">
-                Describe your item or upload a photo to see which office is holding it.
+                Describe your item or upload a photo to see which office is
+                holding it.
               </p>
               <Link className="btn btn--filled" to="/">
                 <Icon name="search" />
@@ -134,8 +149,12 @@ export default function SearchResults() {
           {error && (
             <section className="state-card state-card--error" role="alert">
               <h3 className="state-card__title">Something went wrong</h3>
-              <p className="state-card__text">{ERROR_COPY[error.code] ?? ERROR_COPY.db}</p>
-              {import.meta.env.DEV && <p className="state-card__debug">{error.message}</p>}
+              <p className="state-card__text">
+                {ERROR_COPY[error.code] ?? ERROR_COPY.db}
+              </p>
+              {import.meta.env.DEV && (
+                <p className="state-card__debug">{error.message}</p>
+              )}
               <button
                 type="button"
                 className="btn btn--filled"
@@ -147,13 +166,15 @@ export default function SearchResults() {
             </section>
           )}
 
-          {items && items.length === 0 && (
+          {noMatches && (
             <section className="state-card" role="status">
-              <h3 className="state-card__title">Walang nakita (nothing found)</h3>
+              <h3 className="state-card__title">
+                Walang nakita (nothing found)
+              </h3>
               <p className="state-card__text">
-                No held item matches that yet. Try fewer words, add a color, or upload a photo.
-                New items are logged at the counters every day, and you can report your item
-                so staff can watch for it.
+                No held item matches that yet. Try fewer words, add a color, or
+                upload a photo. New items are logged at the counters every day,
+                and you can report your item so staff can watch for it.
               </p>
               <div className="state-card__actions">
                 <Link className="btn btn--filled" to="/report/lost">
@@ -168,18 +189,46 @@ export default function SearchResults() {
             </section>
           )}
 
-          {items && items.length > 0 && (
+          {primary && primary.length > 0 && (
             <>
               <p className="results__count" role="status">
-                {items.length} possible {items.length === 1 ? 'match' : 'matches'}, best first
+                {primary.length} possible{' '}
+                {primary.length === 1 ? 'match' : 'matches'}, best first
               </p>
               <ul className="results__list">
-                {items.map((item) => (
+                {primary.map((item) => (
                   <li key={item.id}>
                     <ResultCard item={item} />
                   </li>
                 ))}
               </ul>
+            </>
+          )}
+
+          {secondary && secondary.length > 0 && (
+            <>
+              {onlySecondary && (
+                <p className="results__secondary-note" role="status">
+                  No direct matches found. Showing lower-confidence
+                  possibilities:
+                </p>
+              )}
+              <details className="search-secondary" open={onlySecondary}>
+                <summary className="search-secondary__summary">
+                  Other possible matches ({secondary.length})
+                </summary>
+                <p className="search-secondary__caption">
+                  These items had lower similarity scores to your query but
+                  might still be relevant.
+                </p>
+                <ul className="results__list">
+                  {secondary.map((item) => (
+                    <li key={item.id}>
+                      <ResultCard item={item} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </>
           )}
         </main>
