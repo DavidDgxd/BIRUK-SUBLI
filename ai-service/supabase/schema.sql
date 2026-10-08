@@ -126,11 +126,15 @@ create table if not exists public.found_reports (
     found_location text not null,
     found_date date not null,
     finder_contact text,                               -- Optional citizen phone or email
+    embedding vector(512),                             -- Optional note/location/photo vector for reverse matching
     status text not null default 'pending' check (
         status in ('pending', 'converted_at_intake', 'no_show')
     ),
     created_at timestamptz default timezone('utc'::text, now()) not null
 );
+
+create index if not exists found_reports_embedding_hnsw_idx
+on public.found_reports using hnsw (embedding vector_cosine_ops);
 
 create index if not exists found_reports_status_idx on public.found_reports (status);
 
@@ -431,3 +435,160 @@ on public.lost_reports for all to authenticated using (true);
 -- Dismissed Matches: Authenticated counter staff only
 create policy "Staff can manage dismissed matches" 
 on public.dismissed_matches for all to authenticated using (true);
+
+
+-- ============================================================================
+-- 10. PUBLIC LOST-REPORT SUBMISSION RPC
+--
+-- Why this exists: lost_reports has an INSERT policy for `anon` but no SELECT
+-- policy (contact_info is staff-visible PII, so an anon SELECT policy would
+-- leak every report). Without SELECT, PostgREST cannot return the inserted
+-- row, so an anonymous client can never read back the generated ref_code.
+-- This SECURITY DEFINER function inserts and returns only the ref_code, so a
+-- citizen gets a receipt without any row-level read access.
+-- ============================================================================
+create or replace function public.submit_lost_report(
+    p_description  text,
+    p_area_route   text,
+    p_date_lost    date,
+    p_contact_info text default null,
+    p_image_url    text default null,
+    p_embedding    vector(512) default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code text;
+begin
+    if p_description is null or btrim(p_description) = '' then
+        raise exception 'A description is required.' using errcode = '22023';
+    end if;
+    if p_area_route is null or btrim(p_area_route) = '' then
+        raise exception 'An area or route is required.' using errcode = '22023';
+    end if;
+    if p_date_lost is null then
+        raise exception 'A date is required.' using errcode = '22023';
+    end if;
+    if p_date_lost > current_date then
+        raise exception 'The date cannot be in the future.' using errcode = '22023';
+    end if;
+    if p_embedding is null then
+        raise exception 'An embedding is required.' using errcode = '22023';
+    end if;
+
+    insert into public.lost_reports
+        (description, area_route, date_lost, contact_info, image_url, embedding)
+    values
+        (btrim(p_description),
+         btrim(p_area_route),
+         p_date_lost,
+         nullif(btrim(coalesce(p_contact_info, '')), ''),
+         nullif(btrim(coalesce(p_image_url, '')), ''),
+         p_embedding)
+    returning ref_code into v_ref_code;
+
+    return v_ref_code;
+end;
+$$;
+
+revoke all on function public.submit_lost_report(text, text, date, text, text, vector) from public;
+grant execute on function public.submit_lost_report(text, text, date, text, text, vector) to anon, authenticated;
+
+
+-- ============================================================================
+-- 13. PUBLIC FOUND-REPORT SUBMISSION RPC
+--
+-- Mirrors submit_lost_report for the same reason: found_reports has an INSERT
+-- policy for `anon` but no SELECT policy (finder_contact is staff-visible PII),
+-- so PostgREST cannot return the inserted row and an anonymous client can never
+-- read back the generated ref_code. This SECURITY DEFINER function inserts and
+-- returns only that code. image_url is required — the finder's photo is uploaded
+-- to the item-photos bucket first and stored with the report.
+-- ============================================================================
+create or replace function public.submit_found_report(
+    p_short_note     text,
+    p_found_location text,
+    p_found_date     date,
+    p_image_url      text,
+    p_finder_contact text default null,
+    p_embedding      vector(512) default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code text;
+begin
+    if p_short_note is null or btrim(p_short_note) = '' then
+        raise exception 'A short note is required.' using errcode = '22023';
+    end if;
+    if p_found_location is null or btrim(p_found_location) = '' then
+        raise exception 'A found location is required.' using errcode = '22023';
+    end if;
+    if p_found_date is null then
+        raise exception 'A date is required.' using errcode = '22023';
+    end if;
+    if p_found_date > current_date then
+        raise exception 'The date cannot be in the future.' using errcode = '22023';
+    end if;
+    if p_image_url is null or btrim(p_image_url) = '' then
+        raise exception 'A photo is required.' using errcode = '22023';
+    end if;
+
+    insert into public.found_reports
+        (short_note, found_location, found_date, image_url, finder_contact, embedding)
+    values
+        (btrim(p_short_note),
+         btrim(p_found_location),
+         p_found_date,
+         btrim(p_image_url),
+         nullif(btrim(coalesce(p_finder_contact, '')), ''),
+         p_embedding)
+    returning ref_code into v_ref_code;
+
+    return v_ref_code;
+end;
+$$;
+
+revoke all on function public.submit_found_report(text, text, date, text, text, vector) from public;
+grant execute on function public.submit_found_report(text, text, date, text, text, vector) to anon, authenticated;
+
+
+-- ============================================================================
+-- 14. STORAGE: ITEM PHOTO BUCKET
+-- The public bucket behind the found-item report photo upload
+-- (web/src/lib/storage.js). A citizen uploads without an account, the returned
+-- public URL is stored on found_reports, and counter staff read it back. WebP
+-- only, 2 MB, because the client re-encodes and downscales every upload.
+--
+-- The storage.objects policies below are what make anonymous upload and public
+-- read possible: the Storage API evaluates them per request, keyed by bucket_id.
+-- RLS is already enabled on storage.objects by Supabase; these policies scope it
+-- to this bucket. (Idempotent: safe to re-run.)
+-- ============================================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('item-photos', 'item-photos', true, 2097152, array['image/webp'])
+on conflict (id) do nothing;
+
+-- Citizens upload photos with the anon key, so INSERT is open to `public`.
+drop policy if exists "Anyone can upload photos" on storage.objects;
+create policy "Anyone can upload photos"
+on storage.objects for insert to public
+with check (bucket_id = 'item-photos');
+
+-- The bucket is public; the URL is embedded in reports and result cards.
+drop policy if exists "Public can view item photos" on storage.objects;
+create policy "Public can view item photos"
+on storage.objects for select to public
+using (bucket_id = 'item-photos');
+
+-- Only authenticated counter staff may remove a photo.
+drop policy if exists "Staff can delete photos" on storage.objects;
+create policy "Staff can delete photos"
+on storage.objects for delete to authenticated
+using (bucket_id = 'item-photos');

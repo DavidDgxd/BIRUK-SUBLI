@@ -7,6 +7,12 @@ __pycache__/
 # Hugging Face cache (if downloaded locally)
 .cache/
 
+# Node dependencies (installed via npm, never committed)
+node_modules/
+
+# Build output
+dist/
+
 # OS and editor files
 .DS_Store
 *.swp
@@ -17,3 +23,9 @@ __pycache__/
 # Environment variables
 .env
 .env.local
+.env
+.env.*
+local.properties
+*.keystore
+*.key
+.claude/settings.local.json
