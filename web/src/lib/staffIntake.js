@@ -13,6 +13,11 @@ import { uploadItemImage } from './storage.js';
  * always opens it as 'held' and returns the generated ref_code used as the
  * custody receipt reference.
  *
+ * `description` is the staff verification record (marks, serial numbers,
+ * condition). It is embedded so it can influence matching, but it is never
+ * returned by match_items and anon has no direct read on items — see the
+ * "hide private verification details" section of schema.sql.
+ *
  * The RPC is used rather than a plain insert so the same call works once real
  * staff auth replaces the dev mock session, and so the server owns the
  * 'held' status and cash retention rules.

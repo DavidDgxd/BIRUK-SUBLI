@@ -44,6 +44,9 @@ create table if not exists public.items (
     id uuid primary key default gen_random_uuid(),
     ref_code text unique not null default ('BS-' || lpad(nextval('items_ref_seq')::text, 4, '0')),
     title text not null,
+    -- Staff-only verification notes: marks, serial numbers, contents, condition.
+    -- Never returned by match_items — the public sees the title + category only,
+    -- so a claimant cannot read the marks and use them to pass the desk check.
     description text not null,
     category text not null default 'General',          -- Classification ('General', 'Cash', 'Document/ID')
     status text not null default 'held' check (
@@ -190,7 +193,17 @@ create table if not exists public.dismissed_matches (
 -- noise cutoff so the client can separate confident results from low-confidence
 -- "other possible matches"; callers that only want confident results pass a
 -- higher threshold (the web client passes 0.18 and splits the two bands).
+--
+-- SECURITY DEFINER + public-safe projection: this is the ONLY way an anonymous
+-- caller reaches `items`. description (the staff verification notes),
+-- storage_location, cash and claimant fields are deliberately not returned — if
+-- a would-be claimant can read the marks, they can pass the counter check. Anon
+-- has no table-level SELECT on items at all (see section 12).
 -- ============================================================================
+-- Dropped first because removing `description` changes the return type, which
+-- `create or replace` refuses to alter. Safe to re-run: absent on a fresh DB.
+drop function if exists public.match_items(vector, double precision, integer, text, date);
+
 create or replace function public.match_items (
     query_embedding vector(512),
     match_threshold float default 0.18,
@@ -202,7 +215,6 @@ returns table (
     id uuid,
     ref_code text,
     title text,
-    description text,
     category text,
     status text,
     image_url text,
@@ -214,12 +226,13 @@ returns table (
     similarity float
 )
 language sql stable
+security definer
+set search_path = public, pg_temp
 as $$
     select
         items.id,
         items.ref_code,
         items.title,
-        items.description,
         items.category,
         items.status,
         items.image_url,
@@ -231,7 +244,7 @@ as $$
         1 - (items.embedding <=> query_embedding) as similarity
     from public.items
     join public.offices on items.holding_office_id = offices.id
-    where 
+    where
         items.status = 'held'                          -- Excludes released/disposed items
         and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
@@ -241,6 +254,10 @@ as $$
     order by similarity desc
     limit match_count;
 $$;
+
+revoke all on function public.match_items(vector, double precision, integer, text, date) from public;
+grant execute on function public.match_items(vector, double precision, integer, text, date)
+    to anon, authenticated, service_role;
 
 
 -- ============================================================================
@@ -423,11 +440,19 @@ alter table public.dismissed_matches enable row level security;
 create policy "Offices are viewable by everyone" 
 on public.offices for select to public using (true);
 
--- Items: The public can read active inventory; only staff can insert/update
-create policy "Public can view held items" 
-on public.items for select to public using (status = 'held');
+-- Items: the public has NO direct table access. A row-only RLS policy would
+-- still expose every column of a held item through PostgREST, including the
+-- verification notes in `description` and the physical `storage_location`, so
+-- the public read policy is dropped and anon's SELECT privilege revoked. Public
+-- search goes exclusively through the SECURITY DEFINER match_items RPC, which
+-- returns only the safe projection. Staff and the seeding script keep access.
+revoke select on public.items from anon;
+revoke select on public.items from public;
+drop policy if exists "Public can view held items" on public.items;
+grant select on public.items to authenticated;
+grant select on public.items to service_role;
 
-create policy "Staff have full access to items" 
+create policy "Staff have full access to items"
 on public.items for all to authenticated using (true);
 
 -- Found Reports: Public can insert new self-reports; staff can review all

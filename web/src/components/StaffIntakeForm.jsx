@@ -173,7 +173,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
       return;
     }
     if (!trimmedDescription) {
-      setError('Describe the item and its condition.');
+      setError('Add verification notes for the item.');
       descriptionRef.current?.focus();
       return;
     }
@@ -376,7 +376,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
         {!receipt.usedPhoto && (
           <p className="state-card__text">
             The photo was saved, but we could not read it for matching — this
-            item is searchable by its description alone.
+            item is searchable by its text details alone.
           </p>
         )}
         {copyNote && <p className="state-card__text">{copyNote}</p>}
@@ -439,8 +439,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={titleHintId}>
-          A short name only the owner would recognise — the public search shows
-          this.
+          Shown in public search results, so keep it generic (colour and type).
+          Put serial numbers and unique marks in the private notes below.
         </p>
       </div>
 
@@ -500,7 +500,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
       <div className="field">
         <label className="field__label" htmlFor={descriptionId}>
-          Description and condition
+          Private verification notes
         </label>
         <textarea
           id={descriptionId}
@@ -508,7 +508,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           className="field__control field__control--area"
           rows={4}
           maxLength={MAX_DESCRIPTION_LENGTH}
-          placeholder="Well-worn bifold wallet, slight tear on the inner lining. Contains a bus card."
+          placeholder="Well-worn bifold wallet, slight tear on the inner lining. Serial 67 Written on the inner flap. Contains a bus card."
           value={description}
           aria-describedby={
             error ? `${descriptionHintId} ${errorId}` : descriptionHintId
@@ -520,8 +520,9 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={descriptionHintId}>
-          Colour, brand, marks, contents and condition all help match it. Leave
-          out one detail only the owner would know.
+          Staff-only — never shown in public search. Record serial numbers,
+          unique marks, contents and condition here; this is what the desk uses
+          to verify a claim, so be specific.
         </p>
       </div>
 

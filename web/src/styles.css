@@ -1013,9 +1013,39 @@ img {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.result-card__desc {
+/* Public cards show the classification, not the staff's verification notes. */
+.result-card__category {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-pill);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-label);
+  font-weight: 500;
+}
+
+.result-card__category .icon {
+  font-size: 16px;
+}
+
+/* Stands in for the removed description: tells the claimant what the desk will ask. */
+.result-card__verify {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-1-5);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-body-md);
-  overflow-wrap: anywhere;
+}
+
+.result-card__verify .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
 }
 
 .result-card__office {
@@ -1045,12 +1075,6 @@ img {
 }
 
 .result-card__office-line {
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.result-card__claim {
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--md-sys-color-outline-variant);
   color: var(--md-sys-color-on-surface-variant);
 }
 
