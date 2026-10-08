@@ -187,12 +187,13 @@ create table if not exists public.dismissed_matches (
 -- Computes cosine similarity between a user query vector and held inventory.
 -- Joins with offices to provide physical counter details and supports metadata filters.
 --
--- Similarity in this setup is tightly compressed: unrelated items score below
--- 0.24, a semantic synonym lands near 0.255 and a near-exact match tops out
--- around 0.30. The default floor of 0.18 deliberately reaches below the 0.24
--- noise cutoff so the client can separate confident results from low-confidence
--- "other possible matches"; callers that only want confident results pass a
--- higher threshold (the web client passes 0.18 and splits the two bands).
+-- Similarity here is calibrated against the photo-backed distribution:
+-- unrelated queries ("bottle", "wallet") score 0.55-0.58, a semantic synonym
+-- ("blower") lands near 0.60 and a direct match ("fan") near 0.675. The default
+-- floor of 0.55 sits just above that noise band so the client can separate
+-- confident results from low-confidence "other possible matches"; callers that
+-- only want confident results pass a higher threshold (the web client passes
+-- 0.55 and splits the two bands at 0.60).
 --
 -- SECURITY DEFINER + public-safe projection: this is the ONLY way an anonymous
 -- caller reaches `items`. description (the staff verification notes),
@@ -206,7 +207,7 @@ drop function if exists public.match_items(vector, double precision, integer, te
 
 create or replace function public.match_items (
     query_embedding vector(512),
-    match_threshold float default 0.18,
+    match_threshold float default 0.55,
     match_count int default 15,
     filter_office text default null,
     date_from date default null
@@ -249,8 +250,8 @@ as $$
         and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
-        -- Hard floor: callers may raise the bar but never drop below 0.18.
-        and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.18)
+        -- Hard floor: callers may raise the bar but never drop below 0.55.
+        and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.55)
     order by similarity desc
     limit match_count;
 $$;
