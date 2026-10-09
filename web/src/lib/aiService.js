@@ -7,12 +7,51 @@
  * The service does not translate yet. If it later returns "translated_text" from
  * /embed/text, the results page shows it to the user.
  *
- * Set VITE_AI_SERVICE_URL in web/.env (defaults to http://localhost:8000).
+ * Set VITE_AI_SERVICE_URL in web/.env to override the service location.
+ * Otherwise the service is assumed to run on the same host that served this
+ * page, port 8000 — so a phone opening the LAN address hits the dev machine
+ * rather than its own loopback.
  */
 
-const BASE_URL = (
-  import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000'
-).replace(/\/$/, '');
+const AI_SERVICE_PORT = 8000;
+
+/** Host names that mean "this very machine" to whichever browser runs this. */
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/i;
+
+function isLoopbackUrl(url) {
+  try {
+    return LOOPBACK_HOST.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where the FastAPI service lives, as seen from this browser.
+ *
+ * "localhost" resolves to whoever runs the browser, so a phone opening
+ * http://192.168.x.x:5173 would otherwise call its own loopback interface. When
+ * the page is served from a LAN host, target that same host on the AI port.
+ *
+ * A VITE_AI_SERVICE_URL naming a real (non-loopback) host still wins, so a
+ * deployed or tunnelled service overrides the dev default — but a loopback URL
+ * from .env does not defeat the LAN case above.
+ */
+function resolveBaseUrl() {
+  const configured = import.meta.env.VITE_AI_SERVICE_URL;
+  const pageHost =
+    typeof window !== 'undefined' ? window.location.hostname : '';
+
+  if (
+    configured &&
+    (!isLoopbackUrl(configured) || LOOPBACK_HOST.test(pageHost))
+  ) {
+    return configured;
+  }
+  return `http://${pageHost || 'localhost'}:${AI_SERVICE_PORT}`;
+}
+
+const BASE_URL = resolveBaseUrl().replace(/\/$/, '');
 
 export const EMBEDDING_DIM = 512;
 
