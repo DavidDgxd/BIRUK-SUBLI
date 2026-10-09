@@ -6,11 +6,14 @@ import io
 
 app = FastAPI(title="Biruk Subli CLIP Service")
 
-# Allow requests from React dev server (localhost:5173)
+# Allow any origin: the dev server is reached from localhost and from phones on
+# the LAN (http://192.168.x.x:5173), each of which is a distinct origin.
+# allow_credentials must stay off — a wildcard origin combined with credentials
+# is rejected by browsers, and these embedding calls carry no cookies anyway.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
