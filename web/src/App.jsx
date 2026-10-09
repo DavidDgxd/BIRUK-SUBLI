@@ -4,6 +4,7 @@ import SearchResults from './pages/SearchResults.jsx';
 import ReportLost from './pages/ReportLost.jsx';
 import ReportFound from './pages/ReportFound.jsx';
 import StaffIntake from './pages/StaffIntake.jsx';
+import AdminOffices from './pages/AdminOffices.jsx';
 import RoutePlaceholder from './pages/RoutePlaceholder.jsx';
 
 /*
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/report/lost" element={<ReportLost />} />
       <Route path="/report/found" element={<ReportFound />} />
       <Route path="/staff/intake" element={<StaffIntake />} />
+      <Route path="/admin/offices" element={<AdminOffices />} />
       <Route
         path="/staff/login"
         element={<RoutePlaceholder title="Staff / Admin log in" />}
