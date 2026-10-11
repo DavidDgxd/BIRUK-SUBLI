@@ -1312,8 +1312,64 @@ img {
   font-size: 20px;
 }
 
-.staff-bar__badge {
+/* Trailing controls: the dev-session badge, a sign-out failure note, and the
+   sign-out button itself. */
+.staff-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
   margin-left: auto;
+}
+
+/* The shared login outlives one shift, so ending it is part of the bar rather
+   than buried in a page. Outlined in the bar's own colour to stay legible on
+   the secondary container in both themes. */
+.staff-bar__signout {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--type-body-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--motion-fast) ease;
+}
+
+.staff-bar__signout:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.staff-bar__signout:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.staff-bar__signout .icon {
+  font-size: 20px;
+}
+
+/* Shown only when signing out failed, so the officer knows the session is
+   still open. The icon, not the colour alone, carries the meaning. */
+.staff-bar__note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--type-body-md);
+  font-weight: 600;
+}
+
+.staff-bar__note .icon {
+  font-size: 20px;
+}
+
+.staff-bar__badge {
   padding: var(--space-0-5) var(--space-1-5);
   border-radius: var(--radius-pill);
   background: color-mix(
@@ -1551,4 +1607,46 @@ img {
   padding-inline: var(--space-1);
   font-size: var(--type-title-sm);
   font-weight: 600;
+}
+
+/* ==================== 16. Staff shared login (US-02) ==================== */
+/* One short form, so it sits narrower than the report forms and keeps the
+   credential guidance beside it rather than above. */
+.staff-login {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  max-width: 440px;
+}
+
+.staff-login__form {
+  width: 100%;
+}
+
+.staff-login__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  max-width: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.staff-login__note .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+/* Holds the page while a stored session is resolved, so a signed-in officer
+   never sees the sign-in-required card flash on reload. */
+.staff-gate__checking {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-lg);
+}
+
+.staff-gate__checking .icon {
+  font-size: 20px;
 }

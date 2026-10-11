@@ -1,22 +1,33 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { supabase } from '../lib/supabase.js';
+import {
+  loadStaffSession,
+  signInWithSiteCredentials,
+  signOutOfSite,
+} from '../lib/staffAuth.js';
 
 /*
  * Staff session context for the counter pages.
  *
- * Real Supabase Auth and staff provisioning do not exist yet, so a development
- * build hands every visitor a mock counter-staff session for the default office.
- * Pages only ever read the session through useStaffAuth(); when real auth lands
- * the internals here change (fetch the Supabase session, resolve the office via
- * offices.auth_user_id) and no consuming page is touched.
+ * Office staff sign in with their office's shared credentials (US-02): a single
+ * Supabase Auth user per office, minted by the central admin in US-01 and tied
+ * to the office row through `offices.auth_user_id`. This provider owns that
+ * session and resolves it to the office the counter is filing against, so pages
+ * only ever read useStaffAuth() and never touch the client themselves.
  *
- * The mock office id comes from VITE_STAFF_OFFICE_ID and defaults to 'BCPIO',
- * the Baguio City Public Information Office row seeded in `offices`.
- *
- * Production builds (import.meta.env.PROD) stay signed out until real auth
- * exists — that is deliberate, so a deployed bundle never exposes the counter.
- * A preview build can opt back into the mock with VITE_STAFF_DEV_SESSION=true.
+ * A build can skip the login and act as the default office by setting
+ * VITE_STAFF_DEV_SESSION=true. That flag is the only way the mock session is
+ * handed out — it is never enabled on its own — and it is labelled "Dev session
+ * · not real auth" wherever the signed-in office is shown.
  */
 
+const DEV_STAFF_SESSION = import.meta.env.VITE_STAFF_DEV_SESSION === 'true';
 const DEV_OFFICE_ID = import.meta.env.VITE_STAFF_OFFICE_ID || 'BCPIO';
 const DEV_OFFICE_NAME =
   import.meta.env.VITE_STAFF_OFFICE_NAME ||
@@ -34,43 +45,94 @@ function mockSession() {
   };
 }
 
-/**
- * Real-auth seam. Returns a session in the same shape as mockSession(), or null.
- *
- * TODO(auth): read supabase.auth.getSession(), then look up the staff member's
- * office by offices.auth_user_id once an admin provisioning UI exists.
- */
-async function loadRealSession() {
-  return null;
-}
-
 export function StaffAuthProvider({ children }) {
-  const [session] = useState(() => {
-    const useMock =
-      import.meta.env.DEV || import.meta.env.VITE_STAFF_DEV_SESSION === 'true';
-    // loadRealSession() is async, so a production build starts signed out and
-    // would sign in through signIn() once that is implemented.
-    return useMock ? mockSession() : null;
-  });
+  const [session, setSession] = useState(() =>
+    DEV_STAFF_SESSION ? mockSession() : null,
+  );
+  const [status, setStatus] = useState(() =>
+    DEV_STAFF_SESSION ? 'authenticated' : 'loading',
+  );
+
+  // Follow the Supabase session rather than reading it once. onAuthStateChange
+  // reports the stored login as soon as we subscribe (INITIAL_SESSION), then
+  // every sign-in, sign-out and token refresh after that — including ones made
+  // from another tab.
+  useEffect(() => {
+    if (DEV_STAFF_SESSION) return undefined;
+
+    let active = true;
+    // Auth user the office has already been resolved for. A token refresh
+    // reports the same user, and re-running the lookup for it would query
+    // `offices` every hour and let one failed request eject an officer
+    // mid-shift.
+    let resolvedFor = null;
+
+    function applyAuthUser(user) {
+      if (!user) {
+        resolvedFor = null;
+        setSession(null);
+        setStatus('unauthenticated');
+        return;
+      }
+      if (resolvedFor === user.id) return;
+      resolvedFor = user.id;
+
+      // The callback below must not await other Supabase calls, so the office
+      // lookup runs off the event rather than inside it. `active` drops results
+      // from a run that has already been torn down.
+      loadStaffSession(user)
+        .then((resolved) => {
+          if (!active) return;
+          if (!resolved) {
+            resolvedFor = null;
+            setSession(null);
+            setStatus('unauthenticated');
+            return;
+          }
+          setSession(resolved);
+          setStatus('authenticated');
+        })
+        .catch(() => {
+          if (!active) return;
+          resolvedFor = null;
+          setSession(null);
+          setStatus('unauthenticated');
+        });
+    }
+
+    const { data } = supabase.auth.onAuthStateChange((_event, authSession) => {
+      applyAuthUser(authSession?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   const value = useMemo(
     () => ({
       session,
-      status: session ? 'authenticated' : 'unauthenticated',
-      isAuthenticated: Boolean(session),
+      status,
+      isAuthenticated: status === 'authenticated',
       office: session
         ? { id: session.officeId, name: session.officeName }
         : null,
-      /** TODO(auth): supabase.auth.signInWithPassword(...) then loadRealSession(). */
-      async signIn() {
-        throw new Error('Staff sign-in is not implemented yet.');
+      /** Signs in with the office's shared credentials; throws StaffAuthError. */
+      async signIn(email, password) {
+        const next = await signInWithSiteCredentials(email, password);
+        setSession(next);
+        setStatus('authenticated');
+        return next;
       },
-      /** TODO(auth): supabase.auth.signOut() and clear the session. */
+      /** Ends the shared session. Throws StaffAuthError if it could not. */
       async signOut() {
-        throw new Error('Staff sign-out is not implemented yet.');
+        await signOutOfSite();
+        setSession(null);
+        setStatus('unauthenticated');
       },
     }),
-    [session],
+    [session, status],
   );
 
   return (
@@ -87,5 +149,3 @@ export function useStaffAuth() {
   }
   return context;
 }
-
-export { loadRealSession };

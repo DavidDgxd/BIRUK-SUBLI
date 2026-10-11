@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import StaffGate from '../components/StaffGate.jsx';
+import StaffBar from '../components/StaffBar.jsx';
 import Icon from '../components/Icon.jsx';
 import AddOfficeDialog from '../components/AddOfficeDialog.jsx';
 import { listOffices } from '../lib/offices.js';
-import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /*
  * Central admin: participating offices & logins (Wireframe Screen 20, US-01).
@@ -16,7 +17,6 @@ import { useStaffAuth } from '../context/StaffAuthContext.jsx';
  */
 export default function AdminOffices() {
   const headingRef = useRef(null);
-  const { isAuthenticated, session } = useStaffAuth();
   const [offices, setOffices] = useState(null); // null while the first load runs
   const [loadError, setLoadError] = useState('');
   const [showDialog, setShowDialog] = useState(false);
@@ -73,36 +73,13 @@ export default function AdminOffices() {
             hold found items.
           </p>
 
-          {!isAuthenticated ? (
-            <section className="state-card state-card--error" role="alert">
-              <h3 className="state-card__title">Admin sign-in required</h3>
-              <p className="state-card__text">
-                Office provisioning is only available to the central admin.
-              </p>
-              <div className="state-card__actions">
-                <Link className="btn btn--filled" to="/staff/login">
-                  <Icon name="lock" />
-                  Go to staff log in
-                </Link>
-              </div>
-            </section>
-          ) : (
+          <StaffGate
+            title="Admin sign-in required"
+            message="Office provisioning is only available to the central admin."
+            from="/admin/offices"
+          >
             <>
-              <div className="staff-bar">
-                <span className="staff-bar__office">
-                  <Icon name="admin_panel_settings" />
-                  Central admin
-                </span>
-                <span className="staff-bar__meta">
-                  <Icon name="badge" />
-                  {session.staffEmail}
-                </span>
-                {session.isMock && (
-                  <span className="staff-bar__badge">
-                    Dev session &middot; not real auth
-                  </span>
-                )}
-              </div>
+              <StaffBar icon="admin_panel_settings" label="Central admin" />
 
               <section
                 className="office-admin"
@@ -193,7 +170,7 @@ export default function AdminOffices() {
                 )}
               </section>
             </>
-          )}
+          </StaffGate>
         </main>
       </div>
 

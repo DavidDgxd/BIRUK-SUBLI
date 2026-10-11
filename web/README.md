@@ -5,7 +5,8 @@ Items are held and released at participating city office counters. The site help
 citizens find where an item is held and report lost or found items. It does not
 support peer-to-peer exchange, in-app messaging, or online claims.
 
-**Status:** landing page, search results, and the lost- and found-item reports are built. The staff routes render a placeholder.
+**Status:** landing page, search results, the lost- and found-item reports, office
+provisioning, and the shared office login with the staff intake counter are built.
 
 ## Getting started
 
@@ -53,13 +54,27 @@ src/
 
 ## Environment
 
-Copy `.env.example` to `.env` and set:
+Create `.env` (untracked) and set:
 
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 VITE_AI_SERVICE_URL=http://localhost:8000
 ```
+
+The Supabase client is created at import time, so the app needs the two
+`VITE_SUPABASE_*` values to start at all.
+
+Optional, for working on the counter pages without a credential:
+
+```
+VITE_STAFF_DEV_SESSION=true      # acts as BCPIO; labelled "not real auth"
+VITE_STAFF_OFFICE_ID=BCPIO       # office to act as
+VITE_STAFF_OFFICE_NAME=...
+```
+
+The mock session is only ever handed out when `VITE_STAFF_DEV_SESSION` is
+explicitly set to `true` — a normal `npm run dev` shows the real login screen.
 
 Restart `npm run dev` after changing `.env`. The AI service must allow CORS from the
 web origin (for example `http://localhost:5173`).
@@ -89,7 +104,8 @@ and no-query states.
 | `/report/lost` | Lost-item report form (built) |
 | `/report/found` | Found-item report form (built) |
 | `/admin/offices` | Central admin — participating offices & logins (built) |
-| `/staff/login` | Placeholder |
+| `/staff/login` | Shared office login (built) |
+| `/staff/intake` | Staff counter intake (built) |
 | `*` | Not-found placeholder |
 
 `SearchPanel` navigates to `/search` with:
@@ -159,8 +175,24 @@ supabase secrets set SUPABASE_URL=https://vwegcexuyznfsbgzurxa.supabase.co \
 ```
 
 The function is at `supabase/functions/provision-office/index.ts`. Real
-central-admin authorization is still a TODO (mirroring the dev mock-auth seam in
-`src/context/StaffAuthContext.jsx`).
+central-admin authorization is still a TODO: the function is callable with the
+anon key, so any office login can reach it until a role claim is checked. See
+the note at the top of that file.
+
+## Shared office login (`/staff/login`)
+
+US-02: counter staff sign in with their office's shared credentials and land on
+the intake screen — no personal account. `src/lib/staffAuth.js` owns the flow:
+`signInWithPassword` against the shared Auth user, then resolve which office
+claims it through `offices.auth_user_id` (an ordinary read — the table is
+readable by everyone). A login that authenticates but maps to no office, or to a
+`suspended` one, is signed straight back out rather than left holding a session.
+
+`src/context/StaffAuthContext.jsx` follows `supabase.auth.onAuthStateChange`, so
+a stored login survives a reload and a sign-out in another tab clears this one.
+`StaffGate` keeps the counter pages behind the login and holds the page while
+the stored session resolves; `StaffBar` shows the office being filed against and
+ends the shared session at the end of a shift.
 
 ## Notes
 
