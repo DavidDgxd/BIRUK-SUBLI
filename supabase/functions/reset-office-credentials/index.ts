@@ -19,8 +19,9 @@ const SITE_CODE_PATTERN = /^[A-Z0-9_-]{2,40}$/;
 
 // No I, O, l, o, 0 or 1: the credential gets read down a phone line to a
 // counter, so every character has to be unambiguous when spoken and typed.
+// 56 characters, about 5.8 bits each.
 const PASSWORD_ALPHABET =
-  'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 const PASSWORD_GROUPS = 4;
 const PASSWORD_GROUP_SIZE = 4;
 
