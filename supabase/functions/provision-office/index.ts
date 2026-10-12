@@ -8,25 +8,14 @@
 //   supabase functions deploy provision-office --project-ref vwegcexuyznfsbgzurxa
 //   supabase secrets set SUPABASE_URL=<url> SUPABASE_SERVICE_ROLE_KEY=<key>
 //
-// TODO(auth): once a real central-admin login exists (US-02/US-03), verify the
-// caller's JWT role here and reject non-admins. For now it mirrors the dev
-// mock-auth seam in web/src/context/StaffAuthContext.jsx and is reachable with
-// the anon key.
+// The caller must carry the central-admin role claim (see
+// _shared/adminAuth.ts). `verify_jwt = true` is not that check: the anon key is
+// itself a signed JWT and ships in the public browser bundle, so without the
+// role test any visitor could mint an office login.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-};
-
-function respond(status, body) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
+import { corsHeaders, respond } from '../_shared/http.ts';
+import { requireCentralAdmin } from '../_shared/adminAuth.ts';
 
 const SITE_CODE_PATTERN = /^[A-Z0-9_-]{2,40}$/;
 const MIN_PASSWORD = 8;
@@ -37,6 +26,23 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const url = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !serviceKey) {
+      return respond(500, {
+        error: 'Provisioning is not configured on this deployment.',
+      });
+    }
+
+    const admin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Refuse before reading the body: an unauthorised caller should not even
+    // get field validation back.
+    const { response } = await requireCentralAdmin(req, admin);
+    if (response) return response;
+
     const body = await req.json();
 
     const id = String(body.id ?? '')
@@ -67,18 +73,6 @@ Deno.serve(async (req) => {
         error: `The shared password must be at least ${MIN_PASSWORD} characters.`,
       });
     }
-
-    const url = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!url || !serviceKey) {
-      return respond(500, {
-        error: 'Provisioning is not configured on this deployment.',
-      });
-    }
-
-    const admin = createClient(url, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     const { data: existing } = await admin
       .from('offices')

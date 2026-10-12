@@ -6,20 +6,24 @@ import StaffGate from '../components/StaffGate.jsx';
 import StaffBar from '../components/StaffBar.jsx';
 import Icon from '../components/Icon.jsx';
 import AddOfficeDialog from '../components/AddOfficeDialog.jsx';
+import ResetCredentialsDialog from '../components/ResetCredentialsDialog.jsx';
 import { listOffices } from '../lib/offices.js';
 
 /*
- * Central admin: participating offices & logins (Wireframe Screen 20, US-01).
+ * Central admin: participating offices & logins (Wireframe Screen 20, US-01/US-03).
  *
- * Lists every office in the directory and opens the "+ ADD AN OFFICE" dialog to
- * provision a new one. The list is read through the anon-readable `offices`
- * SELECT policy; provisioning goes through the provision-office Edge Function.
+ * Lists every office in the directory, opens the "+ ADD AN OFFICE" dialog to
+ * provision a new one, and resets an office's shared login when it is reported
+ * lost or compromised. The list is read through the anon-readable `offices`
+ * SELECT policy; every write goes through an Edge Function that re-checks the
+ * caller's central-admin role.
  */
 export default function AdminOffices() {
   const headingRef = useRef(null);
   const [offices, setOffices] = useState(null); // null while the first load runs
   const [loadError, setLoadError] = useState('');
   const [showDialog, setShowDialog] = useState(false);
+  const [resetTarget, setResetTarget] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -70,12 +74,16 @@ export default function AdminOffices() {
           </h2>
           <p className="report-page__lead">
             Provision shared logins and directory entries for the offices that
-            hold found items.
+            hold found items, and reissue a login when one is reported lost or
+            compromised.
           </p>
 
           <StaffGate
             title="Admin sign-in required"
             message="Office provisioning is only available to the central admin."
+            deniedTitle="Central admin only"
+            deniedMessage="This directory is managed by the central admin. Your office login still works on the counter pages."
+            requireAdmin
             from="/admin/offices"
           >
             <>
@@ -136,6 +144,7 @@ export default function AdminOffices() {
                           <th scope="col">Contact</th>
                           <th scope="col">Status</th>
                           <th scope="col">Login</th>
+                          <th scope="col">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -162,6 +171,25 @@ export default function AdminOffices() {
                               </span>
                             </td>
                             <td>{office.auth_user_id ? 'Ready' : 'Pending'}</td>
+                            <td>
+                              {office.auth_user_id ? (
+                                <button
+                                  type="button"
+                                  className="btn office-table__action"
+                                  onClick={() => setResetTarget(office)}
+                                >
+                                  <Icon name="lock_reset" />
+                                  Reset password
+                                </button>
+                              ) : (
+                                // Nothing to reset until the office has a
+                                // login, so say that rather than offering a
+                                // button that could only fail.
+                                <span className="office-table__action-note">
+                                  No login yet
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -178,6 +206,12 @@ export default function AdminOffices() {
         open={showDialog}
         onClose={() => setShowDialog(false)}
         onCreated={handleCreated}
+      />
+
+      <ResetCredentialsDialog
+        open={resetTarget !== null}
+        office={resetTarget}
+        onClose={() => setResetTarget(null)}
       />
     </>
   );

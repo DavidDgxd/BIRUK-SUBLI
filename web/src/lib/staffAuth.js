@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js';
 
 /*
- * Shared office login (US-02).
+ * Shared office login (US-02) and central-admin session (US-03).
  *
  * An office signs in with one set of site credentials, never a personal
  * account: the provision-office Edge Function (US-01) mints a single Supabase
@@ -11,7 +11,10 @@ import { supabase } from './supabase.js';
  *
  * The lookup is an ordinary read, since "Offices are viewable by everyone". An
  * account that authenticates but claims no office is not a counter login, so it
- * is signed straight back out rather than left holding a live session.
+ * is signed straight back out rather than left holding a live session — with one
+ * exception. The central admin manages every office and belongs to none, so a
+ * caller carrying the `central_admin` role claim gets an office-less session
+ * instead of the sign-out.
  */
 
 /** code: 'credentials' | 'unlinked' | 'suspended' | 'db' | 'signout' */
@@ -25,12 +28,31 @@ export class StaffAuthError extends Error {
 
 const OFFICE_COLUMNS = 'id, name, status, auth_user_id';
 
-/** The session shape every counter page reads through useStaffAuth(). */
-function sessionFor(office, email) {
+/**
+ * The role claim that marks the central admin. It lives in `app_metadata`
+ * because only the service_role can write that; `user_metadata` is editable by
+ * the user themselves, so it could never gate anything.
+ */
+const ADMIN_ROLE = 'central_admin';
+
+/** Whether a signed-in auth user carries the central-admin role claim. */
+export function isCentralAdmin(user) {
+  return user?.app_metadata?.role === ADMIN_ROLE;
+}
+
+/**
+ * The session shape every counter page reads through useStaffAuth().
+ *
+ * `officeId`/`officeName` are null for a central-admin session: they run the
+ * directory rather than file against one counter, and pages that need an office
+ * check for it rather than assuming.
+ */
+function sessionFor(office, user) {
   return {
-    staffEmail: email,
-    officeId: office.id,
-    officeName: office.name,
+    staffEmail: user?.email,
+    officeId: office?.id ?? null,
+    officeName: office?.name ?? null,
+    isAdmin: isCentralAdmin(user),
     isMock: false,
   };
 }
@@ -117,6 +139,10 @@ export async function signInWithSiteCredentials(email, password) {
   }
 
   if (!office) {
+    // The central admin has no office row of their own — they manage all of
+    // them — so their session is legitimately office-less.
+    if (isCentralAdmin(user)) return sessionFor(null, user);
+
     await supabase.auth.signOut();
     throw new StaffAuthError(
       'unlinked',
@@ -131,7 +157,7 @@ export async function signInWithSiteCredentials(email, password) {
     );
   }
 
-  return sessionFor(office, user.email);
+  return sessionFor(office, user);
 }
 
 /**
@@ -141,8 +167,9 @@ export async function signInWithSiteCredentials(email, password) {
  */
 export async function loadStaffSession(user) {
   const office = await resolveOfficeForUser(user?.id);
-  if (!office || office.status === 'suspended') return null;
-  return sessionFor(office, user.email);
+  if (!office) return isCentralAdmin(user) ? sessionFor(null, user) : null;
+  if (office.status === 'suspended') return null;
+  return sessionFor(office, user);
 }
 
 /** Ends the shared session so the next shift starts from the login screen. */

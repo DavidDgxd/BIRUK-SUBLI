@@ -48,6 +48,8 @@ export default function StaffIntake() {
           <StaffGate
             title="Staff sign-in required"
             message="This counter is only available to a signed-in office login."
+            deniedTitle="Counter logins only"
+            deniedMessage="This counter files items against one office, and the central admin does not belong to one. Sign in with an office login to log items, or head back to the directory."
             from="/staff/intake"
           >
             <>
