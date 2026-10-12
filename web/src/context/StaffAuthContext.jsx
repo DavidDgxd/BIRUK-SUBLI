@@ -21,10 +21,17 @@ import {
  * session and resolves it to the office the counter is filing against, so pages
  * only ever read useStaffAuth() and never touch the client themselves.
  *
+ * The central admin (US-03) signs in through the same form but belongs to no
+ * office, so their session carries `isAdmin` and a null office. `isAdmin` is a
+ * UI gate only — every admin action is re-checked server-side against the
+ * role claim.
+ *
  * A build can skip the login and act as the default office by setting
  * VITE_STAFF_DEV_SESSION=true. That flag is the only way the mock session is
  * handed out — it is never enabled on its own — and it is labelled "Dev session
- * · not real auth" wherever the signed-in office is shown.
+ * · not real auth" wherever the signed-in office is shown. It covers the counter
+ * pages only: the central-admin console needs a real sign-in, because the
+ * provision and reset functions verify the caller's role server-side.
  */
 
 const DEV_STAFF_SESSION = import.meta.env.VITE_STAFF_DEV_SESSION === 'true';
@@ -41,6 +48,11 @@ function mockSession() {
     staffEmail: DEV_STAFF_EMAIL,
     officeId: DEV_OFFICE_ID,
     officeName: DEV_OFFICE_NAME,
+    // Deliberately not an admin session. The mock holds no real Supabase
+    // session, so it cannot satisfy the central-admin role check on the
+    // provision and reset functions — every write would fail. Claiming the
+    // role here would only open an admin console whose buttons all error.
+    isAdmin: false,
     isMock: true,
   };
 }
@@ -115,7 +127,9 @@ export function StaffAuthProvider({ children }) {
       session,
       status,
       isAuthenticated: status === 'authenticated',
-      office: session
+      /** The central admin session (US-03), which has no office of its own. */
+      isAdmin: session?.isAdmin === true,
+      office: session?.officeId
         ? { id: session.officeId, name: session.officeName }
         : null,
       /** Signs in with the office's shared credentials; throws StaffAuthError. */

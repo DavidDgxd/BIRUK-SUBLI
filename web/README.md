@@ -76,6 +76,10 @@ VITE_STAFF_OFFICE_NAME=...
 The mock session is only ever handed out when `VITE_STAFF_DEV_SESSION` is
 explicitly set to `true` — a normal `npm run dev` shows the real login screen.
 
+It covers the counter pages only. `/admin/offices` needs a real central-admin
+sign-in in every build, because the provision and reset Edge Functions verify
+the caller's role server-side and the mock holds no Supabase session to verify.
+
 Restart `npm run dev` after changing `.env`. The AI service must allow CORS from the
 web origin (for example `http://localhost:5173`).
 
@@ -103,8 +107,8 @@ and no-query states.
 | `/search` | Search results (built) |
 | `/report/lost` | Lost-item report form (built) |
 | `/report/found` | Found-item report form (built) |
-| `/admin/offices` | Central admin — participating offices & logins (built) |
-| `/staff/login` | Shared office login (built) |
+| `/admin/offices` | Central admin — participating offices, logins & credential reset (built) |
+| `/staff/login` | Shared office login, and the central admin's sign-in (built) |
 | `/staff/intake` | Staff counter intake (built) |
 | `*` | Not-found placeholder |
 
@@ -166,18 +170,55 @@ mints the shared Supabase Auth user with the service_role key and inserts the
 `offices` row (`auth_user_id` = the new user). The browser never sees the
 service_role key.
 
-To enable it:
+Deploy both office-management functions and set the secret they share:
 
 ```bash
-supabase functions deploy provision-office --project-ref vwegcexuyznfsbgzurxa
+supabase functions deploy provision-office reset-office-credentials \
+  --project-ref vwegcexuyznfsbgzurxa
 supabase secrets set SUPABASE_URL=https://vwegcexuyznfsbgzurxa.supabase.co \
   SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 ```
 
-The function is at `supabase/functions/provision-office/index.ts`. Real
-central-admin authorization is still a TODO: the function is callable with the
-anon key, so any office login can reach it until a role claim is checked. See
-the note at the top of that file.
+Both functions are at `supabase/functions/`, with the shared caller check in
+`supabase/functions/_shared/adminAuth.ts`.
+
+## Credential reset (`/admin/offices`)
+
+US-03: when an office reports its shared login lost or compromised, the admin
+issues a new one from the office's row in the directory. The
+`reset-office-credentials` Edge Function generates the password server-side — 16
+characters in four hyphenated groups, drawn from an alphabet with no `I`, `O`,
+`l`, `o`, `0` or `1` so it survives being read down a phone line — writes it to
+the office's Auth user, and returns it once. Nothing stores it, so the admin has
+to hand it over before closing the dialog; a second reset is the only recovery.
+
+The old password stops working immediately and the office's sessions are ended.
+A token already issued stays valid until it expires (an hour by default), so an
+office that was actually compromised is locked out within the hour rather than
+instantly.
+
+### Making an account the central admin
+
+Both functions refuse anyone without the `central_admin` role claim, and nothing
+in the app can grant it — the claim lives in `app_metadata`, which only the
+service_role can write. `user_metadata` is *not* a substitute: it is editable by
+the user themselves through `supabase.auth.updateUser()`, so a role kept there
+could be granted by anyone to themselves.
+
+Create the account in the Dashboard (Authentication → Users), then stamp the
+role:
+
+```sql
+update auth.users
+   set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
+                         || '{"role":"central_admin"}'::jsonb
+ where email = '<admin email>';
+```
+
+The claim is copied into the access token when it is issued, so sign in **after**
+stamping — or sign out and back in — or the session will not carry it yet. The
+admin signs in at `/staff/login` like everyone else; having no office of their
+own, they land on the directory instead of a counter.
 
 ## Shared office login (`/staff/login`)
 
@@ -193,6 +234,14 @@ a stored login survives a reload and a sign-out in another tab clears this one.
 `StaffGate` keeps the counter pages behind the login and holds the page while
 the stored session resolves; `StaffBar` shows the office being filed against and
 ends the shared session at the end of a shift.
+
+The central admin is the one exception to the office mapping: they carry the
+`central_admin` claim instead of an `offices` row, so their session has no
+office and `StaffGate`'s `requireAdmin` mode is what admits them to
+`/admin/offices`. Default mode now requires an office as well as a session,
+which keeps an office-less admin out of the counter pages — intake files items
+against an office id and cannot work without one. Both checks are UI only; the
+role is re-verified server-side on every admin action.
 
 ## Notes
 

@@ -4,7 +4,12 @@
 # (https://vwegcexuyznfsbgzurxa.supabase.co). It is public, not a secret.
 project_id = "vwegcexuyznfsbgzurxa"
 
-# provision-office runs with the service_role key (set via `supabase secrets set`),
-# so the anon-invoked function can mint shared office logins and insert offices.
+# Both functions run with the service_role key (set via `supabase secrets set`),
+# so an anon-invoked function can mint and reset shared office logins. verify_jwt
+# only proves the caller sent *a* project JWT — the anon key is one too — so the
+# real gate is the central-admin role check in functions/_shared/adminAuth.ts.
 [functions.provision-office]
+verify_jwt = true
+
+[functions.reset-office-credentials]
 verify_jwt = true

@@ -1609,6 +1609,67 @@ img {
   font-weight: 600;
 }
 
+/* ============ 15b. Credential reset dialog (US-03) ============ */
+.office-dialog__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-1-5);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  font-size: var(--type-body-md);
+}
+
+/* The one-time credential. Read aloud down a phone line, so the fields are
+   spaced for transcription rather than dense like a form. */
+.credential {
+  display: grid;
+  gap: var(--space-0-5);
+  padding: var(--space-2);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container);
+}
+
+.credential__label {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.credential__email {
+  font-size: var(--type-body-lg);
+  overflow-wrap: anywhere;
+}
+
+.credential__password {
+  margin-top: var(--space-1);
+  text-align: center;
+}
+
+.credential__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.office-table__action {
+  min-height: var(--tap-target);
+  padding: var(--space-0-5) var(--space-1-5);
+  font-size: var(--type-body-md);
+  white-space: nowrap;
+}
+
+.office-table__action-note {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+  white-space: nowrap;
+}
+
 /* ==================== 16. Staff shared login (US-02) ==================== */
 /* One short form, so it sits narrower than the report forms and keeps the
    credential guidance beside it rather than above. */
