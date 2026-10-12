@@ -15,6 +15,10 @@ const MAX_QUERY_LENGTH = 200;
  *   - ?color=<color>   optional lowercase color filter
  *   - location.state.photo = File (optional, lost on page reload)
  * The results page owns translation, embedding and ranking.
+ *
+ * US-11: the field takes a description in the user's own words. The copy below
+ * has to say so — nothing here asks for a category or a tag, and the query is
+ * embedded as typed.
  */
 export default function SearchPanel() {
   const navigate = useNavigate();
@@ -86,13 +90,13 @@ export default function SearchPanel() {
       <h2 className="search__title" id={headingId}>
         Search your Items
       </h2>
-      <p className="search__subtitle">Search via description and color</p>
+      <p className="search__subtitle">Describe it in your own words</p>
 
       <form role="search" onSubmit={handleSubmit} noValidate>
         <div className="search-field" data-invalid={error ? 'true' : undefined}>
           <Icon name="search" />
           <label className="visually-hidden" htmlFor="item-query">
-            Item description and color
+            Describe the item you are looking for
           </label>
           <input
             id="item-query"
@@ -102,7 +106,7 @@ export default function SearchPanel() {
             enterKeyHint="search"
             autoComplete="off"
             maxLength={MAX_QUERY_LENGTH}
-            placeholder="Item description and color"
+            placeholder="e.g. black leather wallet"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -134,8 +138,9 @@ export default function SearchPanel() {
         </div>
 
         <p className="search__hint" id={hintId}>
-          Works in English or Filipino, like &ldquo;itim na pitaka&rdquo; or
-          &ldquo;blue water bottle&rdquo;.
+          Just describe it &mdash; no category or tag needed. Works in English
+          or Filipino, like &ldquo;itim na pitaka&rdquo; or &ldquo;blue water
+          bottle&rdquo;.
         </p>
         <div aria-live="polite">
           {error && (

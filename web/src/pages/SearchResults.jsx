@@ -11,7 +11,11 @@ const SKELETON_COUNT = 3;
 const ERROR_COPY = {
   'ai-unreachable':
     'Search is temporarily unavailable. Please try again in a moment.',
-  'ai-failed': 'Search ran into a problem. Please try again.',
+  // Shown when the search service rejects the description itself. The service's
+  // own wording is more specific, but it is developer-facing ("text too long"),
+  // so the user sees this and the debug line below carries the detail in dev.
+  'ai-failed':
+    'We could not search for that description. Try describing the item in a few words.',
   'ai-bad-response': 'Search ran into a problem. Please try again.',
   db: 'We could not load results right now. Please try again.',
 };
@@ -125,8 +129,8 @@ export default function SearchResults() {
             <section className="state-card">
               <h3 className="state-card__title">Nothing to search yet</h3>
               <p className="state-card__text">
-                Describe your item or upload a photo to see which office is
-                holding it.
+                Describe your item in your own words, add a color, or upload a
+                photo to see which office is holding it.
               </p>
               <Link className="btn btn--filled" to="/">
                 <Icon name="search" />
@@ -136,8 +140,11 @@ export default function SearchResults() {
           )}
 
           {loading && (
-            <div role="status" aria-live="polite">
-              <p className="visually-hidden">Searching for your item&hellip;</p>
+            <div role="status">
+              <p className="results__searching">
+                <Icon name="search" className="icon--pulse" />
+                Embedding your description&hellip;
+              </p>
               <ul className="results__list" aria-hidden="true">
                 {Array.from({ length: SKELETON_COUNT }, (_, i) => (
                   <li key={i} className="result-skeleton" />

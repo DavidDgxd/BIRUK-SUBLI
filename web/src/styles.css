@@ -1078,10 +1078,28 @@ img {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+/* Visible counterpart to the skeletons: the query is on its way to /embed/text
+ * and the search service is encoding it. Replaces the old visually-hidden
+ * status line, so what a screen reader announces is what is on the screen. */
+.results__searching {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+  font-size: var(--type-body-md);
+  font-weight: 500;
+  color: var(--md-sys-color-primary);
+}
+
 .result-skeleton {
   min-height: 280px;
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Shares the skeletons' pulse so the page reads as one waiting state. */
+.icon--pulse {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 

@@ -1,8 +1,11 @@
 /*
  * Client for the FastAPI CLIP microservice (ai-service/main.py).
  *
- *   POST {BASE}/embed/text   form field "text"  -> { "vector": number[512] }
- *   POST {BASE}/embed/image  form field "file"  -> { "vector": number[512] }
+ *   POST {BASE}/embed/text   form field "text"  -> { "vector": number[512], "dim": 512 }
+ *   POST {BASE}/embed/image  form field "file"  -> { "vector": number[512], "dim": 512 }
+ *
+ * A rejected call answers {"detail": "..."} with 422 (blank or over-long text)
+ * or 503 (the model failed); postForEmbedding surfaces that sentence to the user.
  *
  * The service does not translate yet. If it later returns "translated_text" from
  * /embed/text, the results page shows it to the user.
@@ -55,6 +58,14 @@ const BASE_URL = resolveBaseUrl().replace(/\/$/, '');
 
 export const EMBEDDING_DIM = 512;
 
+/**
+ * Longest description sent to POST /embed/text. Mirrors MAX_TEXT_LENGTH in
+ * ai-service/main.py: the public search box caps typing at 200 characters, but
+ * the report and staff-intake flows caption a photo with several fields joined
+ * together, which runs longer.
+ */
+export const MAX_EMBED_TEXT_LENGTH = 1000;
+
 /** code: 'ai-unreachable' | 'ai-failed' | 'ai-bad-response' | 'db' */
 export class SearchError extends Error {
   constructor(code, message) {
@@ -62,6 +73,30 @@ export class SearchError extends Error {
     this.name = 'SearchError';
     this.code = code;
   }
+}
+
+/**
+ * Readable reason for a rejected embedding call.
+ *
+ * The service answers a bad request with {"detail": "..."} (FastAPI's shape for
+ * both HTTPException and validation errors). That sentence — "Describe the item
+ * you are looking for in a few words." — is far more use to a user than the
+ * bare status code, so it is preferred and the status is kept as a fallback.
+ */
+async function failureMessage(response, path) {
+  const fallback = `AI service returned ${response.status} for ${path}`;
+  try {
+    const body = await response.json();
+    const detail = body?.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    // Validation errors arrive as a list of {loc, msg, type} objects.
+    if (Array.isArray(detail) && typeof detail[0]?.msg === 'string') {
+      return detail[0].msg;
+    }
+  } catch {
+    // Not JSON (a proxy error page, say) — the status code is all we have.
+  }
+  return fallback;
 }
 
 async function postForEmbedding(path, init, signal) {
@@ -81,10 +116,7 @@ async function postForEmbedding(path, init, signal) {
   }
 
   if (!response.ok) {
-    throw new SearchError(
-      'ai-failed',
-      `AI service returned ${response.status} for ${path}`,
-    );
+    throw new SearchError('ai-failed', await failureMessage(response, path));
   }
 
   let body;
@@ -106,9 +138,33 @@ async function postForEmbedding(path, init, signal) {
   return body;
 }
 
+/**
+ * Embeds a typed description via POST /embed/text (US-11).
+ *
+ * The caller may type freely — a phrase, a sentence, English or Filipino — and
+ * does not need to name a category or tag. Blank input is rejected here rather
+ * than at the service: an empty description still encodes to a meaningless
+ * vector that scores close to every item, so the search would "succeed" while
+ * showing arbitrary results.
+ */
 export async function embedText(text, signal) {
+  const clean = (text ?? '').trim();
+
+  if (!clean) {
+    throw new SearchError(
+      'ai-failed',
+      'Describe the item you are looking for in a few words.',
+    );
+  }
+  if (clean.length > MAX_EMBED_TEXT_LENGTH) {
+    throw new SearchError(
+      'ai-failed',
+      `Description is too long. Keep it under ${MAX_EMBED_TEXT_LENGTH} characters.`,
+    );
+  }
+
   const form = new FormData();
-  form.append('text', text);
+  form.append('text', clean);
   const body = await postForEmbedding('/embed/text', { body: form }, signal);
   return {
     embedding: body.vector,
