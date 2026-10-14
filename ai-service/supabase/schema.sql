@@ -320,6 +320,7 @@ create or replace function public.release_item_at_counter(
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 begin
     update public.items
@@ -347,6 +348,7 @@ create or replace function public.transfer_item_custody(
 returns void
 language plpgsql
 security definer
+set search_path = public, pg_temp
 as $$
 begin
     update public.items
