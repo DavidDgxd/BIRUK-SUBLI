@@ -923,6 +923,7 @@ img {
 }
 
 .result-card {
+  position: relative; /* containing block for the title button's overlay */
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -977,10 +978,56 @@ img {
 }
 
 .result-card__title {
+  min-width: 0;
   font-size: var(--type-title-sm);
   font-weight: 500;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+/* Opens the item detail view (US-18). The button wraps only the title, so the
+   control's accessible name is the item itself; the overlay below stretches
+   its hit area — and its focus ring — over the whole card, which keeps this to
+   one focus stop instead of a nested control per card. */
+.result-card__open {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.result-card__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+}
+
+.result-card__open:hover {
+  text-decoration: underline;
+}
+
+/* The ring moves to the overlay so it outlines the card, not the title text. */
+.result-card__open:focus-visible {
+  outline: none;
+}
+
+/* Offset inwards: the card clips its overflow, so an outward ring would be
+   cut off at the rounded edge. */
+.result-card__open:focus-visible::after {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -3px;
+}
+
+.result-card__open-icon {
+  margin-inline-start: var(--space-0-5);
+  font-size: 20px;
+  vertical-align: middle;
+  color: var(--md-sys-color-primary);
 }
 
 .result-card__badge {
@@ -1728,4 +1775,186 @@ img {
 
 .staff-gate__checking .icon {
   font-size: 20px;
+}
+
+/* ==================== 17. Item detail dialog (US-18) ==================== */
+.item-dialog {
+  width: min(560px, calc(100vw - var(--space-4)));
+  max-height: calc(100dvh - var(--space-4));
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: var(--radius-card);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.item-dialog::backdrop {
+  background: color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
+}
+
+.item-dialog__body {
+  display: grid;
+  max-height: calc(100dvh - var(--space-4));
+  overflow-y: auto;
+}
+
+/* Taller than the result card's 16/9: this view is the last look a claimant
+   gets before travelling, so the photo is as large as the width allows. */
+.item-dialog__media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--md-sys-color-surface-container);
+}
+
+/* contain, not cover — cropping the item out of frame would defeat the point
+   of the view. Any letterboxing sits on the container's own surface. */
+.item-dialog__media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.item-dialog__no-photo {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.item-dialog__no-photo .icon {
+  font-size: 56px;
+}
+
+.item-dialog__content {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+}
+
+.item-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.item-dialog__title {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--type-title);
+  line-height: 1.2;
+  color: var(--md-sys-color-primary);
+  overflow-wrap: anywhere;
+}
+
+.item-dialog__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-1-5);
+}
+
+.item-dialog__badge {
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.item-dialog__badge--strong {
+  background: var(--bs-match-strong-container);
+  color: var(--bs-match-strong-on-container);
+}
+
+.item-dialog__badge--moderate {
+  background: var(--bs-match-moderate-container);
+  color: var(--bs-match-moderate-on-container);
+}
+
+.item-dialog__badge--weak {
+  background: var(--bs-match-weak-container);
+  color: var(--bs-match-weak-on-container);
+}
+
+.item-dialog__ref {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-label);
+  letter-spacing: 0.5px;
+}
+
+.item-dialog__category {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-pill);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-label);
+  font-weight: 500;
+}
+
+.item-dialog__category .icon {
+  font-size: 16px;
+}
+
+/* Says why the marks are not on this screen, so their absence reads as the
+   verification step rather than as a gap in the record. */
+.item-dialog__verify {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.item-dialog__verify .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+.item-dialog__office {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-field);
+  font-size: var(--type-body-lg);
+}
+
+.item-dialog__office-name,
+.item-dialog__office-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.item-dialog__office-name {
+  font-weight: 500;
+}
+
+.item-dialog__office .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+.item-dialog__office-line {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.item-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
 }
