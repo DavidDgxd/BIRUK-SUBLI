@@ -148,32 +148,102 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate added/modified migrations
+      - name: Validate changed schema files
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          # Everything under supabase/migrations as that directory grows, plus the
+          # standalone schema file the ai-service keeps its own copy of.
           mapfile -t files < <(
-            git diff --name-only --diff-filter=AM "$BASE_SHA...$HEAD_SHA" -- supabase/migrations \
+            git diff --name-only --diff-filter=AM "$BASE_SHA...$HEAD_SHA" \
+              -- supabase/migrations ai-service/supabase/schema.sql \
               | grep -E '\.sql$' || true
           )
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "No migration .sql files added or modified in this PR."
+            echo "No schema .sql files added or modified in this PR."
             exit 0
           fi
 
           fail=0
           for file in "${files[@]}"; do
             echo "Checking $file"
-            # SECURITY DEFINER without a pinned search_path is a privilege-escalation footgun.
-            if grep -qiE 'security[[:space:]]+definer' "$file" && ! grep -qiE 'search_path' "$file"; then
-              echo "::error file=$file::SECURITY DEFINER requires an explicit search_path (e.g. SET search_path = '')"
-              fail=1
-            fi
-            # Every CREATE TABLE must be paired with RLS being enabled.
-            if grep -qiE 'create[[:space:]]+table' "$file" && ! grep -qiE 'enable[[:space:]]+row[[:space:]]+level[[:space:]]+security' "$file"; then
-              echo "::error file=$file::CREATE TABLE requires a matching ENABLE ROW LEVEL SECURITY"
+
+            # Findings are reported per table and per function header rather than per
+            # file. A monolithic schema file (ai-service/supabase/schema.sql is ~750
+            # lines) almost always contains at least one ENABLE ROW LEVEL SECURITY and
+            # one search_path somewhere, so a whole-file "does it contain X?" test would
+            # pass no matter what else in the file is broken. SQL comments are stripped
+            # first, so prose that merely mentions SECURITY DEFINER can neither raise a
+            # finding nor mask a real one; line numbers are preserved for annotations.
+            findings=$(awk '
+              function bare(t,   s) {
+                s = t
+                sub(/^.*[[:space:]]/, "", s)
+                gsub(/"/, "", s)
+                sub(/^[a-z0-9_]+[.]/, "", s)
+                return s
+              }
+              function check_definer() {
+                if (hdr ~ /security[[:space:]]+definer/ && hdr !~ /search_path/) {
+                  printf "%d\tSECURITY DEFINER without a SET search_path clause\n", start
+                }
+              }
+              {
+                line = ""; i = 1
+                while (i <= length($0)) {
+                  if (inblk) {
+                    if (substr($0, i, 2) == "*/") { inblk = 0; i += 2 } else { i++ }
+                    continue
+                  }
+                  if (substr($0, i, 2) == "/*") { inblk = 1; i += 2; continue }
+                  if (substr($0, i, 2) == "--") break
+                  line = line substr($0, i, 1); i++
+                }
+                l = tolower(line)
+
+                if (match(l, /create[[:space:]]+table[[:space:]]+(if[[:space:]]+not[[:space:]]+exists[[:space:]]+)?[a-z0-9_".]+/)) {
+                  created[bare(substr(l, RSTART, RLENGTH))] = NR
+                }
+
+                if (l ~ /alter[[:space:]]+table/) { alt = l } else if (alt != "") { alt = alt " " l }
+                if (alt != "") {
+                  if (match(alt, /alter[[:space:]]+table[[:space:]]+[a-z0-9_".]+[[:space:]]+enable[[:space:]]+row[[:space:]]+level[[:space:]]+security/)) {
+                    s = substr(alt, RSTART, RLENGTH)
+                    sub(/[[:space:]]+enable.*$/, "", s)
+                    rls[bare(s)] = 1
+                    alt = ""
+                  } else if (l ~ /;/) { alt = "" }
+                }
+
+                if (l ~ /create[[:space:]]+(or[[:space:]]+replace[[:space:]]+)?function/) {
+                  if (hdr != "") check_definer()
+                  hdr = l; start = NR
+                  if (l ~ /[$][a-z_]*[$]/) { check_definer(); hdr = "" }
+                  next
+                }
+                if (hdr != "") {
+                  hdr = hdr " " l
+                  if (l ~ /[$][a-z_]*[$]/) { check_definer(); hdr = "" }
+                }
+              }
+              END {
+                if (hdr != "") check_definer()
+                for (t in created) {
+                  if (!(t in rls)) {
+                    printf "%d\tCREATE TABLE without a matching ENABLE ROW LEVEL SECURITY\n", created[t]
+                  }
+                }
+              }
+            ' "$file" | sort -n)
+
+            if [ -n "$findings" ]; then
+              while IFS=$'\t' read -r lineno message; do
+                if [ -n "$lineno" ]; then
+                  echo "::error file=$file,line=$lineno::$message"
+                fi
+              done <<< "$findings"
               fail=1
             fi
           done
