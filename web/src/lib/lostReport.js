@@ -1,5 +1,10 @@
 import { supabase } from './supabase.js';
-import { embedImageOrNull, embedText, SearchError } from './aiService.js';
+import {
+  embedImageOrNull,
+  embedText,
+  MAX_EMBED_TEXT_LENGTH,
+  SearchError,
+} from './aiService.js';
 import { combineEmbeddings } from './searchItems.js';
 
 /*
@@ -33,8 +38,12 @@ export async function submitLostReport({
   photo,
   signal,
 }) {
+  // A description may sit right at the embed limit; the row keeps it in full,
+  // but only what /embed/text accepts is sent for matching.
+  const matchingText = description.trim().slice(0, MAX_EMBED_TEXT_LENGTH);
+
   const [textResult, photoEmbedding] = await Promise.all([
-    embedText(description.trim(), signal),
+    embedText(matchingText, signal),
     photo ? embedImageOrNull(photo, signal, { label: 'lostReport' }) : null,
   ]);
 

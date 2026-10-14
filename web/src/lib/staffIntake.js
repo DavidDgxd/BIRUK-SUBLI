@@ -1,5 +1,10 @@
 import { supabase } from './supabase.js';
-import { embedImageOrNull, embedText, SearchError } from './aiService.js';
+import {
+  embedImageOrNull,
+  embedText,
+  MAX_EMBED_TEXT_LENGTH,
+  SearchError,
+} from './aiService.js';
 import { combineEmbeddings } from './searchItems.js';
 import { uploadItemImage } from './storage.js';
 
@@ -57,9 +62,14 @@ export async function submitStaffCustody({
 
   // Storage location is deliberately left out: where a shelf is says nothing
   // about what the item is, and it would only add noise to the vector.
+  //
+  // A full description runs to 1000 characters on its own, so the joined text
+  // can exceed what /embed/text accepts. The opening of the description holds
+  // the identifying detail; the row still stores every field in full.
   const matchingText = [cleanTitle, category, cleanDescription]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
+    .slice(0, MAX_EMBED_TEXT_LENGTH);
 
   const [imageUrl, textResult, photoEmbedding] = await Promise.all([
     uploadItemImage(photo, signal, 'staff-intake'),
