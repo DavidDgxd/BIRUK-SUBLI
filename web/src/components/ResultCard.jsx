@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Icon from './Icon.jsx';
 import { calibrateMatchScore } from '../lib/searchItems.js';
 
-export default function ResultCard({ item }) {
+export default function ResultCard({ item, onOpen }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = item.image_url && !imageFailed;
   const { percent, tier } = calibrateMatchScore(item.similarity);
@@ -30,7 +30,18 @@ export default function ResultCard({ item }) {
 
       <div className="result-card__body">
         <div className="result-card__head">
-          <h3 className="result-card__title">{item.title}</h3>
+          <h3 className="result-card__title">
+            {/* The button owns the whole card through a stretched overlay, so
+                one control opens the details and its name is the item. */}
+            <button
+              type="button"
+              className="result-card__open"
+              onClick={() => onOpen(item)}
+            >
+              {item.title}
+              <Icon name="chevron_right" className="result-card__open-icon" />
+            </button>
+          </h3>
           <span className={`result-card__badge result-card__badge--${tier}`}>
             {percent}% Match
           </span>
