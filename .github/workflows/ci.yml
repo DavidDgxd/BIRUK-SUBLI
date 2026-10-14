@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  pull_request:
+
+# One run per PR head branch; a new push cancels the run already in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+# Least privilege by default; jobs below only widen this where they must.
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so the PR base SHA is available for diffing.
+          fetch-depth: 0
+
+      - name: Branch name follows convention
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|chore|docs|refactor)/([A-Z]+-[0-9]+-)?[a-z0-9]+(-[a-z0-9]+)*$'
+          if [[ ! "$HEAD_REF" =~ $pattern ]]; then
+            echo "::error::Branch '$HEAD_REF' does not match <type>/<STORY-ID>-<short-description> ($pattern)"
+            exit 1
+          fi
+          if [[ "$HEAD_REF" =~ -v[0-9]+$ ]]; then
+            echo "::error::Branch '$HEAD_REF' must not end in -v<number>; keep the same branch name instead"
+            exit 1
+          fi
+          echo "Branch name OK: $HEAD_REF"
+
+      - name: No .env* file is added
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          added=$(git diff --name-only --diff-filter=A "$BASE_SHA...$HEAD_SHA")
+          offenders=$(printf '%s\n' "$added" | grep -E '(^|/)\.env[^/]*$' || true)
+          if [ -n "$offenders" ]; then
+            while IFS= read -r file; do
+              echo "::error file=$file::.env* files must never be committed"
+            done <<< "$offenders"
+            exit 1
+          fi
+          echo "No .env* files added."
+
+      - name: Warn when the diff is large
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          total=$(gh pr view "$PR_NUMBER" --json additions,deletions --jq '.additions + .deletions')
+          echo "Diff size: $total changed lines"
+          if [ "$total" -gt 400 ]; then
+            echo "::warning::This PR touches $total lines (>400). Consider splitting it into smaller PRs."
+          fi
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # web/ installs with npm and commits a package-lock.json.
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  ai-service:
+    name: ai-service
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Non-blocking on purpose: main.py and seed_item.py already fail `ruff check` on main
+    # (I001 + B008 in main.py, EXE001 in seed_item.py). Those are pre-existing app-code
+    # findings, not workflow problems, so this job is left continue-on-error until the
+    # app code is cleaned up -- then remove this flag to make the check enforcing.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ai-service
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        # ruff only. The service's runtime deps (torch/transformers) are far too heavy
+        # to install in CI and are not needed to lint or syntax-check the source.
+        run: pip install --disable-pip-version-check ruff
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: Byte-compile sources
+        run: python -m compileall -q .
+
+  schema:
+    name: schema
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate added/modified migrations
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(
+            git diff --name-only --diff-filter=AM "$BASE_SHA...$HEAD_SHA" -- supabase/migrations \
+              | grep -E '\.sql$' || true
+          )
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No migration .sql files added or modified in this PR."
+            exit 0
+          fi
+
+          fail=0
+          for file in "${files[@]}"; do
+            echo "Checking $file"
+            # SECURITY DEFINER without a pinned search_path is a privilege-escalation footgun.
+            if grep -qiE 'security[[:space:]]+definer' "$file" && ! grep -qiE 'search_path' "$file"; then
+              echo "::error file=$file::SECURITY DEFINER requires an explicit search_path (e.g. SET search_path = '')"
+              fail=1
+            fi
+            # Every CREATE TABLE must be paired with RLS being enabled.
+            if grep -qiE 'create[[:space:]]+table' "$file" && ! grep -qiE 'enable[[:space:]]+row[[:space:]]+level[[:space:]]+security' "$file"; then
+              echo "::error file=$file::CREATE TABLE requires a matching ENABLE ROW LEVEL SECURITY"
+              fail=1
+            fi
+          done
+          exit "$fail"
