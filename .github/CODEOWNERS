@@ -1,12 +1,2 @@
-# Reviewers requested automatically per path.
-# Owners are the top committer per path, taken from `git shortlog -sne -- <path>`:
-#   web/        Edrel Aquino <edrelaquino02@proton.me>  12 commits
-#   ai-service/ Edrel Aquino <edrelaquino02@proton.me>  14 commits
-#   supabase/   DavidDgxd <20251028@s.ubaguo.edu>        2 commits
-
-# Fallback for anything not matched below (repo owner).
-*             @DavidDgxd
-
-/web/         @Eddie02345
-/ai-service/  @Eddie02345
-/supabase/    @DavidDgxd
+# Auto-requests a reviewer on every PR. Not required for merge; any teammate with write access can approve.
+* @DavidDgxd
