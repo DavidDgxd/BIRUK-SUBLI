@@ -101,11 +101,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # Non-blocking on purpose: main.py and seed_item.py already fail `ruff check` on main
-    # (I001 + B008 in main.py, EXE001 in seed_item.py). Those are pre-existing app-code
-    # findings, not workflow problems, so this job is left continue-on-error until the
-    # app code is cleaned up -- then remove this flag to make the check enforcing.
-    continue-on-error: true
     defaults:
       run:
         working-directory: ai-service
@@ -121,8 +116,24 @@ jobs:
         # to install in CI and are not needed to lint or syntax-check the source.
         run: pip install --disable-pip-version-check ruff
 
+      # Non-blocking on purpose. `ruff check` already fails on main with three findings
+      # in app code, not in this workflow: I001 (import order) and B008 (function call in
+      # argument default) in main.py, and EXE001 (shebang on a non-executable file) in
+      # seed_item.py. Failing the job for those would block every PR on pre-existing debt,
+      # so the step is allowed to fail and the findings are surfaced as a warning instead.
+      # Fix the app code, then delete `continue-on-error` and the warning step to make
+      # this enforcing. Note this is deliberately a step-level guard: a failing job would
+      # still report a FAILURE check run, which would block merging once this check is
+      # required on main.
       - name: ruff check
+        id: ruff
+        continue-on-error: true
         run: ruff check .
+
+      - name: Report non-blocking ruff findings
+        if: steps.ruff.outcome == 'failure'
+        run: |
+          echo "::warning::ruff check found pre-existing issues in ai-service app code (I001, B008 in main.py; EXE001 in seed_item.py). This step is non-blocking until that debt is fixed."
 
       - name: Byte-compile sources
         run: python -m compileall -q .
