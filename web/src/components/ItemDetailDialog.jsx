@@ -149,7 +149,6 @@ export default function ItemDetailDialog({ open, item, onClose }) {
                 className="btn btn--filled"
                 onClick={onClose}
               >
-                <Icon name="check" />
                 Close
               </button>
             </div>
