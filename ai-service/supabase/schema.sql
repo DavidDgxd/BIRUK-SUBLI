@@ -262,6 +262,67 @@ grant execute on function public.match_items(vector, double precision, integer, 
 
 
 -- ============================================================================
+-- 6b. RPC: PUBLIC ITEM DETAIL (US-18)
+-- One held item, by id, for the standalone detail page at /items/:id.
+--
+-- This is the second and last route by which an anonymous caller reaches
+-- `items`. It returns exactly match_items' projection minus `similarity` — the
+-- two public read surfaces are kept identical on purpose, so there is one short
+-- column list to audit rather than two that can drift apart. description,
+-- storage_location, cash and claimant fields stay out for the reason in
+-- section 12: a claimant who can read the marks can pass the counter check.
+--
+-- The status filter matches match_items too. A released, transferred or
+-- disposed item is not a live result, and it must not be readable by link
+-- either — otherwise the page would outlive the search that hides it.
+--
+-- Idempotent: `drop` first so a changed return type can be re-applied, the same
+-- reason match_items drops before it recreates.
+-- ============================================================================
+drop function if exists public.get_item_public(uuid);
+
+create or replace function public.get_item_public (item_id_input uuid)
+returns table (
+    id uuid,
+    ref_code text,
+    title text,
+    category text,
+    status text,
+    image_url text,
+    holding_office_id text,
+    holding_office_name text,
+    counter_hours text,
+    office_address text,
+    created_at timestamptz
+)
+language sql stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select
+        items.id,
+        items.ref_code,
+        items.title,
+        items.category,
+        items.status,
+        items.image_url,
+        items.holding_office_id,
+        offices.name as holding_office_name,
+        offices.counter_hours,
+        offices.address as office_address,
+        items.created_at
+    from public.items
+    join public.offices on items.holding_office_id = offices.id
+    where items.id = item_id_input
+      and items.status = 'held';
+$$;
+
+revoke all on function public.get_item_public(uuid) from public;
+grant execute on function public.get_item_public(uuid)
+    to anon, authenticated, service_role;
+
+
+-- ============================================================================
 -- 7. RPC: REVERSE MATCHING ENGINE
 -- Compares newly logged items against open citizen lost-reports.
 -- Excludes previously reviewed or dismissed candidate pairings.

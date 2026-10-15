@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { calibrateMatchScore } from '../lib/searchItems.js';
 
-export default function ResultCard({ item, onOpen }) {
+export default function ResultCard({ item }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = item.image_url && !imageFailed;
   const { percent, tier } = calibrateMatchScore(item.similarity);
@@ -31,16 +32,20 @@ export default function ResultCard({ item, onOpen }) {
       <div className="result-card__body">
         <div className="result-card__head">
           <h3 className="result-card__title">
-            {/* The button owns the whole card through a stretched overlay, so
-                one control opens the details and its name is the item. */}
-            <button
-              type="button"
-              className="result-card__open"
-              onClick={() => onOpen(item)}
+            {/* The link owns the whole card through a stretched overlay, so one
+                control opens the details and its name is the item. It is a real
+                anchor rather than a button: the href is what lets the browser
+                offer "open in a new tab" and what makes a middle-click work.
+                The score rides along in router state so the detail page can
+                still show how well this result matched. */}
+            <Link
+              className="result-card__link"
+              to={`/items/${item.id}`}
+              state={{ similarity: item.similarity }}
             >
               {item.title}
-              <Icon name="chevron_right" className="result-card__open-icon" />
-            </button>
+              <Icon name="chevron_right" className="result-card__link-icon" />
+            </Link>
           </h3>
           <span className={`result-card__badge result-card__badge--${tier}`}>
             {percent}% Match
