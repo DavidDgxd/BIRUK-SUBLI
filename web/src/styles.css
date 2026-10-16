@@ -1591,17 +1591,35 @@ img {
   min-width: 14ch;
 }
 
-.office-table__name {
+/* Each cell pairs a bold primary line with a muted line of detail. */
+.office-table__primary {
   display: block;
   font-weight: 600;
 }
 
-.office-table__code {
+.office-table__meta {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-top: var(--space-0-5);
   font-size: var(--type-label);
-  letter-spacing: 0.04em;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+.office-table__email {
+  overflow-wrap: anywhere;
+}
+
+.office-table__none {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.office-table__actions {
+  width: 1%;
+  padding-block: var(--space-0-5);
+  text-align: right;
+}
+
+.office-table__actions .icon-btn {
+  margin-left: auto;
 }
 
 .office-status {
@@ -1613,14 +1631,71 @@ img {
   white-space: nowrap;
 }
 
-.office-status--active {
+.office-status--ready {
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
+}
+
+.office-status--pending {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .office-status--suspended {
   background: var(--md-sys-color-tertiary-container);
   color: var(--md-sys-color-on-tertiary-container);
+}
+
+/* Row actions menu. Fixed so the table's scroll container cannot clip it;
+   OfficeActionsMenu sets top/right from the kebab button. */
+.office-menu {
+  position: fixed;
+  z-index: 10;
+  min-width: 200px;
+  margin-top: var(--space-0-5);
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.office-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--type-body-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.office-menu__item:hover,
+.office-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+.office-menu__item[aria-disabled='true'] {
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: not-allowed;
+}
+
+.office-menu__item[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.office-menu__label {
+  display: grid;
+}
+
+.office-menu__hint {
+  font-size: var(--type-label);
 }
 
 /* "+ ADD AN OFFICE" dialog */
@@ -1729,19 +1804,6 @@ img {
   gap: var(--space-1);
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-body-md);
-}
-
-.office-table__action {
-  min-height: var(--tap-target);
-  padding: var(--space-0-5) var(--space-1-5);
-  font-size: var(--type-body-md);
-  white-space: nowrap;
-}
-
-.office-table__action-note {
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: var(--type-body-md);
-  white-space: nowrap;
 }
 
 /* ==================== 16. Staff shared login (US-02) ==================== */

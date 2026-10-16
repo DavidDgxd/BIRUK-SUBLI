@@ -14,7 +14,7 @@ import { supabase } from './supabase.js';
  *
  * Columns map onto schema.sql's `offices` table: phone_number is the office's
  * contact line and counter_hours its opening hours. `auth_user_id` is set when
- * the shared login has been provisioned and drives the "Login" column.
+ * the shared login has been provisioned and drives the "Account status" column.
  */
 
 /** code: 'db' | 'provision' | 'reset' */
