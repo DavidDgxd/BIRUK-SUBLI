@@ -1550,7 +1550,6 @@ img {
 }
 
 .office-admin__table-wrap {
-  overflow-x: auto;
   border-radius: var(--radius-field);
   background: var(--md-sys-color-surface-container-lowest);
   box-shadow:
@@ -1562,46 +1561,155 @@ img {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--type-body-md);
-}
-
-.office-table th,
-.office-table td {
-  padding: var(--space-1-5) var(--space-2);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
   text-align: left;
-  vertical-align: top;
 }
 
-.office-table thead th {
-  background: var(--md-sys-color-surface-container);
+/* Phones: each row is a stacked card, so nothing scrolls sideways. The column
+   headings are hidden visually but kept for screen readers, and the cells that
+   need one show their heading as a label (data-label). */
+.office-table thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.office-table tbody {
+  display: block;
+}
+
+.office-table tbody tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1-5) var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.office-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.office-table tbody th,
+.office-table tbody td {
+  display: block;
+}
+
+.office-table__hours,
+.office-table__email,
+.office-table__status {
+  grid-column: 1 / -1;
+}
+
+.office-table__email {
+  overflow-wrap: anywhere;
+}
+
+.office-table__none {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.office-table td[data-label]::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: var(--space-0-5);
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-label);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
-.office-table tbody tr:last-child th,
-.office-table tbody tr:last-child td {
-  border-bottom: none;
+/* Tablet and up: a real table again. */
+@media (min-width: 600px) {
+  .office-admin__table-wrap {
+    overflow-x: auto;
+  }
+
+  .office-table thead {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+
+  .office-table tbody {
+    display: table-row-group;
+  }
+
+  .office-table tbody tr {
+    display: table-row;
+    padding: 0;
+    border-bottom: none;
+  }
+
+  .office-table th,
+  .office-table td,
+  .office-table tbody th,
+  .office-table tbody td {
+    display: table-cell;
+    padding: var(--space-1-5) var(--space-2);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    vertical-align: top;
+  }
+
+  .office-table thead th {
+    background: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--type-label);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .office-table tbody tr:last-child th,
+  .office-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .office-table td[data-label]::before {
+    content: none;
+  }
+
+  .office-table__office {
+    min-width: 14ch;
+  }
 }
 
-.office-table__office {
-  min-width: 14ch;
-}
-
-.office-table__name {
+/* Each cell pairs a bold primary line with a muted line of detail. */
+.office-table__primary {
   display: block;
   font-weight: 600;
 }
 
-.office-table__code {
+.office-table__meta {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-top: var(--space-0-5);
   font-size: var(--type-label);
-  letter-spacing: 0.04em;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+/* On phones the kebab sits top-right of its card, beside the office name. */
+.office-table__actions {
+  grid-column: 2;
+  grid-row: 1;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0 0;
+}
+
+@media (min-width: 600px) {
+  .office-table__actions,
+  .office-table tbody .office-table__actions {
+    width: 1%;
+    margin: 0;
+    padding-block: var(--space-0-5);
+  }
+}
+
+.office-table__actions .icon-btn {
+  margin-left: auto;
 }
 
 .office-status {
@@ -1613,14 +1721,71 @@ img {
   white-space: nowrap;
 }
 
-.office-status--active {
+.office-status--ready {
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
+}
+
+.office-status--pending {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .office-status--suspended {
   background: var(--md-sys-color-tertiary-container);
   color: var(--md-sys-color-on-tertiary-container);
+}
+
+/* Row actions menu. Fixed so the table's scroll container cannot clip it;
+   OfficeActionsMenu sets top/right from the kebab button. */
+.office-menu {
+  position: fixed;
+  z-index: 10;
+  min-width: 200px;
+  margin-top: var(--space-0-5);
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.office-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--type-body-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.office-menu__item:hover,
+.office-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+.office-menu__item[aria-disabled='true'] {
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: not-allowed;
+}
+
+.office-menu__item[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.office-menu__label {
+  display: grid;
+}
+
+.office-menu__hint {
+  font-size: var(--type-label);
 }
 
 /* "+ ADD AN OFFICE" dialog */
@@ -1729,19 +1894,6 @@ img {
   gap: var(--space-1);
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-body-md);
-}
-
-.office-table__action {
-  min-height: var(--tap-target);
-  padding: var(--space-0-5) var(--space-1-5);
-  font-size: var(--type-body-md);
-  white-space: nowrap;
-}
-
-.office-table__action-note {
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: var(--type-body-md);
-  white-space: nowrap;
 }
 
 /* ==================== 16. Staff shared login (US-02) ==================== */

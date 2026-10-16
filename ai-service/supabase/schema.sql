@@ -541,6 +541,33 @@ as $$
     group by o.id, o.name;
 $$;
 
+-- Central admin only: the login email behind each office's shared account.
+-- The address lives in auth.users, not on the anon-readable offices table, so
+-- it is never published with the directory. The role comes from app_metadata,
+-- which only the service_role can write (same rule as _shared/adminAuth.ts).
+create or replace function public.list_office_logins()
+returns table (office_id text, email text)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin' then
+        raise exception 'Only the central admin can list office logins.'
+            using errcode = '42501';
+    end if;
+
+    return query
+        select o.id, u.email::text
+        from public.offices o
+        join auth.users u on u.id = o.auth_user_id;
+end;
+$$;
+
+revoke all on function public.list_office_logins() from public, anon;
+grant execute on function public.list_office_logins() to authenticated;
+
 
 -- ============================================================================
 -- 12. SECURITY & ROW LEVEL SECURITY (RLS) POLICIES

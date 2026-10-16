@@ -14,7 +14,7 @@ import { supabase } from './supabase.js';
  *
  * Columns map onto schema.sql's `offices` table: phone_number is the office's
  * contact line and counter_hours its opening hours. `auth_user_id` is set when
- * the shared login has been provisioned and drives the "Login" column.
+ * the shared login has been provisioned and drives the "Account status" column.
  */
 
 /** code: 'db' | 'provision' | 'reset' */
@@ -39,6 +39,21 @@ export async function listOffices({ signal } = {}) {
   const { data, error } = await query;
   if (error) throw new OfficeError('db', error.message);
   return data ?? [];
+}
+
+/**
+ * Loads each office's login email through the admin-only `list_office_logins`
+ * RPC. The address lives in auth.users, not on the public `offices` table.
+ *
+ * Resolves to a Map of office id → email.
+ */
+export async function listOfficeLogins({ signal } = {}) {
+  let query = supabase.rpc('list_office_logins');
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
+  if (error) throw new OfficeError('db', error.message);
+  return new Map((data ?? []).map((row) => [row.office_id, row.email]));
 }
 
 /**
