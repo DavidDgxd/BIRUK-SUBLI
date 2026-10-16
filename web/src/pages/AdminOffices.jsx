@@ -181,7 +181,10 @@ export default function AdminOffices() {
                                   {office.address}
                                 </span>
                               </th>
-                              <td>
+                              <td
+                                className="office-table__hours"
+                                data-label="Hours & contact"
+                              >
                                 <span className="office-table__primary">
                                   {office.counter_hours}
                                 </span>
@@ -189,14 +192,20 @@ export default function AdminOffices() {
                                   {office.phone_number || '—'}
                                 </span>
                               </td>
-                              <td className="office-table__email">
+                              <td
+                                className="office-table__email"
+                                data-label="Login email"
+                              >
                                 {logins.get(office.id) ?? (
                                   <span className="office-table__none">
                                     Not provided
                                   </span>
                                 )}
                               </td>
-                              <td>
+                              <td
+                                className="office-table__status"
+                                data-label="Account status"
+                              >
                                 <span
                                   className={`office-status office-status--${status.key}`}
                                 >
