@@ -42,6 +42,21 @@ export async function listOffices({ signal } = {}) {
 }
 
 /**
+ * Loads each office's login email through the admin-only `list_office_logins`
+ * RPC. The address lives in auth.users, not on the public `offices` table.
+ *
+ * Resolves to a Map of office id → email.
+ */
+export async function listOfficeLogins({ signal } = {}) {
+  let query = supabase.rpc('list_office_logins');
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
+  if (error) throw new OfficeError('db', error.message);
+  return new Map((data ?? []).map((row) => [row.office_id, row.email]));
+}
+
+/**
  * Calls an office-management Edge Function and unwraps its answer.
  *
  * The functions report failures as `{ error }` with a non-2xx status, which
