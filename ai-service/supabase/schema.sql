@@ -34,6 +34,12 @@ create table if not exists public.offices (
     created_at timestamptz default timezone('utc'::text, now()) not null
 );
 
+-- Office rows are written by the provision-office Edge Function. Drop the old
+-- auth.users trigger that tried to do it too: it targeted columns this table
+-- does not have (user_id, office_name), so any matching signup would fail.
+drop trigger if exists on_auth_office_user_created on auth.users;
+drop function if exists public.handle_new_office_user();
+
 
 -- ============================================================================
 -- 3. FOUND ITEMS INVENTORY & CUSTODY LOGBOOK
@@ -105,7 +111,9 @@ create index if not exists items_date_received_idx on public.items (date_receive
 
 -- Trigger: Automatically enforces the 6-month holding deadline on cash deposits
 create or replace function public.calculate_cash_reward_date()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
     if new.is_cash = true and new.reward_date is null then
         new.reward_date := new.date_received + interval '6 months';
@@ -344,6 +352,7 @@ returns table (
     similarity float
 )
 language sql stable
+set search_path = public, pg_temp
 as $$
     select
         lr.id as lost_report_id,
@@ -383,9 +392,21 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+    v_office_id text;
 begin
+    -- Only the signed-in office holding the item may release it.
+    select id into v_office_id
+    from public.offices
+    where auth_user_id = auth.uid() and status = 'active';
+
+    if v_office_id is null or v_office_id is distinct from p_releasing_office_id then
+        raise exception 'Only the signed-in office can release its items.'
+            using errcode = '42501';
+    end if;
+
     update public.items
-    set 
+    set
         status = 'released',
         releasing_office_id = p_releasing_office_id,
         claimant_name = p_claimant_name,
@@ -393,9 +414,18 @@ begin
         release_notes = p_release_notes,
         released_at = timezone('utc'::text, now()),
         updated_at = timezone('utc'::text, now())
-    where id = p_item_id;
+    where id = p_item_id
+      and holding_office_id = v_office_id;
+
+    if not found then
+        raise exception 'Item % is not held by this office.', p_item_id
+            using errcode = '42501';
+    end if;
 end;
 $$;
+
+revoke all on function public.release_item_at_counter(uuid, text, text, text, text) from public, anon;
+grant execute on function public.release_item_at_counter(uuid, text, text, text, text) to authenticated;
 
 
 -- ============================================================================
@@ -411,14 +441,35 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+    v_office_id text;
 begin
+    -- Only the signed-in office currently holding the item may hand it over.
+    select id into v_office_id
+    from public.offices
+    where auth_user_id = auth.uid() and status = 'active';
+
+    if v_office_id is null then
+        raise exception 'Only a signed-in office can transfer custody.'
+            using errcode = '42501';
+    end if;
+
     update public.items
-    set 
+    set
         holding_office_id = p_new_office_id,
         updated_at = timezone('utc'::text, now())
-    where id = p_item_id;
+    where id = p_item_id
+      and holding_office_id = v_office_id;
+
+    if not found then
+        raise exception 'Item % is not held by this office.', p_item_id
+            using errcode = '42501';
+    end if;
 end;
 $$;
+
+revoke all on function public.transfer_item_custody(uuid, text) from public, anon;
+grant execute on function public.transfer_item_custody(uuid, text) to authenticated;
 
 -- ============================================================================
 -- 10. STAFF ACTION VIEW
@@ -475,6 +526,7 @@ returns table (
     avg_days_held numeric
 )
 language sql stable
+set search_path = public, pg_temp
 as $$
     select 
         o.id as office_id,
