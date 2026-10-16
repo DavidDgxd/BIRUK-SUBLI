@@ -8,7 +8,9 @@
  *
  * Sections: 1 Tokens, 2 Base, 3 Layout, 4 Buttons, 5 Header, 6 Mist hero,
  * 7 Search, 8 Report cards, 9 How it works, 10 Footer, 11 Placeholder page,
- * 12 Search results.
+ * 12 Search results, 13 Lost report form, 14 Staff custody intake,
+ * 15 Central admin offices, 15b Credential reset dialog, 16 Staff shared login,
+ * 17 Item details page.
  */
 
 /* ============================== 1. Tokens ============================== */
@@ -822,6 +824,18 @@ img {
   background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
 }
 
+/* The same control as a button: used where the action is "go back through
+   history" rather than "go to this known page". Back restores the search
+   exactly as it was — including an uploaded photo, which only history state
+   carries — so it beats a link to a rebuilt /search URL. */
+.results__back--button {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
 .results__title {
   font-family: var(--font-display);
   font-weight: 700;
@@ -923,7 +937,7 @@ img {
 }
 
 .result-card {
-  position: relative; /* containing block for the title button's overlay */
+  position: relative; /* containing block for the title link's overlay */
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -989,41 +1003,36 @@ img {
    control's accessible name is the item itself; the overlay below stretches
    its hit area — and its focus ring — over the whole card, which keeps this to
    one focus stop instead of a nested control per card. */
-.result-card__open {
+.result-card__link {
   display: inline;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
   color: inherit;
-  text-align: start;
-  cursor: pointer;
+  text-decoration: none;
 }
 
-.result-card__open::after {
+.result-card__link::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: var(--radius-card);
 }
 
-.result-card__open:hover {
+.result-card__link:hover {
   text-decoration: underline;
 }
 
 /* The ring moves to the overlay so it outlines the card, not the title text. */
-.result-card__open:focus-visible {
+.result-card__link:focus-visible {
   outline: none;
 }
 
 /* Offset inwards: the card clips its overflow, so an outward ring would be
    cut off at the rounded edge. */
-.result-card__open:focus-visible::after {
+.result-card__link:focus-visible::after {
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: -3px;
 }
 
-.result-card__open-icon {
+.result-card__link-icon {
   margin-inline-start: var(--space-0-5);
   font-size: 20px;
   vertical-align: middle;
@@ -1777,40 +1786,33 @@ img {
   font-size: 20px;
 }
 
-/* ==================== 17. Item detail dialog (US-18) ==================== */
-.item-dialog {
-  width: min(560px, calc(100vw - var(--space-4)));
-  max-height: calc(100dvh - var(--space-4));
-  padding: 0;
-  overflow: hidden;
-  border: none;
+/* ==================== 17. Item details page (US-18) ==================== */
+/* The standalone /items/:id page. The media block is the claimant's last look
+   at the item before travelling to the counter, so it gets the larger share of
+   the width and shows the photo in full (object-fit: contain) rather than
+   cropping it to a card thumbnail. */
+
+.item-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2);
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container-lowest);
-  color: var(--md-sys-color-on-surface);
-  box-shadow: var(--shadow-2);
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 1px var(--md-sys-color-outline-variant);
 }
 
-.item-dialog::backdrop {
-  background: color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
-}
-
-.item-dialog__body {
-  display: grid;
-  max-height: calc(100dvh - var(--space-4));
-  overflow-y: auto;
-}
-
-/* Taller than the result card's 16/9: this view is the last look a claimant
-   gets before travelling, so the photo is as large as the width allows. */
-.item-dialog__media {
+.item-detail__media {
   position: relative;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-field);
   background: var(--md-sys-color-surface-container);
 }
 
-/* contain, not cover — cropping the item out of frame would defeat the point
-   of the view. Any letterboxing sits on the container's own surface. */
-.item-dialog__media img {
+.item-detail__media img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1818,7 +1820,7 @@ img {
   object-fit: contain;
 }
 
-.item-dialog__no-photo {
+.item-detail__no-photo {
   display: grid;
   place-items: center;
   width: 100%;
@@ -1826,41 +1828,24 @@ img {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.item-dialog__no-photo .icon {
+.item-detail__no-photo .icon {
   font-size: 56px;
 }
 
-.item-dialog__content {
+.item-detail__content {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-2);
-}
-
-.item-dialog__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-content: start;
   gap: var(--space-2);
 }
 
-.item-dialog__title {
-  min-width: 0;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--type-title);
-  line-height: 1.2;
-  color: var(--md-sys-color-primary);
-  overflow-wrap: anywhere;
-}
-
-.item-dialog__meta {
+.item-detail__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1) var(--space-1-5);
 }
 
-.item-dialog__badge {
+.item-detail__badge {
   padding: var(--space-0-5) var(--space-1-5);
   border-radius: var(--radius-pill);
   font-size: var(--type-label);
@@ -1868,63 +1853,61 @@ img {
   white-space: nowrap;
 }
 
-.item-dialog__badge--strong {
+.item-detail__badge--strong {
   background: var(--bs-match-strong-container);
   color: var(--bs-match-strong-on-container);
 }
 
-.item-dialog__badge--moderate {
+.item-detail__badge--moderate {
   background: var(--bs-match-moderate-container);
   color: var(--bs-match-moderate-on-container);
 }
 
-.item-dialog__badge--weak {
+.item-detail__badge--weak {
   background: var(--bs-match-weak-container);
   color: var(--bs-match-weak-on-container);
 }
 
-.item-dialog__ref {
+.item-detail__ref {
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-label);
   letter-spacing: 0.5px;
 }
 
-.item-dialog__category {
+.item-detail__category {
   display: inline-flex;
   align-items: center;
-  justify-self: start;
   gap: var(--space-1);
+  justify-self: start;
   padding: var(--space-0-5) var(--space-1-5);
   border-radius: var(--radius-pill);
   background: var(--md-sys-color-surface-container);
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-label);
-  font-weight: 500;
 }
 
-.item-dialog__category .icon {
+.item-detail__category .icon {
   font-size: 16px;
 }
 
-/* Says why the marks are not on this screen, so their absence reads as the
-   verification step rather than as a gap in the record. */
-.item-dialog__verify {
+.item-detail__verify {
   display: flex;
-  align-items: flex-start;
   gap: var(--space-1);
   padding: var(--space-2);
   border-radius: var(--radius-field);
   background: var(--md-sys-color-surface-container);
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-body-md);
+  overflow-wrap: anywhere;
 }
 
-.item-dialog__verify .icon {
+.item-detail__verify .icon {
+  flex: none;
   font-size: 20px;
   color: var(--md-sys-color-primary);
 }
 
-.item-dialog__office {
+.item-detail__office {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);
@@ -1933,28 +1916,32 @@ img {
   font-size: var(--type-body-lg);
 }
 
-.item-dialog__office-name,
-.item-dialog__office-line {
+.item-detail__office-name,
+.item-detail__office-line {
   display: flex;
-  align-items: flex-start;
   gap: var(--space-1);
+  overflow-wrap: anywhere;
 }
 
-.item-dialog__office-name {
+.item-detail__office-name {
   font-weight: 500;
 }
 
-.item-dialog__office .icon {
+.item-detail__office .icon {
+  flex: none;
   font-size: 20px;
   color: var(--md-sys-color-primary);
 }
 
-.item-dialog__office-line {
+.item-detail__office-line {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.item-dialog__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1-5);
+/* Two columns once there is room, so the photo and the facts sit side by side
+   instead of one being scrolled past to reach the other. */
+@media (min-width: 840px) {
+  .item-detail {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    padding: var(--space-3);
+  }
 }

@@ -3,7 +3,6 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
 import ResultCard from '../components/ResultCard.jsx';
-import ItemDetailDialog from '../components/ItemDetailDialog.jsx';
 import Icon from '../components/Icon.jsx';
 import { searchItems } from '../lib/searchItems.js';
 
@@ -37,9 +36,6 @@ export default function SearchResults() {
 
   const [attempt, setAttempt] = useState(0);
   const [outcome, setOutcome] = useState(null); // { key, items, translatedText } or { key, error }
-  // The result whose details are open. Held here rather than per card so only
-  // one dialog exists no matter how many results the search returns.
-  const [detailItem, setDetailItem] = useState(null);
   const headingRef = useRef(null);
 
   useEffect(() => {
@@ -209,7 +205,7 @@ export default function SearchResults() {
               <ul className="results__list">
                 {primary.map((item) => (
                   <li key={item.id}>
-                    <ResultCard item={item} onOpen={setDetailItem} />
+                    <ResultCard item={item} />
                   </li>
                 ))}
               </ul>
@@ -235,7 +231,7 @@ export default function SearchResults() {
                 <ul className="results__list">
                   {secondary.map((item) => (
                     <li key={item.id}>
-                      <ResultCard item={item} onOpen={setDetailItem} />
+                      <ResultCard item={item} />
                     </li>
                   ))}
                 </ul>
@@ -244,12 +240,6 @@ export default function SearchResults() {
           )}
         </main>
       </div>
-
-      <ItemDetailDialog
-        open={detailItem !== null}
-        item={detailItem}
-        onClose={() => setDetailItem(null)}
-      />
     </>
   );
 }
