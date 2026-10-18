@@ -1386,6 +1386,41 @@ img {
   font-size: 20px;
 }
 
+.staff-bar__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.staff-bar__nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: var(--radius-pill);
+  color: inherit;
+  font-size: var(--type-body-md);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--motion-fast) ease;
+}
+
+.staff-bar__nav-link:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.staff-bar__nav-link[aria-current='page'] {
+  border-color: transparent;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.staff-bar__nav-link .icon {
+  font-size: 20px;
+}
+
 /* Trailing controls: the dev-session badge, a sign-out failure note, and the
    sign-out button itself. */
 .staff-bar__actions {
