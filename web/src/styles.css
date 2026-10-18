@@ -1421,6 +1421,89 @@ img {
   font-size: 20px;
 }
 
+/* Held-items list (US-31). One compact card per item so a counter officer can
+   scan references and storage slots without a dense table. */
+.staff-items {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.staff-items__list {
+  display: grid;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staff-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: inherit;
+  text-decoration: none;
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 1px var(--md-sys-color-outline-variant);
+  transition: background var(--motion-fast) ease;
+}
+
+.staff-item:hover {
+  background: var(--md-sys-color-surface-container);
+}
+
+.staff-item:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.staff-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.staff-item__title {
+  font-size: var(--type-title-sm);
+  font-weight: 600;
+}
+
+.staff-item__head .icon {
+  flex: none;
+  color: var(--md-sys-color-primary);
+}
+
+.staff-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.staff-item__ref {
+  color: var(--md-sys-color-on-surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.staff-item__storage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.staff-item__storage .icon {
+  flex: none;
+  font-size: 18px;
+}
+
 /* Trailing controls: the dev-session badge, a sign-out failure note, and the
    sign-out button itself. */
 .staff-bar__actions {
