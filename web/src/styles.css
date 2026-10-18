@@ -2077,6 +2077,52 @@ img {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+.item-detail__transfer {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px dashed var(--md-sys-color-outline);
+  border-radius: var(--radius-field);
+}
+
+.item-detail__transfer-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--type-title-sm);
+}
+
+.item-detail__transfer-title .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+.item-detail__transfer-lead {
+  max-width: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.item-detail__transfer .btn {
+  justify-self: start;
+}
+
+.item-detail__transfer-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  font-size: var(--type-body-md);
+}
+
+.item-detail__transfer-note .icon {
+  flex: none;
+  font-size: 20px;
+}
+
 /* Two columns once there is room, so the photo and the facts sit side by side
    instead of one being scrolled past to reach the other. */
 @media (min-width: 840px) {
