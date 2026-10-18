@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
@@ -15,6 +15,7 @@ import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 export default function StaffBar({ icon = 'corporate_fare', label }) {
   const { session, signOut } = useStaffAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [signOutError, setSignOutError] = useState('');
   const [signingOut, setSigningOut] = useState(false);
 
@@ -44,6 +45,22 @@ export default function StaffBar({ icon = 'corporate_fare', label }) {
         <Icon name="badge" />
         {session.staffEmail}
       </span>
+      {!session.isAdmin && (
+        <nav className="staff-bar__nav" aria-label="Staff tools">
+          <Link
+            className="staff-bar__nav-link"
+            to="/staff/intake"
+            aria-current={pathname === '/staff/intake' ? 'page' : undefined}
+          >
+            <Icon name="add_box" />
+            Log an item
+          </Link>
+          <Link className="staff-bar__nav-link" to="/">
+            <Icon name="search" />
+            Search held items
+          </Link>
+        </nav>
+      )}
       <div className="staff-bar__actions">
         {session.isMock && (
           <span className="staff-bar__badge">Dev session &middot; not real auth</span>

@@ -1386,6 +1386,41 @@ img {
   font-size: 20px;
 }
 
+.staff-bar__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.staff-bar__nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: var(--radius-pill);
+  color: inherit;
+  font-size: var(--type-body-md);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--motion-fast) ease;
+}
+
+.staff-bar__nav-link:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.staff-bar__nav-link[aria-current='page'] {
+  border-color: transparent;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.staff-bar__nav-link .icon {
+  font-size: 20px;
+}
+
 /* Trailing controls: the dev-session badge, a sign-out failure note, and the
    sign-out button itself. */
 .staff-bar__actions {
@@ -2075,6 +2110,52 @@ img {
 
 .item-detail__office-line {
   color: var(--md-sys-color-on-surface-variant);
+}
+
+.item-detail__transfer {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px dashed var(--md-sys-color-outline);
+  border-radius: var(--radius-field);
+}
+
+.item-detail__transfer-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--type-title-sm);
+}
+
+.item-detail__transfer-title .icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+.item-detail__transfer-lead {
+  max-width: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--type-body-md);
+}
+
+.item-detail__transfer .btn {
+  justify-self: start;
+}
+
+.item-detail__transfer-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-field);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  font-size: var(--type-body-md);
+}
+
+.item-detail__transfer-note .icon {
+  flex: none;
+  font-size: 20px;
 }
 
 /* Two columns once there is room, so the photo and the facts sit side by side

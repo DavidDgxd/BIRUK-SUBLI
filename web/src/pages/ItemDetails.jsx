@@ -1,15 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
 import Icon from '../components/Icon.jsx';
+import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { fetchPublicItem } from '../lib/itemDetails.js';
+import { transferItemCustody } from '../lib/itemTransfer.js';
+import { listOffices } from '../lib/offices.js';
 import { calibrateMatchScore } from '../lib/searchItems.js';
 
 const ERROR_COPY = {
   'not-found':
     'We could not find that item. It may already have been released, or the link may be mistyped.',
   db: 'We could not load this item right now. Please try again.',
+};
+
+const TRANSFER_ERROR_COPY = {
+  forbidden:
+    'Only the office currently holding this item can transfer it. Sign in with that office and try again.',
+  db: 'We could not update the holding office. Please try again.',
 };
 
 /** Intake date as "8 Oct 2026", or null when the value is missing or unparseable. */
@@ -46,10 +55,19 @@ export default function ItemDetails() {
   const { state } = useLocation();
   const navigate = useNavigate();
 
+  const { office: staffOffice } = useStaffAuth();
+
   const [attempt, setAttempt] = useState(0);
   const [outcome, setOutcome] = useState(null); // { key, item } or { key, error }
   const [imageFailed, setImageFailed] = useState(false);
+  const [officeOptions, setOfficeOptions] = useState(null);
+  const [officeError, setOfficeError] = useState('');
+  const [selectedOfficeId, setSelectedOfficeId] = useState('');
+  const [transferStatus, setTransferStatus] = useState('idle');
+  const [transferError, setTransferError] = useState('');
+  const [transferredTo, setTransferredTo] = useState('');
   const headingRef = useRef(null);
+  const transferSelectId = useId();
 
   // Identifies the fetch in flight, so a slow response for a previously viewed
   // item cannot overwrite the one now on screen.
@@ -80,9 +98,84 @@ export default function ItemDetails() {
     setImageFailed(false);
   }, [id]);
 
+  // Transfer feedback belongs to one item, not the next one opened.
+  useEffect(() => {
+    setSelectedOfficeId('');
+    setTransferError('');
+    setTransferredTo('');
+    setTransferStatus('idle');
+  }, [id]);
+
   const loading = outcome?.key !== key;
   const error = loading ? null : outcome.error;
   const item = loading ? null : (outcome.item ?? null);
+  const holdingOfficeId = item?.holding_office_id ?? null;
+
+  const canTransfer = Boolean(
+    item &&
+    staffOffice &&
+    item.status === 'held' &&
+    item.holding_office_id === staffOffice.id,
+  );
+
+  useEffect(() => {
+    if (!canTransfer) return undefined;
+
+    const controller = new AbortController();
+    let active = true;
+
+    setOfficeError('');
+    setOfficeOptions(null);
+
+    listOffices({ signal: controller.signal })
+      .then((rows) => {
+        if (!active) return;
+        setOfficeOptions(
+          rows.filter(
+            (row) => row.status === 'active' && row.id !== holdingOfficeId,
+          ),
+        );
+      })
+      .catch((loadError) => {
+        if (!active || loadError.name === 'AbortError') return;
+        if (import.meta.env.DEV) console.error('[ItemDetails]', loadError);
+        setOfficeOptions([]);
+        setOfficeError('We could not load the office list. Please try again.');
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [canTransfer, holdingOfficeId]);
+
+  async function handleTransfer(event) {
+    event.preventDefault();
+    if (!selectedOfficeId || transferStatus === 'saving') return;
+
+    setTransferError('');
+    setTransferStatus('saving');
+
+    try {
+      await transferItemCustody({
+        itemId: item.id,
+        newOfficeId: selectedOfficeId,
+      });
+      const target = officeOptions?.find(
+        (option) => option.id === selectedOfficeId,
+      );
+      setTransferredTo(target?.name ?? 'The selected office');
+      setSelectedOfficeId('');
+      setTransferStatus('idle');
+      setAttempt((n) => n + 1);
+    } catch (transferFailure) {
+      if (import.meta.env.DEV) console.error('[ItemDetails]', transferFailure);
+      setTransferStatus('idle');
+      setTransferError(
+        TRANSFER_ERROR_COPY[transferFailure.code] ?? TRANSFER_ERROR_COPY.db,
+      );
+    }
+  }
 
   const showImage = Boolean(item?.image_url) && !imageFailed;
   const logged = formatLoggedDate(item?.created_at);
@@ -247,6 +340,97 @@ export default function ItemDetails() {
                       <span>{item.counter_hours}</span>
                     </p>
                   </div>
+
+                  {transferredTo && (
+                    <p className="item-detail__transfer-note" role="status">
+                      <Icon name="check_circle" />
+                      <span>
+                        Custody updated. {transferredTo} now holds this item.
+                      </span>
+                    </p>
+                  )}
+
+                  {canTransfer && (
+                    <form
+                      className="item-detail__transfer"
+                      onSubmit={handleTransfer}
+                    >
+                      <h3 className="item-detail__transfer-title">
+                        <Icon name="swap_horiz" />
+                        Update holding office
+                      </h3>
+                      <p className="item-detail__transfer-lead">
+                        Use this after physically moving the item to another
+                        counter. It stays searchable and keeps its reference
+                        code.
+                      </p>
+
+                      <label
+                        className="field__label"
+                        htmlFor={transferSelectId}
+                      >
+                        New holding office
+                      </label>
+                      <select
+                        id={transferSelectId}
+                        className="field__control field__control--select"
+                        value={selectedOfficeId}
+                        onChange={(event) => {
+                          setSelectedOfficeId(event.target.value);
+                          setTransferError('');
+                        }}
+                        disabled={transferStatus === 'saving' || !officeOptions}
+                        required
+                      >
+                        <option value="">
+                          {officeOptions
+                            ? 'Choose an office'
+                            : 'Loading offices…'}
+                        </option>
+                        {officeOptions?.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div aria-live="polite">
+                        {officeError && (
+                          <p className="search__error">
+                            <Icon name="error" />
+                            {officeError}
+                          </p>
+                        )}
+                        {transferError && (
+                          <p className="search__error">
+                            <Icon name="error" />
+                            {transferError}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="btn btn--filled"
+                        disabled={
+                          !selectedOfficeId ||
+                          transferStatus === 'saving' ||
+                          !officeOptions
+                        }
+                      >
+                        <Icon
+                          name={
+                            transferStatus === 'saving'
+                              ? 'hourglass_top'
+                              : 'swap_horiz'
+                          }
+                        />
+                        {transferStatus === 'saving'
+                          ? 'Updating…'
+                          : 'Update holding office'}
+                      </button>
+                    </form>
+                  )}
                 </div>
               </article>
             </>
