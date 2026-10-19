@@ -55,9 +55,13 @@ export default function StaffBar({ icon = 'corporate_fare', label }) {
             <Icon name="add_box" />
             Log an item
           </Link>
-          <Link className="staff-bar__nav-link" to="/">
-            <Icon name="search" />
-            Search held items
+          <Link
+            className="staff-bar__nav-link"
+            to="/staff/items"
+            aria-current={pathname === '/staff/items' ? 'page' : undefined}
+          >
+            <Icon name="inventory_2" />
+            Held items
           </Link>
         </nav>
       )}
