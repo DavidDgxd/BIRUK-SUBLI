@@ -45,6 +45,8 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
 
   const titleId = useId();
   const errorId = useId();
+  const siteCodeHintId = useId();
+  const passwordHintId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -156,6 +158,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
     >
       <form
         className="office-dialog__form"
+        aria-label="Add an office"
         onSubmit={handleSubmit}
         noValidate
         aria-busy={submitting}
@@ -190,6 +193,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             type="text"
             maxLength={MAX_NAME}
             placeholder="City Hall Information Desk"
+            required
             value={form.name}
             aria-describedby={error ? errorIds : undefined}
             aria-invalid={error && !form.name.trim() ? 'true' : undefined}
@@ -207,12 +211,16 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             type="text"
             maxLength={MAX_ID}
             placeholder="CITY_HALL_INFO"
+            pattern="[A-Za-z0-9_-]{2,40}"
+            required
             value={form.id}
-            aria-describedby={error ? errorIds : undefined}
+            aria-describedby={
+              error ? `${siteCodeHintId} ${errorIds}` : siteCodeHintId
+            }
             aria-invalid={error && !form.id.trim() ? 'true' : undefined}
             onChange={setField('id')}
           />
-          <p className="field__hint">
+          <p className="field__hint" id={siteCodeHintId}>
             Short unique key for this counter, e.g. BCPIO. Letters, numbers,
             underscores and hyphens.
           </p>
@@ -228,6 +236,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             type="text"
             maxLength={MAX_ADDRESS}
             placeholder="City Hall lobby, Baguio City"
+            required
             value={form.address}
             aria-describedby={error ? errorIds : undefined}
             aria-invalid={error && !form.address.trim() ? 'true' : undefined}
@@ -245,6 +254,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             type="text"
             maxLength={MAX_HOURS}
             placeholder="Mon–Fri, 8:00 AM – 5:00 PM"
+            required
             value={form.counterHours}
             aria-describedby={error ? errorIds : undefined}
             aria-invalid={
@@ -314,6 +324,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
               type="email"
               maxLength={MAX_EMAIL}
               placeholder="office@baguio.gov.ph"
+              required
               value={form.email}
               aria-describedby={error ? errorIds : undefined}
               aria-invalid={error && !form.email.trim() ? 'true' : undefined}
@@ -330,8 +341,11 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
               type="password"
               minLength={MIN_PASSWORD}
               autoComplete="new-password"
+              required
               value={form.password}
-              aria-describedby={error ? errorIds : undefined}
+              aria-describedby={
+                error ? `${passwordHintId} ${errorIds}` : passwordHintId
+              }
               aria-invalid={
                 error && form.password.length < MIN_PASSWORD
                   ? 'true'
@@ -339,7 +353,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
               }
               onChange={setField('password')}
             />
-            <p className="field__hint">
+            <p className="field__hint" id={passwordHintId}>
               At least {MIN_PASSWORD} characters. Share it with the office out
               of band.
             </p>

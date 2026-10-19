@@ -303,23 +303,15 @@ export default function StaffIntakeForm({ office, staffEmail }) {
       )
       .join('');
 
+    const stylesheet = new URL('/print.css', document.baseURI).href;
+
     win.document.write(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Custody receipt ${escapeHtml(current.refCode)}</title>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 32px; color: #111; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .office { margin: 0 0 16px; color: #444; font-size: 13px; }
-  .ref { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 700;
-         letter-spacing: 0.08em; margin: 0 0 20px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 6px 0; vertical-align: top;
-           border-bottom: 1px solid #ddd; }
-  th { width: 38%; color: #555; font-weight: 600; }
-  .note { margin-top: 24px; font-size: 12px; color: #666; }
-</style>
+<link rel="stylesheet" href="${escapeHtml(stylesheet)}">
 </head>
 <body>
   <h1>Custody receipt</h1>
@@ -344,11 +336,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           The item is logged to {receipt.officeName} and is now searchable. Give
           the reference below to whoever handed it in.
         </p>
-        <p
-          className="receipt"
-          ref={refCodeRef}
-          aria-label={`Custody reference ${receipt.refCode}`}
-        >
+        <p className="receipt" ref={refCodeRef}>
+          <span className="visually-hidden">Custody reference </span>
           {receipt.refCode}
         </p>
         <dl className="receipt-details">
@@ -415,6 +404,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
   return (
     <form
       className="report-form"
+      aria-label="Log a found item into custody"
       onSubmit={handleSubmit}
       noValidate
       aria-busy={submitting}
@@ -430,6 +420,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           type="text"
           maxLength={MAX_TITLE_LENGTH}
           placeholder="Black leather wallet"
+          required
           value={title}
           aria-describedby={error ? `${titleHintId} ${errorId}` : titleHintId}
           aria-invalid={error && !title.trim() ? 'true' : undefined}
@@ -453,6 +444,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           ref={categoryRef}
           className="field__control field__control--select"
           value={category}
+          required
           aria-describedby={error ? errorId : undefined}
           aria-invalid={error && !category ? 'true' : undefined}
           onChange={(event) => {
@@ -482,6 +474,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           type="text"
           maxLength={MAX_SHORT_LENGTH}
           placeholder="Locker 2, Bin B"
+          required
           value={storageLocation}
           aria-describedby={
             error ? `${storageHintId} ${errorId}` : storageHintId
@@ -509,6 +502,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           rows={4}
           maxLength={MAX_DESCRIPTION_LENGTH}
           placeholder="Well-worn bifold wallet, slight tear on the inner lining. Serial 67 Written on the inner flap. Contains a bus card."
+          required
           value={description}
           aria-describedby={
             error ? `${descriptionHintId} ${errorId}` : descriptionHintId
@@ -536,6 +530,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           className="field__control"
           type="date"
           max={todayIso()}
+          required
           value={dateReceived}
           aria-invalid={error && !dateReceived ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -582,6 +577,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
               type="text"
               maxLength={MAX_SHORT_LENGTH}
               placeholder="Juan dela Cruz"
+              required={isCash}
               value={finderName}
               aria-describedby={
                 error ? `${finderHintId} ${errorId}` : finderHintId
@@ -662,6 +658,9 @@ export default function StaffIntakeForm({ office, staffEmail }) {
             className="photo-chip__img"
             src={photo.url}
             alt="Preview of the photo you selected"
+            width="48"
+            height="48"
+            decoding="async"
           />
           <p className="photo-chip__name">
             {photo.file.name}

@@ -167,7 +167,8 @@ export default function LostReportForm() {
           Keep this reference code. Staff will ask for it when an item matching
           your description is handed in at a counter.
         </p>
-        <p className="receipt" aria-label={`Reference code ${receipt.refCode}`}>
+        <p className="receipt">
+          <span className="visually-hidden">Reference code </span>
           {receipt.refCode}
         </p>
         {photo && !receipt.usedPhoto && (
@@ -199,6 +200,7 @@ export default function LostReportForm() {
   return (
     <form
       className="report-form"
+      aria-label="Report a lost item"
       onSubmit={handleSubmit}
       noValidate
       aria-busy={submitting}
@@ -214,6 +216,7 @@ export default function LostReportForm() {
           rows={4}
           maxLength={MAX_DESCRIPTION_LENGTH}
           placeholder="Blue backpack with a white logo, laptop inside"
+          required
           value={description}
           aria-describedby={
             error ? `${descriptionHintId} ${errorId}` : descriptionHintId
@@ -241,6 +244,7 @@ export default function LostReportForm() {
           type="text"
           maxLength={MAX_SHORT_LENGTH}
           placeholder="Session Road, or jeepney to Aurora Hill"
+          required
           value={areaRoute}
           aria-describedby={error ? `${areaHintId} ${errorId}` : areaHintId}
           aria-invalid={error && !areaRoute.trim() ? 'true' : undefined}
@@ -264,6 +268,7 @@ export default function LostReportForm() {
           className="field__control"
           type="date"
           max={todayIso()}
+          required
           value={dateLost}
           aria-invalid={error && !dateLost ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -334,6 +339,9 @@ export default function LostReportForm() {
             className="photo-chip__img"
             src={photo.url}
             alt="Preview of the photo you selected"
+            width="48"
+            height="48"
+            decoding="async"
           />
           <p className="photo-chip__name">
             {photo.file.name}

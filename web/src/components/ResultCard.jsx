@@ -15,7 +15,10 @@ export default function ResultCard({ item }) {
           <img
             src={item.image_url}
             alt={`Photo of ${item.title}`}
+            width="640"
+            height="360"
             loading="lazy"
+            decoding="async"
             onError={() => setImageFailed(true)}
           />
         ) : (

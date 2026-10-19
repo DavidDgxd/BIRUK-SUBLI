@@ -178,7 +178,8 @@ export default function FoundReportForm() {
           Keep this reference code. Hand the item in at any participating city
           office counter and staff will log it against this code.
         </p>
-        <p className="receipt" aria-label={`Reference code ${receipt.refCode}`}>
+        <p className="receipt">
+          <span className="visually-hidden">Reference code </span>
           {receipt.refCode}
         </p>
         {!receipt.usedPhoto && (
@@ -209,6 +210,7 @@ export default function FoundReportForm() {
   return (
     <form
       className="report-form"
+      aria-label="Report a found item"
       onSubmit={handleSubmit}
       noValidate
       aria-busy={submitting}
@@ -224,6 +226,7 @@ export default function FoundReportForm() {
           rows={4}
           maxLength={MAX_NOTE_LENGTH}
           placeholder="Black leather wallet with a student ID inside"
+          required
           value={shortNote}
           aria-describedby={error ? `${noteHintId} ${errorId}` : noteHintId}
           aria-invalid={error && !shortNote.trim() ? 'true' : undefined}
@@ -250,6 +253,7 @@ export default function FoundReportForm() {
           type="text"
           maxLength={MAX_SHORT_LENGTH}
           placeholder="Session Road, near the market entrance"
+          required
           value={foundLocation}
           aria-describedby={
             error ? `${locationHintId} ${errorId}` : locationHintId
@@ -275,6 +279,7 @@ export default function FoundReportForm() {
           className="field__control"
           type="date"
           max={todayIso()}
+          required
           value={foundDate}
           aria-invalid={error && !foundDate ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -343,6 +348,9 @@ export default function FoundReportForm() {
             className="photo-chip__img"
             src={photo.url}
             alt="Preview of the photo you selected"
+            width="48"
+            height="48"
+            decoding="async"
           />
           <p className="photo-chip__name">
             {photo.file.name}

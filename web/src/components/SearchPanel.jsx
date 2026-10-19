@@ -2,7 +2,16 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 
-const COLORS = ['Black', 'White', 'Gray', 'Brown', 'Red', 'Blue', 'Green', 'Yellow'];
+const COLORS = [
+  'Black',
+  'White',
+  'Gray',
+  'Brown',
+  'Red',
+  'Blue',
+  'Green',
+  'Yellow',
+];
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_QUERY_LENGTH = 200;
@@ -92,7 +101,12 @@ export default function SearchPanel() {
       </h2>
       <p className="search__subtitle">Describe it in your own words</p>
 
-      <form role="search" onSubmit={handleSubmit} noValidate>
+      <form
+        role="search"
+        aria-label="Search held items"
+        onSubmit={handleSubmit}
+        noValidate
+      >
         <div className="search-field" data-invalid={error ? 'true' : undefined}>
           <Icon name="search" />
           <label className="visually-hidden" htmlFor="item-query">
@@ -206,6 +220,9 @@ export default function SearchPanel() {
               className="photo-chip__img"
               src={photo.url}
               alt="Preview of the photo you selected"
+              width="48"
+              height="48"
+              decoding="async"
             />
             <p className="photo-chip__name">
               {photo.file.name}

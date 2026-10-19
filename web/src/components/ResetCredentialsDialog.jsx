@@ -144,11 +144,8 @@ export default function ResetCredentialsDialog({ open, office, onClose }) {
               <p className="credential__email">{credential.email}</p>
 
               <p className="credential__label">New shared password</p>
-              <p
-                className="receipt credential__password"
-                ref={receiptRef}
-                aria-label="New shared password"
-              >
+              <p className="receipt credential__password" ref={receiptRef}>
+                <span className="visually-hidden">New shared password </span>
                 {credential.password}
               </p>
             </div>
