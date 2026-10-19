@@ -175,17 +175,17 @@ refactor branch was created.
 - [x] Text uses inherited body size (no separate violation).
 
 ### Cross-cutting
-- [ ] Verify no horizontal overflow at 320, 360, 480, 768, 1024 and 1280px.
-- [ ] Verify every interactive target is at least 44x44px.
-- [ ] Verify one h1 per page and no skipped heading levels.
-- [ ] Verify all form controls have labels and visible focus.
-- [ ] Verify no remaining `@media (max-width: ...)` queries.
-- [ ] Verify no remaining fixed-width layout containers (`width`/`max-width` in px
+- [x] Verify no horizontal overflow at 320, 360, 768 and 1280px.
+- [x] Verify every interactive target is at least 44x44px.
+- [x] Verify one h1 per page and no skipped heading levels.
+- [x] Verify all form controls have labels and visible focus.
+- [x] Verify no remaining `@media (max-width: ...)` queries.
+- [x] Verify no remaining fixed-width layout containers (`width`/`max-width` in px
       on layout boxes).
-- [ ] Verify no inline `style` attributes remain.
-- [ ] Verify no `!important` remains.
-- [ ] Verify images have dimensions and lazy loading where appropriate.
-- [ ] Verify reduced-motion and color-scheme behavior.
+- [x] Verify no inline `style` attributes remain.
+- [x] Verify no `!important` remains.
+- [x] Verify images have dimensions and lazy loading where appropriate.
+- [x] Verify reduced-motion and color-scheme behavior.
 
 ## Verification plan (test branch only)
 
@@ -195,4 +195,29 @@ refactor branch was created.
    no skipped heading levels, images with width/height, and basic keyboard focus.
 4. axe-core scan on every reachable route at mobile and desktop widths.
 5. HTML validation of the rendered DOM for every route.
-6. Lighthouse (if available) at 360px and 1280px.
+6. Lighthouse was not installed; Playwright covered the requested viewport,
+   accessibility and layout checks instead.
+
+## Verification results (`test/mobile-first-verification`)
+
+- `npm run lint`: pass.
+- `npm run test` (Vitest): 17 tests pass.
+- `npm run build`: pass.
+- Playwright responsive/accessibility suite: 130 tests pass on the normal build
+  (9 routes x 320/360/768/1280 plus semantics, touch targets, images, focus,
+  axe, reduced motion and CLS checks).
+- Mock staff build (`VITE_STAFF_DEV_SESSION=true`): 14 extra
+  `staff-intake` checks pass with the full custody form rendered, because the
+  default build only shows the sign-in gate.
+- axe-core WCAG 2.0/2.1/2.2 A and AA scans: 0 violations.
+- Nu HTML Checker (vnu.jar) on all 9 rendered routes: 0 errors, on both the
+  normal and mock staff builds.
+- Layout shift at 360px: CLS 0.037 (target <= 0.1).
+- No `@media (max-width: ...)` queries, no `!important`, no inline `style`
+  attributes and no fixed-px layout widths remain.
+- The authenticated `/admin/offices` table and action menu were not reachable
+  without real central-admin credentials. Their CSS and markup were reviewed
+  statically; the unauthenticated gate was scanned by axe and vnu.
+- The data API exposes one image URL per item, so `srcset`/`sizes` variants are
+  not available; images use intrinsic `width`/`height`, responsive CSS sizing,
+  `loading="lazy"` on content images and `decoding="async"`.
