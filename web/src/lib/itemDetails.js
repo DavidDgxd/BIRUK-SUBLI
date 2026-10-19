@@ -48,9 +48,10 @@ export async function fetchPublicItem(id, signal) {
   if (error) throw new ItemDetailError('db', error.message);
 
   // A table-returning RPC resolves to an array: empty means no held item has
-  // that id, which is the 404 case.
+  // that id, which is the 404 case. The status check is a second guard against
+  // a stale get_item_public that still returns released rows.
   const item = data?.[0];
-  if (!item) {
+  if (!item || item.status !== 'held') {
     throw new ItemDetailError('not-found', `No held item with id ${clean}.`);
   }
 

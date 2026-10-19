@@ -103,9 +103,14 @@ export async function searchItems({ text, color, photo, signal }) {
 
   if (error) throw new SearchError('db', error.message);
 
-  // The RPC already applies the floor; re-checking here keeps the guarantee
-  // even if an older match_items is still deployed.
-  const all = (data ?? []).filter((item) => item.similarity >= MATCH_THRESHOLD);
+  // The RPC already applies the floor and excludes released rows; re-checking
+  // both here keeps the guarantee even if an older match_items is still
+  // deployed. A released item must never surface in a public listing, even if
+  // that function is stale or a row's status changed between the query and the
+  // read.
+  const all = (data ?? []).filter(
+    (item) => item.status === 'held' && item.similarity >= MATCH_THRESHOLD,
+  );
 
   return {
     primary: all.filter((item) => item.similarity >= PRIMARY_THRESHOLD),
