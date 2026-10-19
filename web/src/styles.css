@@ -1669,8 +1669,33 @@ img {
 
 /* Tablet and up: a real table again. */
 @media (min-width: 37.5rem) {
-  .office-admin__table-wrap {
-    overflow-x: auto;
+  .office-table {
+    table-layout: fixed;
+  }
+
+  .office-table th:nth-child(1) {
+    width: 24%;
+  }
+
+  .office-table th:nth-child(2) {
+    width: 22%;
+  }
+
+  .office-table th:nth-child(3) {
+    width: 24%;
+  }
+
+  .office-table th:nth-child(4) {
+    width: 16%;
+  }
+
+  .office-table th:nth-child(5) {
+    width: 14%;
+  }
+
+  .office-table th,
+  .office-table td {
+    overflow-wrap: anywhere;
   }
 
   .office-table thead {
@@ -1739,6 +1764,7 @@ img {
 
 /* On phones the kebab sits top-right of its card, beside the office name. */
 .office-table__actions {
+  position: relative;
   grid-column: 2;
   grid-row: 1;
   margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0 0;
@@ -1781,12 +1807,14 @@ img {
   color: var(--md-sys-color-on-tertiary-container);
 }
 
-/* Row actions menu. Fixed so the table's scroll container cannot clip it;
-   OfficeActionsMenu sets top/right from the kebab button. */
+/* Row actions menu, anchored to its kebab button. */
 .office-menu {
-  position: fixed;
-  z-index: 10;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
   min-width: 12.5rem;
+  max-width: min(20rem, calc(100vw - var(--space-4)));
   margin-top: var(--space-0-5);
   padding: var(--space-1) 0;
   border-radius: var(--radius-field);
