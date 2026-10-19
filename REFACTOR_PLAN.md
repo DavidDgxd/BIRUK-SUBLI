@@ -26,153 +26,153 @@ refactor branch was created.
 ## Violations by file
 
 ### web/index.html
-- [ ] Two separate Google Fonts stylesheets are render-blocking.
-- [ ] Font CSS is not loaded with a non-blocking strategy; consolidate and defer.
+- [x] Two separate Google Fonts stylesheets are render-blocking.
+- [x] Font CSS is not loaded with a non-blocking strategy; consolidate and defer.
 
 ### web/src/theme.css
-- [ ] Shape radius tokens use fixed pixels (`28px`, `16px`, `999px`) rather than
+- [x] Shape radius tokens use fixed pixels (`28px`, `16px`, `999px`) rather than
       relative units.
-- [ ] No max-width query; `prefers-color-scheme` handling is already correct.
+- [x] No max-width query; `prefers-color-scheme` handling is already correct.
 
 ### web/src/styles.css
-- [ ] `@media (max-width: 379px)` is a desktop-first/max-width query; replace it
+- [x] `@media (max-width: 379px)` is a desktop-first/max-width query; replace it
       with mobile-first base styles and a `min-width` enhancement.
-- [ ] Fixed px spacing/type/layout tokens (`--space-*`, `--tap-target`,
+- [x] Fixed px spacing/type/layout tokens (`--space-*`, `--tap-target`,
       `--page-max`, etc.) instead of relative units.
-- [ ] Fixed-pixel layout containers: `max-width: 1040px`, `640px`, `440px`,
+- [x] Fixed-pixel layout containers: `max-width: 1040px`, `640px`, `440px`,
       `width: min(560px, ...)`, `min-width: 200px`, and fixed control heights
       (`168px` equivalent values such as `56px`, `54px`, `40px`, `120px`).
-- [ ] Fixed px component boxes (`340px`, `280px`, `48px`, `56px`, icon sizes).
-- [ ] `--type-body-md: 0.875rem` (14px) and `--type-label: 0.75rem` (12px) are
+- [x] Fixed px component boxes (`340px`, `280px`, `48px`, `56px`, icon sizes).
+- [x] `--type-body-md: 0.875rem` (14px) and `--type-label: 0.75rem` (12px) are
       used for body copy and hints below the 16px body-text floor.
-- [ ] `!important` in the reduced-motion block (avoid unless unavoidable).
-- [ ] `body { overflow-x: hidden }` can mask horizontal overflow rather than
+- [x] `!important` in the reduced-motion block (avoid unless unavoidable).
+- [x] `body { overflow-x: hidden }` can mask horizontal overflow rather than
       fixing its cause.
-- [ ] Brand link has no guaranteed 44px touch target.
-- [ ] Receipt and reference strings have no `overflow-wrap`, risking overflow at
+- [x] Brand link has no guaranteed 44px touch target.
+- [x] Receipt and reference strings have no `overflow-wrap`, risking overflow at
       320px with long codes.
-- [ ] No container-level `overflow-x` guard on the admin table at tablet widths.
-- [ ] Reduced-motion override is global/`!important` rather than targeting the
+- [x] No container-level `overflow-x` guard on the admin table at tablet widths.
+- [x] Reduced-motion override is global/`!important` rather than targeting the
       few animated/transitioned selectors.
 
 ### web/src/components/SiteHeader.jsx
-- [ ] On every non-home page the brand renders as `<p>`, so the page has no
+- [x] On every non-home page the brand renders as `<p>`, so the page has no
       `<h1>` and its first heading is `<h2>`.
-- [ ] Brand link is an inline text link with a height below 44px.
-- [ ] Staff link text is shown at the smallest widths by default and hidden with
+- [x] Brand link is an inline text link with a height below 44px.
+- [x] Staff link text is shown at the smallest widths by default and hidden with
       a max-width query (desktop-first).
 
 ### web/src/components/SearchPanel.jsx
-- [ ] `role="search"` form has no accessible name.
-- [ ] Photo preview `<img>` has no explicit `width`/`height` (layout shift).
-- [ ] Hints/help text rely on 14px body tokens.
-- [ ] Hidden file input is not associated with the visible upload control beyond
+- [x] `role="search"` form has no accessible name.
+- [x] Photo preview `<img>` has no explicit `width`/`height` (layout shift).
+- [x] Hints/help text rely on 14px body tokens.
+- [x] Hidden file input is not associated with the visible upload control beyond
       the button label (acceptable, but the button name should stay explicit).
 
 ### web/src/components/ReportCard.jsx
-- [ ] Body copy uses 14px token.
-- [ ] No heading-level issue on the landing page (h2 under the brand h1).
+- [x] Body copy uses 14px token.
+- [x] No heading-level issue on the landing page (h2 under the brand h1).
 
 ### web/src/components/HowItWorks.jsx
-- [ ] Step/lead copy uses 14px tokens.
-- [ ] No heading-level issue (h2 then h3).
+- [x] Step/lead copy uses 14px tokens.
+- [x] No heading-level issue (h2 then h3).
 
 ### web/src/components/ResultCard.jsx
-- [ ] Result image has no explicit `width`/`height` and no `decoding` hint
+- [x] Result image has no explicit `width`/`height` and no `decoding` hint
       (layout shift risk); `loading="lazy"` is already present.
-- [ ] Category/verification/office copy uses 14px tokens.
+- [x] Category/verification/office copy uses 14px tokens.
 
 ### web/src/components/StaffBar.jsx
-- [ ] Bar/meta copy uses 14px tokens.
-- [ ] Interactive targets already meet 44px.
+- [x] Bar/meta copy uses 14px tokens.
+- [x] Interactive targets already meet 44px.
 
 ### web/src/components/StaffGate.jsx
-- [ ] State-card heading is h3, which is valid only once the page has an h1/h2
+- [x] State-card heading is h3, which is valid only once the page has an h1/h2
       hierarchy (fixed by the header change).
-- [ ] State-card text uses 14px/16px tokens (check after token change).
+- [x] State-card text uses 14px/16px tokens (check after token change).
 
 ### web/src/components/LostReportForm.jsx
-- [ ] Required fields are validated only in JS and do not expose `required`.
-- [ ] Photo preview `<img>` has no explicit `width`/`height`.
-- [ ] Help/hint text uses 14px token.
-- [ ] Receipt uses `aria-label` on a plain `<p>` (generic role), which is not a
+- [x] Required fields are validated only in JS and do not expose `required`.
+- [x] Photo preview `<img>` has no explicit `width`/`height`.
+- [x] Help/hint text uses 14px token.
+- [x] Receipt uses `aria-label` on a plain `<p>` (generic role), which is not a
       reliable accessible name.
 
 ### web/src/components/FoundReportForm.jsx
-- [ ] Required fields do not expose `required`.
-- [ ] Photo preview `<img>` has no explicit `width`/`height`.
-- [ ] Help/hint text uses 14px token.
-- [ ] Receipt uses `aria-label` on a plain `<p>`.
+- [x] Required fields do not expose `required`.
+- [x] Photo preview `<img>` has no explicit `width`/`height`.
+- [x] Help/hint text uses 14px token.
+- [x] Receipt uses `aria-label` on a plain `<p>`.
 
 ### web/src/components/StaffIntakeForm.jsx
-- [ ] Print receipt is generated with an inline `<style>` block and hardcoded
+- [x] Print receipt is generated with an inline `<style>` block and hardcoded
       colors (inline-style violation).
-- [ ] Required fields do not expose `required`.
-- [ ] Photo preview `<img>` has no explicit `width`/`height`.
-- [ ] Help/hint text uses 14px token.
-- [ ] Receipt uses `aria-label` on a plain `<p>`.
+- [x] Required fields do not expose `required`.
+- [x] Photo preview `<img>` has no explicit `width`/`height`.
+- [x] Help/hint text uses 14px token.
+- [x] Receipt uses `aria-label` on a plain `<p>`.
 
 ### web/src/components/AddOfficeDialog.jsx
-- [ ] Required fields do not expose `required`.
-- [ ] Site-code and password hints are not connected with `aria-describedby`.
-- [ ] Dialog width is a fixed pixel value in CSS.
-- [ ] Help text uses 14px token.
+- [x] Required fields do not expose `required`.
+- [x] Site-code and password hints are not connected with `aria-describedby`.
+- [x] Dialog width is a fixed pixel value in CSS.
+- [x] Help text uses 14px token.
 
 ### web/src/components/ResetCredentialsDialog.jsx
-- [ ] Password/receipt uses `aria-label` on a plain `<p>`.
-- [ ] Help text uses 14px token.
-- [ ] Dialog width is a fixed pixel value in CSS.
+- [x] Password/receipt uses `aria-label` on a plain `<p>`.
+- [x] Help text uses 14px token.
+- [x] Dialog width is a fixed pixel value in CSS.
 
 ### web/src/components/OfficeActionsMenu.jsx
-- [ ] Dynamic positioning is applied with an inline `style` attribute.
-- [ ] Tabbing out of the `role="menu"` unmounts it and can drop focus instead of
+- [x] Dynamic positioning is applied with an inline `style` attribute.
+- [x] Tabbing out of the `role="menu"` unmounts it and can drop focus instead of
       moving to the next control.
-- [ ] Menu width is a fixed pixel value in CSS.
+- [x] Menu width is a fixed pixel value in CSS.
 
 ### web/src/components/MistHero.jsx
-- [ ] No violations: decorative, `aria-hidden`, no inline styles, SVG tokens.
+- [x] No violations: decorative, `aria-hidden`, no inline styles, SVG tokens.
 
 ### web/src/pages/Landing.jsx
-- [ ] Has a skip link and `<main id="main">`; heading hierarchy depends on the
+- [x] Has a skip link and `<main id="main">`; heading hierarchy depends on the
       header fix.
 
 ### web/src/pages/SearchResults.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Search-result/state copy uses 14px tokens.
-- [ ] Result images inherit the ResultCard image issue.
+- [x] No skip link; `<main>` has no id.
+- [x] Search-result/state copy uses 14px tokens.
+- [x] Result images inherit the ResultCard image issue.
 
 ### web/src/pages/ItemDetails.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Item image has no `width`/`height`, no `loading="lazy"`, no `decoding`
+- [x] No skip link; `<main>` has no id.
+- [x] Item image has no `width`/`height`, no `loading="lazy"`, no `decoding`
       hint (layout shift).
-- [ ] Release/transfer forms and notes use 14px tokens.
+- [x] Release/transfer forms and notes use 14px tokens.
 
 ### web/src/pages/ReportLost.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Lead copy is 16px but form hints are 14px.
+- [x] No skip link; `<main>` has no id.
+- [x] Lead copy is 16px but form hints are 14px.
 
 ### web/src/pages/ReportFound.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Lead copy is 16px but form hints are 14px.
+- [x] No skip link; `<main>` has no id.
+- [x] Lead copy is 16px but form hints are 14px.
 
 ### web/src/pages/StaffIntake.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Inherits StaffBar and intake form issues.
+- [x] No skip link; `<main>` has no id.
+- [x] Inherits StaffBar and intake form issues.
 
 ### web/src/pages/StaffLogin.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Error/note copy uses 14px tokens.
+- [x] No skip link; `<main>` has no id.
+- [x] Error/note copy uses 14px tokens.
 
 ### web/src/pages/AdminOffices.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Table has no `<caption>` (the surrounding section has an aria-label).
-- [ ] Table becomes stacked cards via `display` changes on table elements; keep
+- [x] No skip link; `<main>` has no id.
+- [x] Table has no `<caption>` (the surrounding section has an aria-label).
+- [x] Table becomes stacked cards via `display` changes on table elements; keep
       native roles and verify semantics in axe.
-- [ ] Table/status/meta copy uses 14px tokens.
+- [x] Table/status/meta copy uses 14px tokens.
 
 ### web/src/pages/RoutePlaceholder.jsx
-- [ ] No skip link; `<main>` has no id.
-- [ ] Text uses inherited body size (no separate violation).
+- [x] No skip link; `<main>` has no id.
+- [x] Text uses inherited body size (no separate violation).
 
 ### Cross-cutting
 - [ ] Verify no horizontal overflow at 320, 360, 480, 768, 1024 and 1280px.
