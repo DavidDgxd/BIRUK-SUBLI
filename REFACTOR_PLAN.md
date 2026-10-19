@@ -212,7 +212,7 @@ refactor branch was created.
 - axe-core WCAG 2.0/2.1/2.2 A and AA scans: 0 violations.
 - Nu HTML Checker (vnu.jar) on all 9 rendered routes: 0 errors, on both the
   normal and mock staff builds.
-- Layout shift at 360px: CLS 0.037 (target <= 0.1).
+- Layout shift at 360px: CLS 0.037-0.043 across runs (target <= 0.1).
 - No `@media (max-width: ...)` queries, no `!important`, no inline `style`
   attributes and no fixed-px layout widths remain.
 - The authenticated `/admin/offices` table and action menu were not reachable
