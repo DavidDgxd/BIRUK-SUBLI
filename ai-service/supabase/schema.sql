@@ -109,6 +109,13 @@ create index if not exists items_status_idx on public.items (status);
 create index if not exists items_holding_office_idx on public.items (holding_office_id);
 create index if not exists items_date_received_idx on public.items (date_received);
 
+-- Public search only reads held items (match_items and get_item_public). This
+-- smaller partial index keeps released rows out of the office-filter path and
+-- gives the release audit a narrow lookup for the holding desk.
+create index if not exists items_held_holding_office_idx
+on public.items (holding_office_id)
+where status = 'held';
+
 -- Trigger: Automatically enforces the 6-month holding deadline on cash deposits
 create or replace function public.calculate_cash_reward_date()
 returns trigger language plpgsql
@@ -394,7 +401,23 @@ set search_path = public, pg_temp
 as $$
 declare
     v_office_id text;
+    v_holding_office_id text;
+    v_status text;
+    v_claimant_name text := btrim(coalesce(p_claimant_name, ''));
+    v_claimant_id_ref text := btrim(coalesce(p_claimant_id_ref, ''));
+    v_release_notes text := nullif(btrim(coalesce(p_release_notes, '')), '');
 begin
+    -- The counter record is the trace of who collected the item. Both halves
+    -- are required so a release can never be filed without an identity check.
+    if v_claimant_name = '' then
+        raise exception 'A claimant name is required.'
+            using errcode = '22023';
+    end if;
+    if v_claimant_id_ref = '' then
+        raise exception 'An ID reference is required.'
+            using errcode = '22023';
+    end if;
+
     -- Only the signed-in office holding the item may release it.
     select id into v_office_id
     from public.offices
@@ -405,21 +428,43 @@ begin
             using errcode = '42501';
     end if;
 
+    -- Lock the custody row before deciding. A second officer cannot release the
+    -- same item concurrently, and a transfer cannot move it out from under the
+    -- release between this check and the update.
+    select holding_office_id, status
+      into v_holding_office_id, v_status
+    from public.items
+    where id = p_item_id
+    for update;
+
+    if not found or v_holding_office_id is distinct from v_office_id then
+        raise exception 'Item % is not held by this office.', p_item_id
+            using errcode = '42501';
+    end if;
+
+    -- A duplicate confirmation is not a second release: the first claimant and
+    -- timestamp stay authoritative instead of being overwritten.
+    if v_status <> 'held' then
+        raise exception 'Item % has already been released or is no longer held.', p_item_id
+            using errcode = '55000';
+    end if;
+
     update public.items
     set
         status = 'released',
-        releasing_office_id = p_releasing_office_id,
-        claimant_name = p_claimant_name,
-        claimant_id_ref = p_claimant_id_ref,
-        release_notes = p_release_notes,
+        releasing_office_id = v_office_id,
+        claimant_name = v_claimant_name,
+        claimant_id_ref = v_claimant_id_ref,
+        release_notes = v_release_notes,
         released_at = timezone('utc'::text, now()),
         updated_at = timezone('utc'::text, now())
     where id = p_item_id
-      and holding_office_id = v_office_id;
+      and holding_office_id = v_office_id
+      and status = 'held';
 
     if not found then
-        raise exception 'Item % is not held by this office.', p_item_id
-            using errcode = '42501';
+        raise exception 'Item % could not be released.', p_item_id
+            using errcode = '55000';
     end if;
 end;
 $$;
@@ -459,7 +504,10 @@ begin
         holding_office_id = p_new_office_id,
         updated_at = timezone('utc'::text, now())
     where id = p_item_id
-      and holding_office_id = v_office_id;
+      and holding_office_id = v_office_id
+      -- Only live custody can move. A released record keeps the office that
+      -- performed the release, even if a transfer races the confirmation.
+      and status = 'held';
 
     if not found then
         raise exception 'Item % is not held by this office.', p_item_id

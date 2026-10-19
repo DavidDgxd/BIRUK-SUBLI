@@ -2112,7 +2112,8 @@ img {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.item-detail__transfer {
+.item-detail__transfer,
+.item-detail__release {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);
@@ -2120,29 +2121,34 @@ img {
   border-radius: var(--radius-field);
 }
 
-.item-detail__transfer-title {
+.item-detail__transfer-title,
+.item-detail__release-title {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   font-size: var(--type-title-sm);
 }
 
-.item-detail__transfer-title .icon {
+.item-detail__transfer-title .icon,
+.item-detail__release-title .icon {
   font-size: 20px;
   color: var(--md-sys-color-primary);
 }
 
-.item-detail__transfer-lead {
+.item-detail__transfer-lead,
+.item-detail__release-lead {
   max-width: 60ch;
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-body-md);
 }
 
-.item-detail__transfer .btn {
+.item-detail__transfer .btn,
+.item-detail__release .btn {
   justify-self: start;
 }
 
-.item-detail__transfer-note {
+.item-detail__transfer-note,
+.item-detail__release-note {
   display: flex;
   align-items: flex-start;
   gap: var(--space-1);
@@ -2153,7 +2159,8 @@ img {
   font-size: var(--type-body-md);
 }
 
-.item-detail__transfer-note .icon {
+.item-detail__transfer-note .icon,
+.item-detail__release-note .icon {
   flex: none;
   font-size: 20px;
 }

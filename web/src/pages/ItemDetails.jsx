@@ -5,6 +5,7 @@ import SiteHeader from '../components/SiteHeader.jsx';
 import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { fetchPublicItem } from '../lib/itemDetails.js';
+import { releaseItemAtCounter } from '../lib/itemRelease.js';
 import { transferItemCustody } from '../lib/itemTransfer.js';
 import { listOffices } from '../lib/offices.js';
 import { calibrateMatchScore } from '../lib/searchItems.js';
@@ -19,6 +20,16 @@ const TRANSFER_ERROR_COPY = {
   forbidden:
     'Only the office currently holding this item can transfer it. Sign in with that office and try again.',
   db: 'We could not update the holding office. Please try again.',
+};
+
+const RELEASE_ERROR_COPY = {
+  validation:
+    'Enter both the claimant name and the ID reference they presented.',
+  forbidden:
+    'Only the office currently holding this item can release it. Sign in with that office and try again.',
+  duplicate:
+    'This item has already been released. Its original claimant and release time were kept.',
+  db: 'We could not release the item. Please try again.',
 };
 
 /** Intake date as "8 Oct 2026", or null when the value is missing or unparseable. */
@@ -66,8 +77,19 @@ export default function ItemDetails() {
   const [transferStatus, setTransferStatus] = useState('idle');
   const [transferError, setTransferError] = useState('');
   const [transferredTo, setTransferredTo] = useState('');
+  const [claimantName, setClaimantName] = useState('');
+  const [claimantIdRef, setClaimantIdRef] = useState('');
+  const [releaseNotes, setReleaseNotes] = useState('');
+  const [releaseStatus, setReleaseStatus] = useState('idle');
+  const [releaseError, setReleaseError] = useState('');
+  const [releasedTo, setReleasedTo] = useState('');
   const headingRef = useRef(null);
   const transferSelectId = useId();
+  const releaseNameRef = useRef(null);
+  const releaseIdRef = useRef(null);
+  const releaseNameId = useId();
+  const releaseIdFieldId = useId();
+  const releaseNotesId = useId();
 
   // Identifies the fetch in flight, so a slow response for a previously viewed
   // item cannot overwrite the one now on screen.
@@ -98,12 +120,18 @@ export default function ItemDetails() {
     setImageFailed(false);
   }, [id]);
 
-  // Transfer feedback belongs to one item, not the next one opened.
+  // Transfer and release feedback belongs to one item, not the next one opened.
   useEffect(() => {
     setSelectedOfficeId('');
     setTransferError('');
     setTransferredTo('');
     setTransferStatus('idle');
+    setClaimantName('');
+    setClaimantIdRef('');
+    setReleaseNotes('');
+    setReleaseError('');
+    setReleaseStatus('idle');
+    setReleasedTo('');
   }, [id]);
 
   const loading = outcome?.key !== key;
@@ -114,6 +142,15 @@ export default function ItemDetails() {
   const canTransfer = Boolean(
     item &&
     staffOffice &&
+    !releasedTo &&
+    item.status === 'held' &&
+    item.holding_office_id === staffOffice.id,
+  );
+
+  const canRelease = Boolean(
+    item &&
+    staffOffice &&
+    !releasedTo &&
     item.status === 'held' &&
     item.holding_office_id === staffOffice.id,
   );
@@ -173,6 +210,49 @@ export default function ItemDetails() {
       setTransferStatus('idle');
       setTransferError(
         TRANSFER_ERROR_COPY[transferFailure.code] ?? TRANSFER_ERROR_COPY.db,
+      );
+    }
+  }
+
+  async function handleRelease(event) {
+    event.preventDefault();
+    if (releaseStatus === 'saving') return;
+
+    const cleanName = claimantName.trim();
+    const cleanIdRef = claimantIdRef.trim();
+
+    if (!cleanName) {
+      setReleaseError("Enter the claimant's name.");
+      releaseNameRef.current?.focus();
+      return;
+    }
+    if (!cleanIdRef) {
+      setReleaseError('Enter the ID reference presented by the claimant.');
+      releaseIdRef.current?.focus();
+      return;
+    }
+
+    setReleaseError('');
+    setReleaseStatus('saving');
+
+    try {
+      const released = await releaseItemAtCounter({
+        itemId: item.id,
+        officeId: staffOffice.id,
+        claimantName: cleanName,
+        claimantIdRef: cleanIdRef,
+        releaseNotes,
+      });
+      setReleasedTo(released.claimantName);
+      setClaimantName('');
+      setClaimantIdRef('');
+      setReleaseNotes('');
+      setReleaseStatus('idle');
+    } catch (releaseFailure) {
+      if (import.meta.env.DEV) console.error('[ItemDetails]', releaseFailure);
+      setReleaseStatus('idle');
+      setReleaseError(
+        RELEASE_ERROR_COPY[releaseFailure.code] ?? RELEASE_ERROR_COPY.db,
       );
     }
   }
@@ -341,7 +421,131 @@ export default function ItemDetails() {
                     </p>
                   </div>
 
-                  {transferredTo && (
+                  {releasedTo && (
+                    <p className="item-detail__release-note" role="status">
+                      <Icon name="check_circle" />
+                      <span>
+                        Released to {releasedTo}. The item is no longer visible
+                        in public search.
+                      </span>
+                    </p>
+                  )}
+
+                  {canRelease && (
+                    <form
+                      className="item-detail__release"
+                      onSubmit={handleRelease}
+                    >
+                      <h3 className="item-detail__release-title">
+                        <Icon name="assignment_turned_in" />
+                        Release item to claimant
+                      </h3>
+                      <p className="item-detail__release-lead">
+                        Confirm that the person at the counter presented a valid
+                        ID. Recording the release removes the item from public
+                        search and keeps the counter record traceable.
+                      </p>
+
+                      <div className="field">
+                        <label className="field__label" htmlFor={releaseNameId}>
+                          Claimant name
+                        </label>
+                        <input
+                          id={releaseNameId}
+                          ref={releaseNameRef}
+                          className="field__control"
+                          type="text"
+                          value={claimantName}
+                          onChange={(event) => {
+                            setClaimantName(event.target.value);
+                            setReleaseError('');
+                          }}
+                          autoComplete="off"
+                          maxLength={200}
+                          required
+                          disabled={releaseStatus === 'saving'}
+                          aria-invalid={
+                            Boolean(releaseError) && !claimantName.trim()
+                          }
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label
+                          className="field__label"
+                          htmlFor={releaseIdFieldId}
+                        >
+                          ID reference
+                        </label>
+                        <input
+                          id={releaseIdFieldId}
+                          ref={releaseIdRef}
+                          className="field__control"
+                          type="text"
+                          value={claimantIdRef}
+                          onChange={(event) => {
+                            setClaimantIdRef(event.target.value);
+                            setReleaseError('');
+                          }}
+                          placeholder="e.g. UMID-4921"
+                          autoComplete="off"
+                          maxLength={100}
+                          required
+                          disabled={releaseStatus === 'saving'}
+                          aria-invalid={
+                            Boolean(releaseError) && !claimantIdRef.trim()
+                          }
+                        />
+                        <p className="field__hint">
+                          ID type and the last four characters only. Do not
+                          record the full ID number.
+                        </p>
+                      </div>
+
+                      <div className="field">
+                        <label className="field__label" htmlFor={releaseNotesId}>
+                          Release notes
+                          <span className="field__optional">Optional</span>
+                        </label>
+                        <textarea
+                          id={releaseNotesId}
+                          className="field__control field__control--area"
+                          value={releaseNotes}
+                          onChange={(event) => setReleaseNotes(event.target.value)}
+                          maxLength={1000}
+                          disabled={releaseStatus === 'saving'}
+                        />
+                      </div>
+
+                      <div aria-live="polite">
+                        {releaseError && (
+                          <p className="search__error">
+                            <Icon name="error" />
+                            {releaseError}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="btn btn--filled"
+                        disabled={releaseStatus === 'saving'}
+                      >
+                        <Icon
+                          name={
+                            releaseStatus === 'saving'
+                              ? 'hourglass_top'
+                              : 'assignment_turned_in'
+                          }
+                        />
+                        {releaseStatus === 'saving'
+                          ? 'Releasing...'
+                          : 'Confirm release'}
+                      </button>
+                    </form>
+                  )}
+
+                  {transferredTo && !releasedTo && (
                     <p className="item-detail__transfer-note" role="status">
                       <Icon name="check_circle" />
                       <span>
