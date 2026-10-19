@@ -166,8 +166,9 @@ refactor branch was created.
 ### web/src/pages/AdminOffices.jsx
 - [x] No skip link; `<main>` has no id.
 - [x] Table has no `<caption>` (the surrounding section has an aria-label).
-- [x] Table becomes stacked cards via `display` changes on table elements; keep
-      native roles and verify semantics in axe.
+- [x] Table becomes stacked cards via `display` changes on table elements; add
+      explicit table/rowgroup/row/columnheader/rowheader/cell roles so the
+      semantics survive the display change.
 - [x] Table/status/meta copy uses 14px tokens.
 
 ### web/src/pages/RoutePlaceholder.jsx

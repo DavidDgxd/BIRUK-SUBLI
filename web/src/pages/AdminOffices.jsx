@@ -159,27 +159,43 @@ export default function AdminOffices() {
                   </p>
                 ) : (
                   <div className="office-admin__table-wrap">
-                    <table className="office-table">
+                    <table className="office-table" role="table">
                       <caption className="visually-hidden">
                         Participating offices and shared logins
                       </caption>
-                      <thead>
-                        <tr>
-                          <th scope="col">Office &amp; address</th>
-                          <th scope="col">Hours &amp; contact</th>
-                          <th scope="col">Login email</th>
-                          <th scope="col">Account status</th>
-                          <th scope="col" className="office-table__actions">
+                      <thead role="rowgroup">
+                        <tr role="row">
+                          <th scope="col" role="columnheader">
+                            Office &amp; address
+                          </th>
+                          <th scope="col" role="columnheader">
+                            Hours &amp; contact
+                          </th>
+                          <th scope="col" role="columnheader">
+                            Login email
+                          </th>
+                          <th scope="col" role="columnheader">
+                            Account status
+                          </th>
+                          <th
+                            scope="col"
+                            role="columnheader"
+                            className="office-table__actions"
+                          >
                             <span className="visually-hidden">Actions</span>
                           </th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody role="rowgroup">
                         {offices.map((office) => {
                           const status = accountStatus(office);
                           return (
-                            <tr key={office.id}>
-                              <th scope="row" className="office-table__office">
+                            <tr key={office.id} role="row">
+                              <th
+                                scope="row"
+                                role="rowheader"
+                                className="office-table__office"
+                              >
                                 <span className="office-table__primary">
                                   {office.name}
                                 </span>
@@ -188,6 +204,7 @@ export default function AdminOffices() {
                                 </span>
                               </th>
                               <td
+                                role="cell"
                                 className="office-table__hours"
                                 data-label="Hours & contact"
                               >
@@ -199,6 +216,7 @@ export default function AdminOffices() {
                                 </span>
                               </td>
                               <td
+                                role="cell"
                                 className="office-table__email"
                                 data-label="Login email"
                               >
@@ -209,6 +227,7 @@ export default function AdminOffices() {
                                 )}
                               </td>
                               <td
+                                role="cell"
                                 className="office-table__status"
                                 data-label="Account status"
                               >
@@ -218,7 +237,7 @@ export default function AdminOffices() {
                                   {status.label}
                                 </span>
                               </td>
-                              <td className="office-table__actions">
+                              <td role="cell" className="office-table__actions">
                                 <OfficeActionsMenu
                                   office={office}
                                   onReset={setResetTarget}
