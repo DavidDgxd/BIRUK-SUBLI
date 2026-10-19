@@ -276,10 +276,13 @@ export default function ItemDetails() {
 
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <MistHero />
       <div className="page">
         <SiteHeader />
-        <main className="report-page">
+        <main id="main" className="report-page">
           {canGoBack ? (
             <button
               type="button"
@@ -374,6 +377,10 @@ export default function ItemDetails() {
                     <img
                       src={item.image_url}
                       alt={`Photo of ${item.title}`}
+                      width="800"
+                      height="600"
+                      loading="lazy"
+                      decoding="async"
                       onError={() => setImageFailed(true)}
                     />
                   ) : (
@@ -434,6 +441,7 @@ export default function ItemDetails() {
                   {canRelease && (
                     <form
                       className="item-detail__release"
+                      aria-label="Release item to claimant"
                       onSubmit={handleRelease}
                     >
                       <h3 className="item-detail__release-title">
@@ -503,7 +511,10 @@ export default function ItemDetails() {
                       </div>
 
                       <div className="field">
-                        <label className="field__label" htmlFor={releaseNotesId}>
+                        <label
+                          className="field__label"
+                          htmlFor={releaseNotesId}
+                        >
                           Release notes
                           <span className="field__optional">Optional</span>
                         </label>
@@ -511,7 +522,9 @@ export default function ItemDetails() {
                           id={releaseNotesId}
                           className="field__control field__control--area"
                           value={releaseNotes}
-                          onChange={(event) => setReleaseNotes(event.target.value)}
+                          onChange={(event) =>
+                            setReleaseNotes(event.target.value)
+                          }
                           maxLength={1000}
                           disabled={releaseStatus === 'saving'}
                         />
@@ -557,6 +570,7 @@ export default function ItemDetails() {
                   {canTransfer && (
                     <form
                       className="item-detail__transfer"
+                      aria-label="Update holding office"
                       onSubmit={handleTransfer}
                     >
                       <h3 className="item-detail__transfer-title">

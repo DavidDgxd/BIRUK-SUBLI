@@ -27,10 +27,13 @@ export default function StaffIntake() {
 
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <MistHero />
       <div className="page">
         <SiteHeader />
-        <main className="report-page">
+        <main id="main" className="report-page">
           <Link className="results__back" to="/">
             <Icon name="arrow_back" />
             Back to search

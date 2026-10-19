@@ -82,10 +82,13 @@ export default function SearchResults() {
 
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <MistHero />
       <div className="page">
         <SiteHeader />
-        <main className="results">
+        <main id="main" className="results">
           <Link className="results__back" to="/">
             <Icon name="arrow_back" />
             New search

@@ -81,10 +81,13 @@ export default function AdminOffices() {
 
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <MistHero />
       <div className="page">
         <SiteHeader />
-        <main className="report-page">
+        <main id="main" className="report-page">
           <Link className="results__back" to="/">
             <Icon name="arrow_back" />
             Back to search
@@ -157,6 +160,9 @@ export default function AdminOffices() {
                 ) : (
                   <div className="office-admin__table-wrap">
                     <table className="office-table">
+                      <caption className="visually-hidden">
+                        Participating offices and shared logins
+                      </caption>
                       <thead>
                         <tr>
                           <th scope="col">Office &amp; address</th>

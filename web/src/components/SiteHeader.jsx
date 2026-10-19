@@ -10,16 +10,23 @@ import { useStaffAuth } from '../context/StaffAuthContext.jsx';
  */
 function staffLinkFor(status, isAdmin) {
   if (status === 'unauthenticated') {
-    return { to: '/staff/login', icon: 'person', lines: ['Staff/Admin', 'Log in'] };
+    return {
+      to: '/staff/login',
+      icon: 'person',
+      lines: ['Staff/Admin', 'Log in'],
+    };
   }
   if (status !== 'authenticated') return null;
   return isAdmin
-    ? { to: '/admin/offices', icon: 'admin_panel_settings', lines: ['Admin', 'Dashboard'] }
+    ? {
+        to: '/admin/offices',
+        icon: 'admin_panel_settings',
+        lines: ['Admin', 'Dashboard'],
+      }
     : { to: '/staff/intake', icon: 'dashboard', lines: ['Staff', 'Dashboard'] };
 }
 
 export default function SiteHeader({ isHome = false }) {
-  const Heading = isHome ? 'h1' : 'p';
   const { status, isAdmin } = useStaffAuth();
   const { pathname } = useLocation();
 
@@ -28,7 +35,7 @@ export default function SiteHeader({ isHome = false }) {
 
   return (
     <header className="site-header">
-      <Heading className="brand__name">
+      <h1 className="brand__name">
         {isHome ? (
           'Biruk-Subli'
         ) : (
@@ -36,8 +43,10 @@ export default function SiteHeader({ isHome = false }) {
             Biruk-Subli
           </Link>
         )}
-      </Heading>
-      <p className="brand__tagline">What&rsquo;s lost is found, safe and sound</p>
+      </h1>
+      <p className="brand__tagline">
+        What&rsquo;s lost is found, safe and sound
+      </p>
       {staffLink && (
         <Link className="btn staff-link" to={staffLink.to}>
           <Icon name={staffLink.icon} />

@@ -10,10 +10,13 @@ export default function RoutePlaceholder({
 }) {
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <MistHero />
       <div className="page">
         <SiteHeader />
-        <main className="placeholder">
+        <main id="main" className="placeholder">
           <h2 className="placeholder__title">{title}</h2>
           <p className="placeholder__text">{message}</p>
           <Link className="btn btn--filled" to="/">

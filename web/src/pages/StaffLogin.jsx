@@ -87,10 +87,13 @@ export default function StaffLogin() {
 
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <MistHero />
       <div className="page">
         <SiteHeader />
-        <main className="report-page">
+        <main id="main" className="report-page">
           <Link className="results__back" to="/">
             <Icon name="arrow_back" />
             Back to search
@@ -109,6 +112,7 @@ export default function StaffLogin() {
           <div className="staff-login">
             <form
               className="report-form staff-login__form"
+              aria-label="Office log in"
               onSubmit={handleSubmit}
               noValidate
               aria-busy={submitting}
@@ -126,6 +130,7 @@ export default function StaffLogin() {
                   inputMode="email"
                   autoCapitalize="none"
                   spellCheck="false"
+                  required
                   value={email}
                   aria-invalid={error && !email.trim() ? 'true' : undefined}
                   aria-describedby={error ? errorId : undefined}
@@ -146,6 +151,7 @@ export default function StaffLogin() {
                   className="field__control"
                   type="password"
                   autoComplete="current-password"
+                  required
                   value={password}
                   aria-invalid={error && !password ? 'true' : undefined}
                   aria-describedby={error ? errorId : undefined}
