@@ -9,6 +9,7 @@ import AddOfficeDialog from '../components/AddOfficeDialog.jsx';
 import ResetCredentialsDialog from '../components/ResetCredentialsDialog.jsx';
 import OfficeActionsMenu from '../components/OfficeActionsMenu.jsx';
 import { listOffices, listOfficeLogins } from '../lib/offices.js';
+import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /** Suspension wins over login state: a suspended office cannot sign in either way. */
 function accountStatus(office) {
@@ -29,6 +30,7 @@ function accountStatus(office) {
  * caller's central-admin role.
  */
 export default function AdminOffices() {
+  const { status, isAdmin } = useStaffAuth();
   const headingRef = useRef(null);
   const [offices, setOffices] = useState(null); // null while the first load runs
   const [logins, setLogins] = useState(() => new Map()); // office id → login email
@@ -42,6 +44,8 @@ export default function AdminOffices() {
   }, []);
 
   useEffect(() => {
+    if (status !== 'authenticated' || !isAdmin) return undefined;
+
     const controller = new AbortController();
     let active = true;
 
@@ -72,7 +76,7 @@ export default function AdminOffices() {
       active = false;
       controller.abort();
     };
-  }, [reloadKey]);
+  }, [reloadKey, status, isAdmin]);
 
   function handleCreated() {
     setShowDialog(false);
