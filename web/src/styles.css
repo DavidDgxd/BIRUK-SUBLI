@@ -3,8 +3,8 @@
  *
  * Rules (from the team guide):
  *  - No hardcoded colors. Use var(--md-sys-color-*) / var(--bs-*) from theme.css.
- *  - Spacing in multiples of 8px, type from the scale below.
- *  - Mobile first: base styles target 360px, media queries scale up.
+ *  - Spacing in multiples of 0.5rem, type from the scale below.
+ *  - Mobile first: base styles target 320px, min-width queries scale up.
  *
  * Sections: 1 Tokens, 2 Base, 3 Layout, 4 Buttons, 5 Header, 6 Mist hero,
  * 7 Search, 8 Report cards, 9 How it works, 10 Footer, 11 Placeholder page,
@@ -15,29 +15,30 @@
 
 /* ============================== 1. Tokens ============================== */
 :root {
-  /* Spacing (8px grid, plus a 4px and 12px half-steps) */
-  --space-0-5: 4px;
-  --space-1: 8px;
-  --space-1-5: 12px;
-  --space-2: 16px;
-  --space-3: 24px;
-  --space-4: 32px;
-  --space-5: 48px;
-  --space-6: 64px;
+  /* Spacing (0.5rem grid, plus 0.25rem and 0.75rem half-steps) */
+  --space-0-5: 0.25rem;
+  --space-1: 0.5rem;
+  --space-1-5: 0.75rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2rem;
+  --space-5: 3rem;
+  --space-6: 4rem;
 
   /* Type scale (size / line-height) */
   --type-display: clamp(2rem, 1.2rem + 3vw, 3.5rem); /* 32 to 56px */
   --type-headline: clamp(1.75rem, 1.5rem + 1vw, 2.25rem); /* 28 to 36px */
   --type-title: 1.75rem; /* 28px, card titles */
   --type-title-sm: 1.125rem; /* 18px */
-  --type-body-lg: 1rem; /* 16px */
-  --type-body-md: 0.875rem; /* 14px */
-  --type-label: 0.75rem; /* 12px */
+  --type-body-lg: 1rem; /* 16px minimum body text */
+  --type-body-md: 1rem;
+  --type-label: 0.875rem; /* 14px, labels and metadata */
 
   /* Layout */
-  --page-max: 1040px;
+  --page-max: 65rem;
   --page-gutter: var(--space-2);
-  --tap-target: 48px;
+  --tap-target: 2.75rem;
+  --control-height: 3.5rem;
 
   /* Elevation */
   --shadow-color: color-mix(
@@ -52,7 +53,7 @@
   --motion-fast: 150ms;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 37.5rem) {
   :root {
     --page-gutter: var(--space-3);
   }
@@ -79,7 +80,6 @@ body {
   line-height: 1.5;
   background: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
-  overflow-x: hidden;
 }
 
 h1,
@@ -140,7 +140,7 @@ img {
   font-family: 'Material Symbols Rounded';
   font-weight: normal;
   font-style: normal;
-  font-size: 24px;
+  font-size: 1.5rem;
   line-height: 1;
   letter-spacing: normal;
   text-transform: none;
@@ -171,7 +171,7 @@ img {
 
 .landing {
   flex: 1;
-  padding-top: clamp(72px, 16vw, 144px);
+  padding-top: clamp(4.5rem, 16vw, 9rem);
   padding-bottom: var(--space-5);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -190,13 +190,13 @@ img {
   gap: var(--space-3);
 }
 
-@media (min-width: 600px) {
+@media (min-width: 37.5rem) {
   .report-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (min-width: 840px) {
+@media (min-width: 52.5rem) {
   .landing__grid {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     gap: var(--space-5);
@@ -215,7 +215,7 @@ img {
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  min-height: 56px;
+  min-height: var(--control-height);
   min-width: 0;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--md-sys-color-outline);
@@ -225,7 +225,7 @@ img {
   font-weight: 500;
   font-size: var(--type-body-lg);
   line-height: 1.25;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.01em;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -347,6 +347,9 @@ img {
 }
 
 .brand__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
   color: inherit;
   text-decoration: none;
 }
@@ -358,43 +361,56 @@ img {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+/* Mobile first: at the smallest widths the link is an icon button. The text
+   stays in the DOM for screen readers and is revealed once there is room. */
 .staff-link {
   grid-area: 1 / 2;
+  width: var(--tap-target);
   min-height: var(--tap-target);
-  padding-inline: var(--space-1-5);
+  padding: 0;
   gap: var(--space-1);
+  border-radius: 50%;
   background: color-mix(in srgb, var(--md-sys-color-surface) 70%, transparent);
   font-size: var(--type-label);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03em;
   line-height: 1.2;
   text-transform: uppercase;
 }
 
 .staff-link__text {
-  display: grid;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* Under 380px there is no room beside the title, so the link becomes an icon
-   button. The text stays in the DOM for screen readers. */
-@media (max-width: 379px) {
+@media (min-width: 30rem) {
   .staff-link {
-    width: var(--tap-target);
-    padding: 0;
-    border-radius: 50%;
+    width: auto;
+    padding-inline: var(--space-1-5);
+    border-radius: var(--radius-pill);
   }
 
   .staff-link__text {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
+    position: static;
+    display: grid;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
   }
 }
 
-@media (min-width: 600px) {
+@media (min-width: 37.5rem) {
   .staff-link__text {
     display: inline;
   }
@@ -409,7 +425,7 @@ img {
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 0;
-  height: 340px;
+  height: 21.25rem;
   pointer-events: none;
   overflow: hidden;
 }
@@ -454,7 +470,7 @@ img {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 56px;
+  min-height: var(--control-height);
   padding-inline: var(--space-2) var(--space-1);
   border: 1px solid var(--md-sys-color-outline);
   border-radius: var(--radius-pill);
@@ -479,7 +495,7 @@ img {
 .search-field__input {
   flex: 1;
   min-width: 0;
-  height: 54px;
+  height: calc(var(--control-height) - 0.125rem);
   padding: 0;
   border: 0;
   outline: 0;
@@ -515,7 +531,7 @@ img {
 }
 
 .search__error .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .chip-group {
@@ -530,7 +546,7 @@ img {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 40px;
+  min-height: 2.5rem;
   padding: 0 var(--space-2);
   border: 1px solid var(--md-sys-color-outline);
   border-radius: var(--radius-pill);
@@ -542,11 +558,11 @@ img {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Extends the touch target to 48px without making the chip taller. */
+/* Extends the touch target to at least 44px without making the chip taller. */
 .chip::before {
   content: '';
   position: absolute;
-  inset: -4px -2px;
+  inset: -0.25rem -0.125rem;
 }
 
 .chip:hover {
@@ -564,12 +580,12 @@ img {
 }
 
 .chip .icon {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .search__actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr));
   gap: var(--space-1-5);
   margin-top: var(--space-2);
 }
@@ -590,8 +606,8 @@ img {
 
 .photo-chip__img {
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   border-radius: var(--space-1);
   object-fit: cover;
 }
@@ -633,13 +649,13 @@ img {
   display: grid;
   place-items: center;
   flex: none;
-  width: 56px;
-  height: 56px;
+  width: 3.5rem;
+  height: 3.5rem;
   border-radius: 50%;
 }
 
 .report-card__badge .icon {
-  font-size: 28px;
+  font-size: 1.75rem;
 }
 
 .report-card--lost .report-card__badge {
@@ -705,8 +721,8 @@ img {
   display: grid;
   place-items: center;
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
@@ -754,11 +770,11 @@ img {
 }
 
 .desks__item .icon {
-  font-size: 18px;
+  font-size: 1.125rem;
   color: var(--md-sys-color-primary);
 }
 
-@media (min-width: 840px) {
+@media (min-width: 52.5rem) {
   .how__steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -781,7 +797,7 @@ img {
   display: grid;
   gap: var(--space-2);
   justify-items: start;
-  padding-top: clamp(72px, 16vw, 112px);
+  padding-top: clamp(4.5rem, 16vw, 7rem);
 }
 
 .placeholder__title {
@@ -803,7 +819,7 @@ img {
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--space-2);
-  padding-top: clamp(64px, 12vw, 96px);
+  padding-top: clamp(4rem, 12vw, 6rem);
   padding-bottom: var(--space-5);
 }
 
@@ -871,7 +887,7 @@ img {
 }
 
 .summary-chip .icon {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .results__translated,
@@ -889,7 +905,7 @@ img {
   list-style: none;
 }
 
-@media (min-width: 840px) {
+@media (min-width: 52.5rem) {
   .results__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
@@ -973,7 +989,7 @@ img {
 }
 
 .result-card__no-photo .icon {
-  font-size: 40px;
+  font-size: 2.5rem;
 }
 
 .result-card__body {
@@ -1034,7 +1050,7 @@ img {
 
 .result-card__link-icon {
   margin-inline-start: var(--space-0-5);
-  font-size: 20px;
+  font-size: 1.25rem;
   vertical-align: middle;
   color: var(--md-sys-color-primary);
 }
@@ -1065,7 +1081,7 @@ img {
 
 .result-card__ref {
   font-size: var(--type-label);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03em;
   color: var(--md-sys-color-on-surface-variant);
 }
 
@@ -1084,7 +1100,7 @@ img {
 }
 
 .result-card__category .icon {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 /* Stands in for the removed description: tells the claimant what the desk will ask. */
@@ -1100,7 +1116,7 @@ img {
 }
 
 .result-card__verify .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -1126,7 +1142,7 @@ img {
 }
 
 .result-card__office .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -1148,7 +1164,7 @@ img {
 }
 
 .result-skeleton {
-  min-height: 280px;
+  min-height: 17.5rem;
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container);
   animation: skeleton-pulse 1.4s ease-in-out infinite;
@@ -1223,7 +1239,7 @@ img {
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--space-2);
-  padding-top: clamp(64px, 12vw, 96px);
+  padding-top: clamp(4rem, 12vw, 6rem);
   padding-bottom: var(--space-5);
 }
 
@@ -1237,7 +1253,7 @@ img {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
-  max-width: 640px;
+  max-width: 40rem;
   padding: var(--space-3) var(--space-2);
   border-radius: var(--radius-card);
   background: var(--md-sys-color-surface-container-lowest);
@@ -1296,7 +1312,7 @@ img {
 }
 
 .field__control--area {
-  min-height: 120px;
+  min-height: 7.5rem;
   padding-top: var(--space-1-5);
   resize: vertical;
 }
@@ -1309,7 +1325,7 @@ img {
 
 .report-form__actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(11.25rem, 1fr));
   gap: var(--space-1-5);
 }
 
@@ -1324,6 +1340,7 @@ img {
   font-size: var(--type-title-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
   user-select: all;
 }
 
@@ -1348,12 +1365,17 @@ img {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .btn,
+  .staff-bar__nav-link,
+  .staff-bar__signout,
+  .result-skeleton,
+  .icon--pulse {
+    transition: none;
+    animation: none;
   }
 }
 
@@ -1383,7 +1405,7 @@ img {
 }
 
 .staff-bar .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .staff-bar__nav {
@@ -1418,7 +1440,7 @@ img {
 }
 
 .staff-bar__nav-link .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 /* Trailing controls: the dev-session badge, a sign-out failure note, and the
@@ -1461,7 +1483,7 @@ img {
 }
 
 .staff-bar__signout .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 /* Shown only when signing out failed, so the officer knows the session is
@@ -1475,7 +1497,7 @@ img {
 }
 
 .staff-bar__note .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .staff-bar__badge {
@@ -1499,11 +1521,11 @@ img {
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
-    calc(100% - 20px) center,
-    calc(100% - 14px) center;
+    calc(100% - 1.25rem) center,
+    calc(100% - 0.875rem) center;
   background-size:
-    6px 6px,
-    6px 6px;
+    0.375rem 0.375rem,
+    0.375rem 0.375rem;
   background-repeat: no-repeat;
 }
 
@@ -1552,7 +1574,7 @@ img {
 }
 
 .photo-tip .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -1646,7 +1668,7 @@ img {
 }
 
 /* Tablet and up: a real table again. */
-@media (min-width: 600px) {
+@media (min-width: 37.5rem) {
   .office-admin__table-wrap {
     overflow-x: auto;
   }
@@ -1722,7 +1744,7 @@ img {
   margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0 0;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 37.5rem) {
   .office-table__actions,
   .office-table tbody .office-table__actions {
     width: 1%;
@@ -1764,7 +1786,7 @@ img {
 .office-menu {
   position: fixed;
   z-index: 10;
-  min-width: 200px;
+  min-width: 12.5rem;
   margin-top: var(--space-0-5);
   padding: var(--space-1) 0;
   border-radius: var(--radius-field);
@@ -1791,7 +1813,11 @@ img {
 
 .office-menu__item:hover,
 .office-menu__item:focus-visible {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) 8%,
+    transparent
+  );
 }
 
 .office-menu__item[aria-disabled='true'] {
@@ -1813,7 +1839,7 @@ img {
 
 /* "+ ADD AN OFFICE" dialog */
 .office-dialog {
-  width: min(560px, calc(100vw - var(--space-4)));
+  width: min(35rem, calc(100vw - var(--space-4)));
   max-height: calc(100dvh - var(--space-4));
   padding: 0;
   border: none;
@@ -1926,7 +1952,7 @@ img {
   display: grid;
   justify-items: start;
   gap: var(--space-2);
-  max-width: 440px;
+  max-width: 27.5rem;
 }
 
 .staff-login__form {
@@ -1943,7 +1969,7 @@ img {
 }
 
 .staff-login__note .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -1958,7 +1984,7 @@ img {
 }
 
 .staff-gate__checking .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 /* ==================== 17. Item details page (US-18) ==================== */
@@ -2004,7 +2030,7 @@ img {
 }
 
 .item-detail__no-photo .icon {
-  font-size: 56px;
+  font-size: 3.5rem;
 }
 
 .item-detail__content {
@@ -2046,7 +2072,7 @@ img {
 .item-detail__ref {
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--type-label);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03em;
 }
 
 .item-detail__category {
@@ -2062,7 +2088,7 @@ img {
 }
 
 .item-detail__category .icon {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .item-detail__verify {
@@ -2078,7 +2104,7 @@ img {
 
 .item-detail__verify .icon {
   flex: none;
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -2104,7 +2130,7 @@ img {
 
 .item-detail__office .icon {
   flex: none;
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -2131,7 +2157,7 @@ img {
 
 .item-detail__transfer-title .icon,
 .item-detail__release-title .icon {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: var(--md-sys-color-primary);
 }
 
@@ -2162,12 +2188,12 @@ img {
 .item-detail__transfer-note .icon,
 .item-detail__release-note .icon {
   flex: none;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 /* Two columns once there is room, so the photo and the facts sit side by side
    instead of one being scrolled past to reach the other. */
-@media (min-width: 840px) {
+@media (min-width: 52.5rem) {
   .item-detail {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
     padding: var(--space-3);

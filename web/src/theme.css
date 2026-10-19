@@ -50,9 +50,9 @@
   --md-sys-color-scrim: #000000;
 
   /* ---- Shape ---- */
-  --radius-card: 28px;
-  --radius-field: 16px;
-  --radius-pill: 999px;
+  --radius-card: 1.75rem;
+  --radius-field: 1rem;
+  --radius-pill: 62.4375rem;
 
   /* ---- Type families ---- */
   --font-body: 'Roboto', system-ui, sans-serif;
