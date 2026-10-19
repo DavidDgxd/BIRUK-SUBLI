@@ -159,42 +159,57 @@ export default function AdminOffices() {
                   </p>
                 ) : (
                   <div className="office-admin__table-wrap">
-                    <table className="office-table" role="table">
-                      <caption className="visually-hidden">
-                        Participating offices and shared logins
-                      </caption>
-                      <thead role="rowgroup">
-                        <tr role="row">
-                          <th scope="col" role="columnheader">
-                            Office &amp; address
-                          </th>
-                          <th scope="col" role="columnheader">
-                            Hours &amp; contact
-                          </th>
-                          <th scope="col" role="columnheader">
-                            Login email
-                          </th>
-                          <th scope="col" role="columnheader">
-                            Account status
-                          </th>
-                          <th
-                            scope="col"
+                    <div
+                      className="office-table"
+                      role="table"
+                      aria-label="Participating offices and shared logins"
+                    >
+                      <div className="office-table__head" role="rowgroup">
+                        <div className="office-table__row" role="row">
+                          <div
                             role="columnheader"
-                            className="office-table__actions"
+                            className="office-table__cell office-table__office"
+                          >
+                            Office &amp; address
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__hours"
+                          >
+                            Hours &amp; contact
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__email"
+                          >
+                            Login email
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__status"
+                          >
+                            Account status
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__actions"
                           >
                             <span className="visually-hidden">Actions</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody role="rowgroup">
+                          </div>
+                        </div>
+                      </div>
+                      <div className="office-table__body" role="rowgroup">
                         {offices.map((office) => {
                           const status = accountStatus(office);
                           return (
-                            <tr key={office.id} role="row">
-                              <th
-                                scope="row"
+                            <div
+                              key={office.id}
+                              className="office-table__row"
+                              role="row"
+                            >
+                              <div
                                 role="rowheader"
-                                className="office-table__office"
+                                className="office-table__cell office-table__office"
                               >
                                 <span className="office-table__primary">
                                   {office.name}
@@ -202,10 +217,10 @@ export default function AdminOffices() {
                                 <span className="office-table__meta">
                                   {office.address}
                                 </span>
-                              </th>
-                              <td
+                              </div>
+                              <div
                                 role="cell"
-                                className="office-table__hours"
+                                className="office-table__cell office-table__hours"
                                 data-label="Hours & contact"
                               >
                                 <span className="office-table__primary">
@@ -214,10 +229,10 @@ export default function AdminOffices() {
                                 <span className="office-table__meta">
                                   {office.phone_number || '—'}
                                 </span>
-                              </td>
-                              <td
+                              </div>
+                              <div
                                 role="cell"
-                                className="office-table__email"
+                                className="office-table__cell office-table__email"
                                 data-label="Login email"
                               >
                                 {logins.get(office.id) ?? (
@@ -225,10 +240,10 @@ export default function AdminOffices() {
                                     Not provided
                                   </span>
                                 )}
-                              </td>
-                              <td
+                              </div>
+                              <div
                                 role="cell"
-                                className="office-table__status"
+                                className="office-table__cell office-table__status"
                                 data-label="Account status"
                               >
                                 <span
@@ -236,18 +251,21 @@ export default function AdminOffices() {
                                 >
                                   {status.label}
                                 </span>
-                              </td>
-                              <td role="cell" className="office-table__actions">
+                              </div>
+                              <div
+                                role="cell"
+                                className="office-table__cell office-table__actions"
+                              >
                                 <OfficeActionsMenu
                                   office={office}
                                   onReset={setResetTarget}
                                 />
-                              </td>
-                            </tr>
+                              </div>
+                            </div>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
                   </div>
                 )}
               </section>

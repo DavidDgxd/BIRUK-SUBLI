@@ -1604,15 +1604,16 @@ img {
 
 .office-table {
   width: 100%;
-  border-collapse: collapse;
   font-size: var(--type-body-md);
   text-align: left;
 }
 
 /* Phones: each row is a stacked card, so nothing scrolls sideways. The column
    headings are hidden visually but kept for screen readers, and the cells that
-   need one show their heading as a label (data-label). */
-.office-table thead {
+   need one show their heading as a label (data-label). The div-based table keeps
+   explicit ARIA table roles at every width, so the display change on mobile
+   cannot strip the row/column relationships. */
+.office-table__head {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1621,11 +1622,11 @@ img {
   white-space: nowrap;
 }
 
-.office-table tbody {
+.office-table__body {
   display: block;
 }
 
-.office-table tbody tr {
+.office-table__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1-5) var(--space-1);
@@ -1633,13 +1634,14 @@ img {
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
-.office-table tbody tr:last-child {
+.office-table__body .office-table__row:last-child {
   border-bottom: none;
 }
 
-.office-table tbody th,
-.office-table tbody td {
+.office-table__cell {
   display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .office-table__hours,
@@ -1648,15 +1650,11 @@ img {
   grid-column: 1 / -1;
 }
 
-.office-table__email {
-  overflow-wrap: anywhere;
-}
-
 .office-table__none {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.office-table td[data-label]::before {
+.office-table__cell[data-label]::before {
   content: attr(data-label);
   display: block;
   margin-bottom: var(--space-0-5);
@@ -1667,38 +1665,9 @@ img {
   text-transform: uppercase;
 }
 
-/* Tablet and up: a real table again. */
+/* Tablet and up: the same ARIA table, laid out as aligned columns. */
 @media (min-width: 37.5rem) {
-  .office-table {
-    table-layout: fixed;
-  }
-
-  .office-table th:nth-child(1) {
-    width: 24%;
-  }
-
-  .office-table th:nth-child(2) {
-    width: 22%;
-  }
-
-  .office-table th:nth-child(3) {
-    width: 24%;
-  }
-
-  .office-table th:nth-child(4) {
-    width: 16%;
-  }
-
-  .office-table th:nth-child(5) {
-    width: 14%;
-  }
-
-  .office-table th,
-  .office-table td {
-    overflow-wrap: anywhere;
-  }
-
-  .office-table thead {
+  .office-table__head {
     position: static;
     width: auto;
     height: auto;
@@ -1706,27 +1675,22 @@ img {
     clip-path: none;
   }
 
-  .office-table tbody {
-    display: table-row-group;
-  }
-
-  .office-table tbody tr {
-    display: table-row;
+  .office-table__row {
+    grid-template-columns:
+      minmax(0, 24fr) minmax(0, 22fr) minmax(0, 24fr)
+      minmax(0, 16fr) minmax(0, 14fr);
+    gap: 0;
     padding: 0;
     border-bottom: none;
   }
 
-  .office-table th,
-  .office-table td,
-  .office-table tbody th,
-  .office-table tbody td {
-    display: table-cell;
+  .office-table__cell {
     padding: var(--space-1-5) var(--space-2);
     border-bottom: 1px solid var(--md-sys-color-outline-variant);
     vertical-align: top;
   }
 
-  .office-table thead th {
+  .office-table__head .office-table__cell {
     background: var(--md-sys-color-surface-container);
     color: var(--md-sys-color-on-surface-variant);
     font-size: var(--type-label);
@@ -1735,12 +1699,11 @@ img {
     text-transform: uppercase;
   }
 
-  .office-table tbody tr:last-child th,
-  .office-table tbody tr:last-child td {
+  .office-table__body .office-table__row:last-child .office-table__cell {
     border-bottom: none;
   }
 
-  .office-table td[data-label]::before {
+  .office-table__cell[data-label]::before {
     content: none;
   }
 
@@ -1771,9 +1734,9 @@ img {
 }
 
 @media (min-width: 37.5rem) {
-  .office-table__actions,
-  .office-table tbody .office-table__actions {
-    width: 1%;
+  .office-table__actions {
+    grid-column: auto;
+    grid-row: auto;
     margin: 0;
     padding-block: var(--space-0-5);
   }
