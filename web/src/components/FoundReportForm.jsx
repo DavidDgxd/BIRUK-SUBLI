@@ -37,7 +37,7 @@ function todayIso() {
  * success it shows the reference code the database generated; the finder hands
  * the item in at a counter and staff quote that code.
  */
-export default function FoundReportForm() {
+export default function FoundReportForm({ onReceiptChange }) {
   const [shortNote, setShortNote] = useState('');
   const [foundLocation, setFoundLocation] = useState('');
   const [foundDate, setFoundDate] = useState(todayIso);
@@ -78,6 +78,11 @@ export default function FoundReportForm() {
   useEffect(() => {
     if (status === 'done') receiptRef.current?.focus();
   }, [status]);
+
+  // Let the page swap its heading and lead for the receipt state.
+  useEffect(() => {
+    onReceiptChange?.(status === 'done');
+  }, [status, onReceiptChange]);
 
   function handleFileChange(event) {
     const file = event.target.files?.[0];
@@ -170,32 +175,30 @@ export default function FoundReportForm() {
 
   if (status === 'done' && receipt) {
     return (
-      <section className="state-card state-card--success" role="status">
-        <h3 className="state-card__title" tabIndex={-1} ref={receiptRef}>
-          Report received
-        </h3>
-        <p className="state-card__text">
+      <section className="state state--success receipt-panel" role="status">
+        <p className="receipt" tabIndex={-1} ref={receiptRef}>
+          <span className="visually-hidden">Reference code </span>
+          {receipt.refCode}
+        </p>
+        <p className="state__text">
           Keep this reference code. Hand the item in at any participating city
           office counter and staff will log it against this code.
         </p>
-        <p className="receipt" aria-label={`Reference code ${receipt.refCode}`}>
-          {receipt.refCode}
-        </p>
         {!receipt.usedPhoto && (
-          <p className="state-card__text">
+          <p className="state__text">
             Your photo was saved, but we could not read it for matching, so your
             report was matched on the description alone.
           </p>
         )}
-        <p className="state-card__text">
+        <p className="state__text">
           Until you hand the item in, it will not appear in the public search.
         </p>
-        <div className="state-card__actions">
-          <Link className="btn btn--filled" to="/">
+        <div className="state__actions receipt-actions">
+          <Link className="btn btn--primary" to="/">
             <Icon name="search" />
             Search held items
           </Link>
-          <button type="button" className="btn" onClick={startAnother}>
+          <button type="button" className="btn btn--quiet" onClick={startAnother}>
             <Icon name="add" />
             Report another item
           </button>
@@ -208,7 +211,8 @@ export default function FoundReportForm() {
 
   return (
     <form
-      className="report-form"
+      className="form"
+      aria-label="Report a found item"
       onSubmit={handleSubmit}
       noValidate
       aria-busy={submitting}
@@ -224,6 +228,7 @@ export default function FoundReportForm() {
           rows={4}
           maxLength={MAX_NOTE_LENGTH}
           placeholder="Black leather wallet with a student ID inside"
+          required
           value={shortNote}
           aria-describedby={error ? `${noteHintId} ${errorId}` : noteHintId}
           aria-invalid={error && !shortNote.trim() ? 'true' : undefined}
@@ -233,9 +238,8 @@ export default function FoundReportForm() {
           }}
         />
         <p className="field__hint" id={noteHintId}>
-          Colour, brand, marks and contents all help us match it. Do not
-          describe the item's full contents — leave something only the owner
-          would know.
+          Colour, brand, marks and contents help matching. Leave out one detail
+          only the owner would know.
         </p>
       </div>
 
@@ -250,6 +254,7 @@ export default function FoundReportForm() {
           type="text"
           maxLength={MAX_SHORT_LENGTH}
           placeholder="Session Road, near the market entrance"
+          required
           value={foundLocation}
           aria-describedby={
             error ? `${locationHintId} ${errorId}` : locationHintId
@@ -261,7 +266,7 @@ export default function FoundReportForm() {
           }}
         />
         <p className="field__hint" id={locationHintId}>
-          A street, landmark, or the route where you picked it up.
+          A street, landmark or the route where you picked it up.
         </p>
       </div>
 
@@ -275,6 +280,7 @@ export default function FoundReportForm() {
           className="field__control"
           type="date"
           max={todayIso()}
+          required
           value={foundDate}
           aria-invalid={error && !foundDate ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -283,27 +289,6 @@ export default function FoundReportForm() {
             if (error) setError('');
           }}
         />
-      </div>
-
-      <div className="field">
-        <label className="field__label" htmlFor={contactId}>
-          Contact information <span className="field__optional">Optional</span>
-        </label>
-        <input
-          id={contactId}
-          className="field__control"
-          type="text"
-          maxLength={MAX_SHORT_LENGTH}
-          placeholder="Phone number or email"
-          autoComplete="tel"
-          value={finderContact}
-          aria-describedby={contactHintId}
-          onChange={(event) => setFinderContact(event.target.value)}
-        />
-        <p className="field__hint" id={contactHintId}>
-          Only counter staff can see this. It is used to reach you about the
-          item you handed in.
-        </p>
       </div>
 
       <div className="field">
@@ -326,14 +311,14 @@ export default function FoundReportForm() {
         >
           <Icon name="photo_camera" />
           <span className="btn__label">
-            <span>{photo ? 'Change Photo' : 'Add Photo'}</span>
-            <small>(JPG, PNG or WebP, up to 8 MB)</small>
+            <span>{photo ? 'Change photo' : 'Add photo'}</span>
+            <small>JPG, PNG or WebP, up to 8 MB</small>
           </span>
         </button>
         <p className="field__hint" id={photoId}>
-          Required. The photo is uploaded and stored with your report so counter
-          staff can identify the item. Please do not photograph people, ID
-          numbers or other personal details.
+          Required. The photo is stored with your report so counter staff can
+          identify the item. Do not photograph people, ID numbers or other
+          personal details.
         </p>
       </div>
 
@@ -343,6 +328,9 @@ export default function FoundReportForm() {
             className="photo-chip__img"
             src={photo.url}
             alt="Preview of the photo you selected"
+            width="48"
+            height="48"
+            decoding="async"
           />
           <p className="photo-chip__name">
             {photo.file.name}
@@ -359,19 +347,46 @@ export default function FoundReportForm() {
         </div>
       )}
 
+      <details className="form-extra">
+        <summary>Add contact details (optional)</summary>
+        <div className="form-extra__body">
+          <div className="field">
+            <label className="field__label" htmlFor={contactId}>
+              Contact information
+              <span className="field__optional">Optional</span>
+            </label>
+            <input
+              id={contactId}
+              className="field__control"
+              type="text"
+              maxLength={MAX_SHORT_LENGTH}
+              placeholder="Phone number or email"
+              autoComplete="tel"
+              value={finderContact}
+              aria-describedby={contactHintId}
+              onChange={(event) => setFinderContact(event.target.value)}
+            />
+            <p className="field__hint" id={contactHintId}>
+              Only counter staff can see this. It is used to reach you about the
+              item you handed in.
+            </p>
+          </div>
+        </div>
+      </details>
+
       <div aria-live="polite">
         {error && (
-          <p className="search__error" id={errorId}>
+          <p className="form-error" id={errorId}>
             <Icon name="error" />
             {error}
           </p>
         )}
       </div>
 
-      <div className="report-form__actions">
-        <button type="submit" className="btn btn--filled" disabled={submitting}>
+      <div className="form-actions">
+        <button type="submit" className="btn btn--primary" disabled={submitting}>
           <Icon name="send" />
-          {submitting ? 'Filing your report…' : 'Submit Report'}
+          {submitting ? 'Filing your report…' : 'Submit report'}
         </button>
       </div>
     </form>

@@ -14,10 +14,9 @@ import Icon from './Icon.jsx';
 export default function OfficeActionsMenu({ office, onReset }) {
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
-  const [position, setPosition] = useState(null); // null while closed
+  const [open, setOpen] = useState(false);
   const menuId = useId();
 
-  const open = position !== null;
   const hasLogin = Boolean(office.auth_user_id);
   const label = `Actions for ${office.name}`;
 
@@ -29,7 +28,7 @@ export default function OfficeActionsMenu({ office, onReset }) {
       ?.focus({ preventScroll: true });
 
     function close() {
-      setPosition(null);
+      setOpen(false);
     }
 
     function handlePointerDown(event) {
@@ -53,30 +52,25 @@ export default function OfficeActionsMenu({ office, onReset }) {
   }, [open]);
 
   function toggle() {
-    if (open) {
-      setPosition(null);
-      return;
-    }
-    const rect = buttonRef.current.getBoundingClientRect();
-    setPosition({
-      top: rect.bottom,
-      right: document.documentElement.clientWidth - rect.right,
-    });
+    setOpen((isOpen) => !isOpen);
   }
 
   function handleKeyDown(event) {
     if (event.key === 'Escape') {
       event.preventDefault();
-      setPosition(null);
+      setOpen(false);
       buttonRef.current?.focus();
     } else if (event.key === 'Tab') {
-      setPosition(null);
+      // Move focus to the trigger before the default Tab action so focus moves
+      // to the next control instead of being lost with the closing menu.
+      setOpen(false);
+      buttonRef.current?.focus();
     }
   }
 
   function handleReset() {
     if (!hasLogin) return;
-    setPosition(null);
+    setOpen(false);
     // Focus the trigger first so the dialog hands focus back here on close,
     // rather than to a menu item that no longer exists.
     buttonRef.current?.focus();
@@ -105,7 +99,6 @@ export default function OfficeActionsMenu({ office, onReset }) {
           role="menu"
           aria-label={label}
           className="office-menu"
-          style={{ top: position.top, right: position.right }}
           onKeyDown={handleKeyDown}
         >
           <button
