@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { fetchPublicItem } from '../lib/itemDetails.js';
@@ -274,54 +274,55 @@ export default function ItemDetails() {
   const canGoBack =
     typeof window !== 'undefined' && (window.history.state?.idx ?? 0) > 0;
 
+  const heldStatus = releasedTo
+    ? 'Released'
+    : item?.status === 'held'
+      ? 'Held for collection'
+      : item?.status;
+
   return (
     <>
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <MistHero />
-      <div className="page">
+      <div className="shell">
         <SiteHeader />
-        <main id="main" className="report-page">
+        <main id="main" className="item-page">
           {canGoBack ? (
             <button
               type="button"
-              className="results__back results__back--button"
+              className="back-link back-link--button"
               onClick={() => navigate(-1)}
             >
               <Icon name="arrow_back" />
               Back to results
             </button>
           ) : (
-            <Link className="results__back" to="/">
+            <Link className="back-link" to="/">
               <Icon name="arrow_back" />
               Back to search
             </Link>
           )}
 
-          <h2 className="results__title" tabIndex={-1} ref={headingRef}>
-            {item ? item.title : 'Item details'}
-          </h2>
-
           {loading && (
-            <div role="status">
-              <p className="results__searching">
+            <>
+              <h1 className="visually-hidden">Item details</h1>
+              <p className="loading" role="status">
                 <Icon name="search" className="icon--pulse" />
-                Loading item details&hellip;
+                Loading item details…
               </p>
-              <div className="result-skeleton" aria-hidden="true" />
-            </div>
+            </>
           )}
 
           {error?.code === 'not-found' && (
-            <section className="state-card" role="status">
-              <h3 className="state-card__title">Item not found</h3>
-              <p className="state-card__text">{ERROR_COPY['not-found']}</p>
+            <section className="state" role="status">
+              <h1>Item not found</h1>
+              <p className="state__text">{ERROR_COPY['not-found']}</p>
               {import.meta.env.DEV && (
-                <p className="state-card__debug">{error.message}</p>
+                <p className="state__debug">{error.message}</p>
               )}
-              <div className="state-card__actions">
-                <Link className="btn btn--filled" to="/">
+              <div className="state__actions">
+                <Link className="btn btn--primary" to="/">
                   <Icon name="search" />
                   Search for your item
                 </Link>
@@ -330,24 +331,24 @@ export default function ItemDetails() {
           )}
 
           {error && error.code !== 'not-found' && (
-            <section className="state-card state-card--error" role="alert">
-              <h3 className="state-card__title">Something went wrong</h3>
-              <p className="state-card__text">
+            <section className="state state--error" role="alert">
+              <h1>Something went wrong</h1>
+              <p className="state__text">
                 {ERROR_COPY[error.code] ?? ERROR_COPY.db}
               </p>
               {import.meta.env.DEV && (
-                <p className="state-card__debug">{error.message}</p>
+                <p className="state__debug">{error.message}</p>
               )}
-              <div className="state-card__actions">
+              <div className="state__actions">
                 <button
                   type="button"
-                  className="btn btn--filled"
+                  className="btn btn--primary"
                   onClick={() => setAttempt((n) => n + 1)}
                 >
                   <Icon name="refresh" />
                   Try again
                 </button>
-                <Link className="btn" to="/">
+                <Link className="btn btn--quiet" to="/">
                   <Icon name="search" />
                   Search for your item
                 </Link>
@@ -357,79 +358,44 @@ export default function ItemDetails() {
 
           {item && (
             <>
-              <p className="item-detail__meta">
-                {match && (
-                  <span
-                    className={`item-detail__badge item-detail__badge--${match.tier}`}
-                  >
-                    {match.percent}% Match
-                  </span>
-                )}
-                <span className="item-detail__ref">Ref {item.ref_code}</span>
-                {logged && (
-                  <span className="item-detail__ref">Logged {logged}</span>
-                )}
-              </p>
-
-              <article className="item-detail">
-                <div className="item-detail__media">
+              <div className="item-hero">
+                <figure className="item-photo">
                   {showImage ? (
                     <img
                       src={item.image_url}
                       alt={`Photo of ${item.title}`}
                       width="800"
                       height="600"
-                      loading="lazy"
                       decoding="async"
                       onError={() => setImageFailed(true)}
                     />
                   ) : (
                     <div
-                      className="item-detail__no-photo"
+                      className="item-photo__empty"
                       role="img"
                       aria-label="No photo available"
                     >
                       <Icon name="hide_image" />
                     </div>
                   )}
-                </div>
+                </figure>
 
-                <div className="item-detail__content">
-                  <p className="item-detail__category">
-                    <Icon name="category" />
-                    {item.category}
+                <div className="item-summary">
+                  <p className="item-status">
+                    <span className="dot" aria-hidden="true" />
+                    {heldStatus}
                   </p>
-
-                  <p className="item-detail__verify">
-                    <Icon name="verified_user" />
-                    <span>
-                      Bring a valid ID to the counter and be ready to describe
-                      unique marks, serial numbers, or condition. The office
-                      checks that against its own record before releasing the
-                      item.
-                    </span>
+                  <h1 tabIndex={-1} ref={headingRef}>
+                    {item.title}
+                  </h1>
+                  <p className="item-meta">
+                    {item.category}. Reference {item.ref_code}.
+                    {logged && ` Logged ${logged}.`}
+                    {match && ` ${match.percent}% search match.`}
                   </p>
-
-                  <div className="item-detail__office">
-                    <p className="item-detail__office-name">
-                      <Icon name="location_on" />
-                      <span>
-                        <span className="visually-hidden">Held at </span>
-                        {item.holding_office_name}
-                      </span>
-                    </p>
-                    <p className="item-detail__office-line">
-                      <Icon name="map" />
-                      <span>{item.office_address}</span>
-                    </p>
-                    <p className="item-detail__office-line">
-                      <Icon name="schedule" />
-                      <span>{item.counter_hours}</span>
-                    </p>
-                  </div>
 
                   {releasedTo && (
-                    <p className="item-detail__release-note" role="status">
+                    <p className="status-note" role="status">
                       <Icon name="check_circle" />
                       <span>
                         Released to {releasedTo}. The item is no longer visible
@@ -438,17 +404,68 @@ export default function ItemDetails() {
                     </p>
                   )}
 
+                  {transferredTo && !releasedTo && (
+                    <p className="status-note" role="status">
+                      <Icon name="check_circle" />
+                      <span>
+                        Custody updated. {transferredTo} now holds this item.
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="item-facts">
+                <section aria-labelledby="held-at-title">
+                  <h2 id="held-at-title">Held at</h2>
+                  <div className="fact">
+                    <p className="fact__name">{item.holding_office_name}</p>
+                    <p>{item.office_address}</p>
+                    <p>{item.counter_hours}</p>
+                  </div>
+                </section>
+
+                <section aria-labelledby="before-title">
+                  <h2 id="before-title">Before you go</h2>
+                  <ul className="checklist">
+                    <li>
+                      <Icon name="check" />
+                      <span>Bring a valid ID for the counter check.</span>
+                    </li>
+                    <li>
+                      <Icon name="check" />
+                      <span>
+                        Be ready to describe unique marks, serial numbers or
+                        condition.
+                      </span>
+                    </li>
+                    <li>
+                      <Icon name="check" />
+                      <span>
+                        Collect in person. There are no online claims or
+                        delivery.
+                      </span>
+                    </li>
+                  </ul>
+                </section>
+              </div>
+
+              {(canRelease || canTransfer) && (
+                <section className="staff-tools" aria-labelledby="staff-title">
+                  <h2 id="staff-title">Staff controls</h2>
+                  <p className="staff-tools__lead">
+                    These controls update the custody record. They are only
+                    shown to the office holding this item.
+                  </p>
+
                   {canRelease && (
                     <form
-                      className="item-detail__release"
+                      className="staff-form"
                       aria-label="Release item to claimant"
                       onSubmit={handleRelease}
                     >
-                      <h3 className="item-detail__release-title">
-                        <Icon name="assignment_turned_in" />
-                        Release item to claimant
-                      </h3>
-                      <p className="item-detail__release-lead">
+                      <h3>Release item to claimant</h3>
+                      <p className="staff-tools__lead">
                         Confirm that the person at the counter presented a valid
                         ID. Recording the release removes the item from public
                         search and keeps the counter record traceable.
@@ -532,7 +549,7 @@ export default function ItemDetails() {
 
                       <div aria-live="polite">
                         {releaseError && (
-                          <p className="search__error">
+                          <p className="form-error">
                             <Icon name="error" />
                             {releaseError}
                           </p>
@@ -541,7 +558,7 @@ export default function ItemDetails() {
 
                       <button
                         type="submit"
-                        className="btn btn--filled"
+                        className="btn btn--primary"
                         disabled={releaseStatus === 'saving'}
                       >
                         <Icon
@@ -552,108 +569,102 @@ export default function ItemDetails() {
                           }
                         />
                         {releaseStatus === 'saving'
-                          ? 'Releasing...'
+                          ? 'Releasing…'
                           : 'Confirm release'}
                       </button>
                     </form>
                   )}
 
-                  {transferredTo && !releasedTo && (
-                    <p className="item-detail__transfer-note" role="status">
-                      <Icon name="check_circle" />
-                      <span>
-                        Custody updated. {transferredTo} now holds this item.
-                      </span>
-                    </p>
-                  )}
-
                   {canTransfer && (
-                    <form
-                      className="item-detail__transfer"
-                      aria-label="Update holding office"
-                      onSubmit={handleTransfer}
-                    >
-                      <h3 className="item-detail__transfer-title">
-                        <Icon name="swap_horiz" />
-                        Update holding office
-                      </h3>
-                      <p className="item-detail__transfer-lead">
-                        Use this after physically moving the item to another
-                        counter. It stays searchable and keeps its reference
-                        code.
-                      </p>
-
-                      <label
-                        className="field__label"
-                        htmlFor={transferSelectId}
+                    <details className="staff-disclose">
+                      <summary>Move item to another office</summary>
+                      <form
+                        className="staff-form"
+                        aria-label="Update holding office"
+                        onSubmit={handleTransfer}
                       >
-                        New holding office
-                      </label>
-                      <select
-                        id={transferSelectId}
-                        className="field__control field__control--select"
-                        value={selectedOfficeId}
-                        onChange={(event) => {
-                          setSelectedOfficeId(event.target.value);
-                          setTransferError('');
-                        }}
-                        disabled={transferStatus === 'saving' || !officeOptions}
-                        required
-                      >
-                        <option value="">
-                          {officeOptions
-                            ? 'Choose an office'
-                            : 'Loading offices…'}
-                        </option>
-                        {officeOptions?.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.name}
-                          </option>
-                        ))}
-                      </select>
+                        <h3>Update holding office</h3>
+                        <p className="staff-tools__lead">
+                          Use this after physically moving the item to another
+                          counter. It stays searchable and keeps its reference
+                          code.
+                        </p>
 
-                      <div aria-live="polite">
-                        {officeError && (
-                          <p className="search__error">
-                            <Icon name="error" />
-                            {officeError}
-                          </p>
-                        )}
-                        {transferError && (
-                          <p className="search__error">
-                            <Icon name="error" />
-                            {transferError}
-                          </p>
-                        )}
-                      </div>
+                        <div className="field">
+                          <label
+                            className="field__label"
+                            htmlFor={transferSelectId}
+                          >
+                            New holding office
+                          </label>
+                          <select
+                            id={transferSelectId}
+                            className="field__control field__control--select"
+                            value={selectedOfficeId}
+                            onChange={(event) => {
+                              setSelectedOfficeId(event.target.value);
+                              setTransferError('');
+                            }}
+                            disabled={transferStatus === 'saving' || !officeOptions}
+                            required
+                          >
+                            <option value="">
+                              {officeOptions
+                                ? 'Choose an office'
+                                : 'Loading offices…'}
+                            </option>
+                            {officeOptions?.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <button
-                        type="submit"
-                        className="btn btn--filled"
-                        disabled={
-                          !selectedOfficeId ||
-                          transferStatus === 'saving' ||
-                          !officeOptions
-                        }
-                      >
-                        <Icon
-                          name={
-                            transferStatus === 'saving'
-                              ? 'hourglass_top'
-                              : 'swap_horiz'
+                        <div aria-live="polite">
+                          {officeError && (
+                            <p className="form-error">
+                              <Icon name="error" />
+                              {officeError}
+                            </p>
+                          )}
+                          {transferError && (
+                            <p className="form-error">
+                              <Icon name="error" />
+                              {transferError}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="btn btn--primary"
+                          disabled={
+                            !selectedOfficeId ||
+                            transferStatus === 'saving' ||
+                            !officeOptions
                           }
-                        />
-                        {transferStatus === 'saving'
-                          ? 'Updating…'
-                          : 'Update holding office'}
-                      </button>
-                    </form>
+                        >
+                          <Icon
+                            name={
+                              transferStatus === 'saving'
+                                ? 'hourglass_top'
+                                : 'swap_horiz'
+                            }
+                          />
+                          {transferStatus === 'saving'
+                            ? 'Updating…'
+                            : 'Update holding office'}
+                        </button>
+                      </form>
+                    </details>
                   )}
-                </div>
-              </article>
+                </section>
+              )}
             </>
           )}
         </main>
+        <SiteFooter />
       </div>
     </>
   );
