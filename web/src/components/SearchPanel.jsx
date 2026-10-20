@@ -24,10 +24,6 @@ const MAX_QUERY_LENGTH = 200;
  *   - ?color=<color>   optional lowercase color filter
  *   - location.state.photo = File (optional, lost on page reload)
  * The results page owns translation, embedding and ranking.
- *
- * US-11: the field takes a description in the user's own words. The copy below
- * has to say so — nothing here asks for a category or a tag, and the query is
- * embedded as typed.
  */
 export default function SearchPanel() {
   const navigate = useNavigate();
@@ -39,7 +35,6 @@ export default function SearchPanel() {
   const [photo, setPhoto] = useState(null); // { file, url }
   const [error, setError] = useState('');
 
-  const headingId = useId();
   const hintId = useId();
   const errorId = useId();
   const filtersId = useId();
@@ -72,7 +67,7 @@ export default function SearchPanel() {
     const text = query.trim();
 
     if (!text && !photo) {
-      setError('Describe your item or upload a photo to search.');
+      setError('Describe your item or add a photo to search.');
       queryInputRef.current?.focus();
       return;
     }
@@ -95,27 +90,18 @@ export default function SearchPanel() {
   const describedBy = error ? `${hintId} ${errorId}` : hintId;
 
   return (
-    <section aria-labelledby={headingId}>
-      <h2 className="search__title" id={headingId}>
-        Search your Items
-      </h2>
-      <p className="search__subtitle">Describe it in your own words</p>
+    <section className="search" aria-label="Search held items">
+      <form role="search" aria-label="Search held items" onSubmit={handleSubmit} noValidate>
+        <label className="field__label" htmlFor="item-query">
+          Describe the item
+        </label>
 
-      <form
-        role="search"
-        aria-label="Search held items"
-        onSubmit={handleSubmit}
-        noValidate
-      >
-        <div className="search-field" data-invalid={error ? 'true' : undefined}>
+        <div className={`search__field${error ? ' is-invalid' : ''}`}>
           <Icon name="search" />
-          <label className="visually-hidden" htmlFor="item-query">
-            Describe the item you are looking for
-          </label>
           <input
             id="item-query"
             ref={queryInputRef}
-            className="search-field__input"
+            className="search__input"
             type="search"
             enterKeyHint="search"
             autoComplete="off"
@@ -132,30 +118,19 @@ export default function SearchPanel() {
           {query && (
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn search__clear"
               onClick={clearQuery}
               aria-label="Clear search text"
             >
               <Icon name="close" />
             </button>
           )}
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => setFiltersOpen((open) => !open)}
-            aria-label="Filter by color"
-            aria-expanded={filtersOpen}
-            aria-controls={filtersId}
-          >
-            <Icon name="tune" />
-          </button>
         </div>
 
         <p className="search__hint" id={hintId}>
-          Just describe it &mdash; no category or tag needed. Works in English
-          or Filipino, like &ldquo;itim na pitaka&rdquo; or &ldquo;blue water
-          bottle&rdquo;.
+          Colour, brand or marks help. English or Filipino is fine.
         </p>
+
         <div aria-live="polite">
           {error && (
             <p className="search__error" id={errorId}>
@@ -165,13 +140,46 @@ export default function SearchPanel() {
           )}
         </div>
 
-        {filtersOpen && (
-          <div
-            className="chip-group"
-            id={filtersId}
-            role="group"
-            aria-label="Color"
+        <div className="search__actions">
+          <button type="submit" className="btn btn--primary">
+            <Icon name="search" />
+            Search
+          </button>
+        </div>
+
+        <div className="search__secondary">
+          <input
+            ref={fileInputRef}
+            className="visually-hidden"
+            type="file"
+            accept={ACCEPTED_TYPES.join(',')}
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleFileChange}
+          />
+          <button
+            type="button"
+            className="btn btn--quiet"
+            onClick={() => fileInputRef.current?.click()}
           >
+            <Icon name="photo_camera" />
+            {photo ? 'Change photo' : 'Add photo'}
+          </button>
+          <button
+            type="button"
+            className="btn btn--quiet"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-label="Filter by color"
+            aria-expanded={filtersOpen}
+            aria-controls={filtersOpen ? filtersId : undefined}
+          >
+            <Icon name="tune" />
+            Color
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="chip-group" id={filtersId} role="group" aria-label="Color">
             {COLORS.map((name) => (
               <button
                 key={name}
@@ -187,33 +195,6 @@ export default function SearchPanel() {
           </div>
         )}
 
-        <div className="search__actions">
-          <input
-            ref={fileInputRef}
-            className="visually-hidden"
-            type="file"
-            accept={ACCEPTED_TYPES.join(',')}
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={handleFileChange}
-          />
-          <button
-            type="button"
-            className="btn"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Icon name="photo_camera" />
-            <span className="btn__label">
-              <span>Upload Photo</span>
-              <small>{photo ? 'Change photo' : '(Optional)'}</small>
-            </span>
-          </button>
-          <button type="submit" className="btn btn--filled">
-            <Icon name="search" />
-            Find Item Now
-          </button>
-        </div>
-
         {photo && (
           <div className="photo-chip">
             <img
@@ -226,7 +207,7 @@ export default function SearchPanel() {
             />
             <p className="photo-chip__name">
               {photo.file.name}
-              <small>Photo will be used to match similar items</small>
+              <small>Used to match similar items</small>
             </p>
             <button
               type="button"

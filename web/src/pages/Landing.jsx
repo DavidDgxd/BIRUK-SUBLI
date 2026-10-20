@@ -1,9 +1,9 @@
-import MistHero from '../components/MistHero.jsx';
+import { Link } from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader.jsx';
 import SearchPanel from '../components/SearchPanel.jsx';
-import ReportCard from '../components/ReportCard.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
+import Icon from '../components/Icon.jsx';
 
 export default function Landing() {
   return (
@@ -11,33 +11,31 @@ export default function Landing() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <MistHero />
-      <div className="page">
+      <div className="shell">
         <SiteHeader isHome />
-        <main id="main" className="landing">
-          <div className="landing__grid">
+        <main id="main" className="home">
+          <div className="home__intro">
+            <h1>Find what you lost.</h1>
+            <p className="lead">
+              Search items held at city office counters. No account needed.
+            </p>
             <SearchPanel />
-            <div className="report-stack">
-              <ReportCard
-                tone="lost"
-                badgeIcon="contract_delete"
-                title="Lost"
-                description="Report Lost Items (Item Description, and optional contact information)"
-                to="/report/lost"
-                ctaIcon="description"
-                ctaLabel="Report Lost Item"
-              />
-              <ReportCard
-                tone="found"
-                badgeIcon="package_2"
-                title="Found"
-                description="Report Found Items (Item description before surrendering)"
-                to="/report/found"
-                ctaIcon="package_2"
-                ctaLabel="Report Found Item"
-              />
-            </div>
           </div>
+
+          <section className="report-links" aria-labelledby="report-title">
+            <h2 id="report-title">Lost or found something?</h2>
+            <div className="link-list">
+              <Link to="/report/lost">
+                <span>Report a lost item</span>
+                <Icon name="arrow_forward" />
+              </Link>
+              <Link to="/report/found">
+                <span>Report a found item</span>
+                <Icon name="arrow_forward" />
+              </Link>
+            </div>
+          </section>
+
           <HowItWorks />
         </main>
         <SiteFooter />

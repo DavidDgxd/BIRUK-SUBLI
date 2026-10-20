@@ -3,30 +3,21 @@ import Icon from './Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /*
- * The header's one staff link, picked from the session: "Log in" when signed
- * out, and a way back to the right dashboard when signed in. Nothing renders
- * while the session check is still loading, so neither link flashes up and
- * swaps, and nothing renders on the page the link would point to.
+ * Minimal site header: the wordmark and one session-aware staff link.
+ * Nothing renders while the session check is loading, so neither link flashes
+ * up and swaps, and the link is hidden on the page it would open.
  */
 function staffLinkFor(status, isAdmin) {
   if (status === 'unauthenticated') {
-    return {
-      to: '/staff/login',
-      icon: 'person',
-      lines: ['Staff/Admin', 'Log in'],
-    };
+    return { to: '/staff/login', icon: 'person', label: 'Staff login' };
   }
   if (status !== 'authenticated') return null;
   return isAdmin
-    ? {
-        to: '/admin/offices',
-        icon: 'admin_panel_settings',
-        lines: ['Admin', 'Dashboard'],
-      }
-    : { to: '/staff/intake', icon: 'dashboard', lines: ['Staff', 'Dashboard'] };
+    ? { to: '/admin/offices', icon: 'admin_panel_settings', label: 'Admin' }
+    : { to: '/staff/intake', icon: 'dashboard', label: 'Dashboard' };
 }
 
-export default function SiteHeader({ isHome = false }) {
+export default function SiteHeader() {
   const { status, isAdmin } = useStaffAuth();
   const { pathname } = useLocation();
 
@@ -35,25 +26,14 @@ export default function SiteHeader({ isHome = false }) {
 
   return (
     <header className="site-header">
-      <h1 className="brand__name">
-        {isHome ? (
-          'Biruk-Subli'
-        ) : (
-          <Link className="brand__link" to="/">
-            Biruk-Subli
-          </Link>
-        )}
-      </h1>
-      <p className="brand__tagline">
-        What&rsquo;s lost is found, safe and sound
-      </p>
+      <Link className="site-header__brand" to="/">
+        <span className="site-header__name">Biruk-Subli</span>
+        <span className="site-header__place">Baguio City lost &amp; found</span>
+      </Link>
       {staffLink && (
-        <Link className="btn staff-link" to={staffLink.to}>
+        <Link className="site-header__staff" to={staffLink.to}>
           <Icon name={staffLink.icon} />
-          <span className="staff-link__text">
-            <span>{staffLink.lines[0]}</span>
-            <span>{staffLink.lines[1]}</span>
-          </span>
+          <span>{staffLink.label}</span>
         </Link>
       )}
     </header>
