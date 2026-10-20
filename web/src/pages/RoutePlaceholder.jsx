@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader.jsx';
-import MistHero from '../components/MistHero.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import Icon from '../components/Icon.jsx';
 
-/* Temporary page for routes that are linked from the landing page but not built yet. */
+/* Simple page for an unknown route, with one way back into the service. */
 export default function RoutePlaceholder({
   title,
   message = 'This page is coming soon.',
@@ -13,17 +13,17 @@ export default function RoutePlaceholder({
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <MistHero />
-      <div className="page">
+      <div className="shell">
         <SiteHeader />
-        <main id="main" className="placeholder">
-          <h2 className="placeholder__title">{title}</h2>
-          <p className="placeholder__text">{message}</p>
-          <Link className="btn btn--filled" to="/">
+        <main id="main" className="state-page">
+          <h1>{title}</h1>
+          <p className="state-page__text">{message}</p>
+          <Link className="btn btn--primary" to="/">
             <Icon name="arrow_back" />
-            Back to home
+            Back to search
           </Link>
         </main>
+        <SiteFooter />
       </div>
     </>
   );

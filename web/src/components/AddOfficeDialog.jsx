@@ -309,7 +309,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
           </select>
         </div>
 
-        <fieldset className="office-dialog__login">
+        <fieldset className="fieldset-plain">
           <legend className="field__label">Shared login</legend>
           <p className="field__hint">
             Everyone at this office signs in with the same credentials.
@@ -362,14 +362,14 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
 
         <div aria-live="polite">
           {error && (
-            <p className="search__error" id={errorId}>
+            <p className="form-error" id={errorId}>
               <Icon name="error" />
               {error}
             </p>
           )}
         </div>
 
-        <div className="report-form__actions">
+        <div className="dialog-actions">
           <button
             type="submit"
             className="btn btn--filled"

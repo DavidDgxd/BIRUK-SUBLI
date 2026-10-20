@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import StaffGate from '../components/StaffGate.jsx';
 import StaffBar from '../components/StaffBar.jsx';
 import Icon from '../components/Icon.jsx';
@@ -21,13 +21,11 @@ function accountStatus(office) {
 }
 
 /*
- * Central admin: participating offices & logins (Wireframe Screen 20, US-01/US-03).
+ * Central admin: participating offices & logins (US-01/US-03).
  *
- * Lists every office in the directory, opens the "+ ADD AN OFFICE" dialog to
- * provision a new one, and resets an office's shared login when it is reported
- * lost or compromised. The list is read through the anon-readable `offices`
- * SELECT policy; every write goes through an Edge Function that re-checks the
- * caller's central-admin role.
+ * Lists every office, opens the add-office dialog to provision a new one, and
+ * resets an office's shared login when it is reported lost or compromised.
+ * Every write goes through an Edge Function that re-checks the caller's role.
  */
 export default function AdminOffices() {
   const { status, isAdmin } = useStaffAuth();
@@ -88,24 +86,25 @@ export default function AdminOffices() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <MistHero />
-      <div className="page">
+      <div className="shell">
         <SiteHeader />
-        <main id="main" className="report-page">
-          <Link className="results__back" to="/">
+        <main id="main" className="admin-page">
+          <Link className="back-link" to="/">
             <Icon name="arrow_back" />
             Back to search
           </Link>
 
-          <h2 className="results__title" tabIndex={-1} ref={headingRef}>
-            Participating offices
-          </h2>
-          <p className="report-page__lead">
-            Provision shared logins and directory entries for the offices that
-            hold found items, and reissue a login when one is reported lost or
-            compromised.
-          </p>
+          <div className="page-head">
+            <h1 tabIndex={-1} ref={headingRef}>
+              Participating offices
+            </h1>
+            <p className="lead">
+              Provision shared logins for offices that hold found items, and
+              reissue a login when one is lost or compromised.
+            </p>
+          </div>
 
+          <h2 className="visually-hidden">Directory access</h2>
           <StaffGate
             title="Admin sign-in required"
             message="Office provisioning is only available to the central admin."
@@ -117,14 +116,11 @@ export default function AdminOffices() {
             <>
               <StaffBar icon="admin_panel_settings" label="Central admin" />
 
-              <section
-                className="office-admin"
-                aria-label="Participating offices"
-              >
-                <div className="office-admin__toolbar">
+              <section className="office-admin" aria-label="Participating offices">
+                <div className="admin-toolbar">
                   <button
                     type="button"
-                    className="btn btn--filled"
+                    className="btn btn--primary"
                     onClick={() => setShowDialog(true)}
                   >
                     <Icon name="add" />
@@ -133,15 +129,10 @@ export default function AdminOffices() {
                 </div>
 
                 {loadError ? (
-                  <section
-                    className="state-card state-card--error"
-                    role="alert"
-                  >
-                    <h3 className="state-card__title">
-                      Could not load offices
-                    </h3>
-                    <p className="state-card__text">{loadError}</p>
-                    <div className="state-card__actions">
+                  <section className="state state--error" role="alert">
+                    <h3 className="state__title">Could not load offices</h3>
+                    <p className="state__text">{loadError}</p>
+                    <div className="state__actions">
                       <button
                         type="button"
                         className="btn"
@@ -204,13 +195,9 @@ export default function AdminOffices() {
                       </div>
                       <div className="office-table__body" role="rowgroup">
                         {offices.map((office) => {
-                          const status = accountStatus(office);
+                          const account = accountStatus(office);
                           return (
-                            <div
-                              key={office.id}
-                              className="office-table__row"
-                              role="row"
-                            >
+                            <div key={office.id} className="office-table__row" role="row">
                               <div
                                 role="rowheader"
                                 className="office-table__cell office-table__office"
@@ -251,9 +238,9 @@ export default function AdminOffices() {
                                 data-label="Account status"
                               >
                                 <span
-                                  className={`office-status office-status--${status.key}`}
+                                  className={`office-status office-status--${account.key}`}
                                 >
-                                  {status.label}
+                                  {account.label}
                                 </span>
                               </div>
                               <div
@@ -276,6 +263,7 @@ export default function AdminOffices() {
             </>
           </StaffGate>
         </main>
+        <SiteFooter />
       </div>
 
       <AddOfficeDialog
