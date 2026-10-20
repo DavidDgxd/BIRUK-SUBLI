@@ -1,20 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
-import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /*
  * Office log in (US-02), and the central admin's way in (US-03). Mounted at
- * /staff/login.
- *
- * One set of credentials per office, issued by the central admin (US-01), so
- * whoever is on the counter that day can sign in without a personal account.
- * On success the officer lands on the intake screen; a session that arrives
- * while the form is open — a reload with the login still held — redirects the
- * same way. The central admin carries the `central_admin` role claim instead of
- * an office, and lands on the directory.
+ * /staff/login. One set of credentials per office, issued by the central admin,
+ * so whoever is on the counter that day can sign in without a personal account.
  */
 export default function StaffLogin() {
   const { isAuthenticated, isAdmin, signIn } = useStaffAuth();
@@ -43,8 +37,6 @@ export default function StaffLogin() {
 
   // The central admin belongs in the office directory — they have no office of
   // their own to file against — so the counter is not a destination for them.
-  // Recomputed after sign-in, once the session says which kind of caller this
-  // is, so an admin who came here directly still lands in the right place.
   const from = requestedPath ?? (isAdmin ? '/admin/offices' : '/staff/intake');
 
   useEffect(() => {
@@ -90,106 +82,102 @@ export default function StaffLogin() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <MistHero />
-      <div className="page">
+      <div className="shell">
         <SiteHeader />
-        <main id="main" className="report-page">
-          <Link className="results__back" to="/">
+        <main id="main" className="auth-page">
+          <Link className="back-link" to="/">
             <Icon name="arrow_back" />
             Back to search
           </Link>
 
-          <h2 className="results__title" tabIndex={-1} ref={headingRef}>
-            Office log in
-          </h2>
-          <p className="report-page__lead">
-            Counter staff sign in with the shared credentials issued to their
-            office. One login covers the desk, so whoever is available that day
-            can log items without a personal account. The central admin signs in
-            here too — it lands on the office directory instead of a counter.
-          </p>
-
-          <div className="staff-login">
-            <form
-              className="report-form staff-login__form"
-              aria-label="Office log in"
-              onSubmit={handleSubmit}
-              noValidate
-              aria-busy={submitting}
-            >
-              <div className="field">
-                <label className="field__label" htmlFor={emailId}>
-                  Site email
-                </label>
-                <input
-                  id={emailId}
-                  ref={emailRef}
-                  className="field__control"
-                  type="email"
-                  autoComplete="username"
-                  inputMode="email"
-                  autoCapitalize="none"
-                  spellCheck="false"
-                  required
-                  value={email}
-                  aria-invalid={error && !email.trim() ? 'true' : undefined}
-                  aria-describedby={error ? errorId : undefined}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    if (error) setError('');
-                  }}
-                />
-              </div>
-
-              <div className="field">
-                <label className="field__label" htmlFor={passwordId}>
-                  Site password
-                </label>
-                <input
-                  id={passwordId}
-                  ref={passwordRef}
-                  className="field__control"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  aria-invalid={error && !password ? 'true' : undefined}
-                  aria-describedby={error ? errorId : undefined}
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                    if (error) setError('');
-                  }}
-                />
-              </div>
-
-              <div aria-live="polite">
-                {error && (
-                  <p className="search__error" id={errorId}>
-                    <Icon name="error" />
-                    {error}
-                  </p>
-                )}
-              </div>
-
-              <div className="report-form__actions">
-                <button
-                  type="submit"
-                  className="btn btn--filled"
-                  disabled={submitting}
-                >
-                  <Icon name="login" />
-                  {submitting ? 'Signing in…' : 'Sign in'}
-                </button>
-              </div>
-            </form>
-
-            <p className="staff-login__note">
-              <Icon name="info" />
-              Lost or compromised credentials? Ask the central admin to issue a
-              new set — the office keeps its logged items either way.
+          <div className="page-head">
+            <h1 tabIndex={-1} ref={headingRef}>
+              Office sign in
+            </h1>
+            <p className="lead">
+              Counter staff use the shared credentials issued to their office.
+              The central admin signs in here too.
             </p>
           </div>
+
+          <form
+            className="form"
+            aria-label="Office sign in"
+            onSubmit={handleSubmit}
+            noValidate
+            aria-busy={submitting}
+          >
+            <div className="field">
+              <label className="field__label" htmlFor={emailId}>
+                Site email
+              </label>
+              <input
+                id={emailId}
+                ref={emailRef}
+                className="field__control"
+                type="email"
+                autoComplete="username"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck="false"
+                required
+                value={email}
+                aria-invalid={error && !email.trim() ? 'true' : undefined}
+                aria-describedby={error ? errorId : undefined}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  if (error) setError('');
+                }}
+              />
+            </div>
+
+            <div className="field">
+              <label className="field__label" htmlFor={passwordId}>
+                Site password
+              </label>
+              <input
+                id={passwordId}
+                ref={passwordRef}
+                className="field__control"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                aria-invalid={error && !password ? 'true' : undefined}
+                aria-describedby={error ? errorId : undefined}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  if (error) setError('');
+                }}
+              />
+            </div>
+
+            <div aria-live="polite">
+              {error && (
+                <p className="form-error" id={errorId}>
+                  <Icon name="error" />
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" className="btn btn--primary" disabled={submitting}>
+                <Icon name="login" />
+                {submitting ? 'Signing in…' : 'Sign in'}
+              </button>
+            </div>
+          </form>
+
+          <p className="note">
+            <Icon name="info" />
+            <span>
+              Lost or compromised credentials? Ask the central admin to issue a
+              new set. The office keeps its logged items either way.
+            </span>
+          </p>
         </main>
+        <SiteFooter />
       </div>
     </>
   );

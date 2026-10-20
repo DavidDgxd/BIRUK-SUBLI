@@ -328,11 +328,11 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
   if (status === 'done' && receipt) {
     return (
-      <section className="state-card state-card--success" role="status">
-        <h3 className="state-card__title" tabIndex={-1} ref={receiptRef}>
+      <section className="state state--success receipt-panel" role="status">
+        <h2 className="state__title" tabIndex={-1} ref={receiptRef}>
           Item taken into custody
-        </h3>
-        <p className="state-card__text">
+        </h2>
+        <p className="state__text">
           The item is logged to {receipt.officeName} and is now searchable. Give
           the reference below to whoever handed it in.
         </p>
@@ -363,13 +363,13 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           </div>
         </dl>
         {!receipt.usedPhoto && (
-          <p className="state-card__text">
+          <p className="state__text">
             The photo was saved, but we could not read it for matching — this
             item is searchable by its text details alone.
           </p>
         )}
-        {copyNote && <p className="state-card__text">{copyNote}</p>}
-        <div className="state-card__actions">
+        {copyNote && <p className="state__text">{copyNote}</p>}
+        <div className="state__actions receipt-actions">
           <button
             type="button"
             className="btn btn--filled"
@@ -403,7 +403,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
   return (
     <form
-      className="report-form"
+      className="form"
       aria-label="Log a found item into custody"
       onSubmit={handleSubmit}
       noValidate
@@ -430,8 +430,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={titleHintId}>
-          Shown in public search results, so keep it generic (colour and type).
-          Put serial numbers and unique marks in the private notes below.
+          Shown publicly. Keep it generic; put serial numbers and marks in the
+          private notes.
         </p>
       </div>
 
@@ -486,8 +486,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={storageHintId}>
-          The exact shelf, locker or bin where you placed it. Staff-only — never
-          shown in the public search.
+          Staff-only. The exact shelf, locker or bin where you placed it.
         </p>
       </div>
 
@@ -514,9 +513,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={descriptionHintId}>
-          Staff-only — never shown in public search. Record serial numbers,
-          unique marks, contents and condition here; this is what the desk uses
-          to verify a claim, so be specific.
+          Staff-only. Serial numbers, marks, contents and condition — what the
+          desk checks a claim against.
         </p>
       </div>
 
@@ -633,21 +631,19 @@ export default function StaffIntakeForm({ office, staffEmail }) {
         >
           <Icon name="photo_camera" />
           <span className="btn__label">
-            <span>{photo ? 'Change Photo' : 'Add Photo'}</span>
+            <span>{photo ? 'Change photo' : 'Add photo'}</span>
             <small>(JPG, PNG or WebP, up to 8 MB)</small>
           </span>
         </button>
         <p className="field__hint" id={photoId}>
-          Required. The photo is uploaded and stored so the public can recognise
-          the item, and so it contributes to matching. Avoid photographing
+          Required. Stored so people can recognise the item. Avoid photographing
           people or personal details.
         </p>
         <p className="photo-tip">
           <Icon name="lightbulb" />
           <span>
-            Tip: Photograph the item as a whole. Avoid photographing private
-            identifiers like ID cards, serial number stickers, or passcode
-            screens.
+            Photograph the whole item, not ID cards, serial stickers or
+            passcode screens.
           </span>
         </p>
       </div>
@@ -679,17 +675,17 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
       <div aria-live="polite">
         {error && (
-          <p className="search__error" id={errorId}>
+          <p className="form-error" id={errorId}>
             <Icon name="error" />
             {error}
           </p>
         )}
       </div>
 
-      <div className="report-form__actions">
+      <div className="form-actions">
         <button type="submit" className="btn btn--filled" disabled={submitting}>
           <Icon name="login" />
-          {submitting ? 'Filing the custody record…' : 'Take into Custody'}
+          {submitting ? 'Filing the custody record…' : 'Take into custody'}
         </button>
       </div>
     </form>
