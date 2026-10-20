@@ -20,6 +20,7 @@ const PATHS = {
   ),
   arrow_back: <path d="M19 12H5M12 19l-7-7 7-7" />,
   arrow_forward: <path d="M5 12h14M12 5l7 7-7 7" />,
+  arrow_right_sharp: <path d="M5 12h14M13 6l6 6-6 6" />,
   assignment_turned_in: (
     <>
       <rect x="5" y="4" width="14" height="17" rx="1.5" />
@@ -87,6 +88,21 @@ const PATHS = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  inventory_2: (
+    <>
+      <path d="M4 8h16v12H4z" />
+      <path d="M3 4h18v4H3z" />
+      <path d="M9 12h6" />
+    </>
+  ),
+  ledger_crest: (
+    <>
+      <path d="M5 3h9l4 4v14H5z" />
+      <path d="M14 3v5h5" />
+      <path d="m12 9 2.75 4h-5.5z" />
+      <path d="M12 12v5M9.5 17h5" />
     </>
   ),
   lightbulb: (
@@ -169,6 +185,22 @@ const PATHS = {
       <path d="M20 4v7h-7" />
     </>
   ),
+  report_found: (
+    <>
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v5h5" />
+      <path d="m9 14 2 2 4-4" />
+    </>
+  ),
+  report_lost: (
+    <>
+      <path d="M6 3h8l4 4v9" />
+      <path d="M14 3v5h5" />
+      <path d="M9 11h6M9 15h2" />
+      <circle cx="16.5" cy="17.5" r="3.5" />
+      <path d="M16.5 16v2M16.5 19.5h.01" />
+    </>
+  ),
   schedule: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -185,6 +217,26 @@ const PATHS = {
     <>
       <path d="M22 2 11 13" />
       <path d="m22 2-7 20-4-9-9-4z" />
+    </>
+  ),
+  step_counter: (
+    <>
+      <path d="M3 20h18M5 20V9l7-4 7 4v11" />
+      <path d="M8 12h2M14 12h2M9 16h6" />
+    </>
+  ),
+  step_query: (
+    <>
+      <path d="M4 5h16v14H4z" />
+      <circle cx="10.5" cy="11" r="3" />
+      <path d="m12.7 13.2 2.8 2.8M17.5 8h.01" />
+    </>
+  ),
+  step_seal: (
+    <>
+      <circle cx="12" cy="10" r="5" />
+      <path d="m9.5 10 1.7 1.7 3.3-3.7" />
+      <path d="m8.5 14.4-1 6.1 4.5-2 4.5 2-1-6.1" />
     </>
   ),
   swap_horiz: <path d="M4 7h16M17 4l3 3-3 3M20 17H4M7 14l-3 3 3 3" />,
@@ -210,13 +262,14 @@ const PATHS = {
   ),
 };
 
-export default function Icon({ name, className = '' }) {
+export default function Icon({ name, className = '', size = 24, strokeWidth }) {
   return (
     <svg
       className={`icon ${className}`.trim()}
       viewBox="0 0 24 24"
-      width="24"
-      height="24"
+      width={size}
+      height={size}
+      strokeWidth={strokeWidth}
       aria-hidden="true"
       focusable="false"
     >

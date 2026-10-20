@@ -2,16 +2,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
 
-const COLORS = [
-  'Black',
-  'White',
-  'Gray',
-  'Brown',
-  'Red',
-  'Blue',
-  'Green',
-  'Yellow',
-];
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_QUERY_LENGTH = 200;
@@ -20,8 +10,7 @@ const MAX_QUERY_LENGTH = 200;
  * Public search entry point (no account required).
  *
  * On submit it navigates to /search with:
- *   - ?q=<text>        free text, English or Filipino
- *   - ?color=<color>   optional lowercase color filter
+ *   - ?q=<text>        free text, English, Filipino or Ilokano
  *   - location.state.photo = File (optional, lost on page reload)
  * The results page owns translation, embedding and ranking.
  */
@@ -30,14 +19,11 @@ export default function SearchPanel() {
   const fileInputRef = useRef(null);
   const queryInputRef = useRef(null);
   const [query, setQuery] = useState('');
-  const [color, setColor] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [photo, setPhoto] = useState(null); // { file, url }
   const [error, setError] = useState('');
 
   const hintId = useId();
   const errorId = useId();
-  const filtersId = useId();
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
   useEffect(() => {
@@ -74,7 +60,6 @@ export default function SearchPanel() {
 
     const params = new URLSearchParams();
     if (text) params.set('q', text);
-    if (color) params.set('color', color.toLowerCase());
 
     navigate(
       { pathname: '/search', search: params.toString() },
@@ -91,109 +76,100 @@ export default function SearchPanel() {
 
   return (
     <section className="search" aria-label="Search held items">
-      <form role="search" aria-label="Search held items" onSubmit={handleSubmit} noValidate>
+      <form
+        role="search"
+        aria-label="Search held items"
+        onSubmit={handleSubmit}
+        noValidate
+      >
         <label className="field__label" htmlFor="item-query">
           Describe the item
         </label>
 
-        <div className={`search__field${error ? ' is-invalid' : ''}`}>
-          <Icon name="search" />
-          <input
-            id="item-query"
-            ref={queryInputRef}
-            className="search__input"
-            type="search"
-            enterKeyHint="search"
-            autoComplete="off"
-            maxLength={MAX_QUERY_LENGTH}
-            placeholder="e.g. black leather wallet"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              if (error) setError('');
-            }}
-            aria-describedby={describedBy}
-            aria-invalid={error ? 'true' : undefined}
-          />
-          {query && (
+        <div className="search-console">
+          <div className={`search-console__field${error ? ' is-invalid' : ''}`}>
+            <Icon
+              name="search"
+              className="search-console__loupe"
+              size={18}
+              strokeWidth={1.5}
+            />
+            <input
+              id="item-query"
+              ref={queryInputRef}
+              className="search__input"
+              type="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              maxLength={MAX_QUERY_LENGTH}
+              placeholder="e.g., umbrella left at Burnham Park, wallet along Session Road..."
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                if (error) setError('');
+              }}
+              aria-describedby={describedBy}
+              aria-invalid={error ? 'true' : undefined}
+            />
+            {query && (
+              <button
+                type="button"
+                className="icon-btn search__clear"
+                onClick={clearQuery}
+                aria-label="Clear search text"
+              >
+                <Icon name="close" size={18} strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
+
+          <div className="search-console__actions">
+            <button
+              type="submit"
+              className="btn btn--primary search-console__submit"
+            >
+              <Icon name="search" size={17} strokeWidth={1.5} />
+              <span>Search</span>
+            </button>
+
+            <input
+              ref={fileInputRef}
+              className="visually-hidden"
+              type="file"
+              accept={ACCEPTED_TYPES.join(',')}
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={handleFileChange}
+            />
             <button
               type="button"
-              className="icon-btn search__clear"
-              onClick={clearQuery}
-              aria-label="Clear search text"
+              className="search-console__attach"
+              onClick={() => fileInputRef.current?.click()}
             >
-              <Icon name="close" />
+              <Icon
+                name="photo_camera"
+                size={14}
+                strokeWidth={1.5}
+                className="search-console__camera"
+              />
+              <span>{photo ? 'Change photo' : 'Add photo'}</span>
             </button>
-          )}
+          </div>
         </div>
 
         <p className="search__hint" id={hintId}>
-          Colour, brand or marks help. English or Filipino is fine.
+          Colour, brand, or unique marks help. English, Filipino, or Ilokano is
+          fine.
         </p>
 
         <div aria-live="polite">
           {error && (
             <p className="search__error" id={errorId}>
-              <Icon name="error" />
+              <Icon name="error" size={18} strokeWidth={1.5} />
               {error}
             </p>
           )}
         </div>
-
-        <div className="search__actions">
-          <button type="submit" className="btn btn--primary">
-            <Icon name="search" />
-            Search
-          </button>
-        </div>
-
-        <div className="search__secondary">
-          <input
-            ref={fileInputRef}
-            className="visually-hidden"
-            type="file"
-            accept={ACCEPTED_TYPES.join(',')}
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={handleFileChange}
-          />
-          <button
-            type="button"
-            className="btn btn--quiet"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Icon name="photo_camera" />
-            {photo ? 'Change photo' : 'Add photo'}
-          </button>
-          <button
-            type="button"
-            className="btn btn--quiet"
-            onClick={() => setFiltersOpen((open) => !open)}
-            aria-label="Filter by color"
-            aria-expanded={filtersOpen}
-            aria-controls={filtersOpen ? filtersId : undefined}
-          >
-            <Icon name="tune" />
-            Color
-          </button>
-        </div>
-
-        {filtersOpen && (
-          <div className="chip-group" id={filtersId} role="group" aria-label="Color">
-            {COLORS.map((name) => (
-              <button
-                key={name}
-                type="button"
-                className="chip"
-                aria-pressed={color === name}
-                onClick={() => setColor(color === name ? null : name)}
-              >
-                {color === name && <Icon name="check" />}
-                {name}
-              </button>
-            ))}
-          </div>
-        )}
 
         {photo && (
           <div className="photo-chip">

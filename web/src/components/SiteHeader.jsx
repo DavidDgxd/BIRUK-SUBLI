@@ -17,7 +17,7 @@ function staffLinkFor(status, isAdmin) {
     : { to: '/staff/intake', icon: 'dashboard', label: 'Dashboard' };
 }
 
-export default function SiteHeader() {
+export default function SiteHeader({ isHome = false }) {
   const { status, isAdmin } = useStaffAuth();
   const { pathname } = useLocation();
 
@@ -27,12 +27,28 @@ export default function SiteHeader() {
   return (
     <header className="site-header">
       <Link className="site-header__brand" to="/">
-        <span className="site-header__name">Biruk-Subli</span>
-        <span className="site-header__place">Baguio City lost &amp; found</span>
+        {isHome && (
+          <Icon
+            name="ledger_crest"
+            className="site-header__crest"
+            size={18}
+            strokeWidth={1.5}
+          />
+        )}
+        <span className="site-header__titles">
+          <span className="site-header__name">Biruk-Subli</span>
+          <span
+            className={`site-header__place${
+              isHome ? ' site-header__place--ledger' : ''
+            }`}
+          >
+            {isHome ? 'BAGUIO CITY CIVIC LEDGER' : 'Baguio City lost & found'}
+          </span>
+        </span>
       </Link>
       {staffLink && (
         <Link className="site-header__staff" to={staffLink.to}>
-          <Icon name={staffLink.icon} />
+          <Icon name={staffLink.icon} size={18} strokeWidth={1.5} />
           <span>{staffLink.label}</span>
         </Link>
       )}
