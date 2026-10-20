@@ -1,15 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import LostReportForm from '../components/LostReportForm.jsx';
 import Icon from '../components/Icon.jsx';
 
 /* Public lost-item report page. Mounted at /report/lost. */
 export default function ReportLost() {
   const headingRef = useRef(null);
+  const [received, setReceived] = useState(false);
 
-  // Move focus to the heading when the page opens so screen readers start here.
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
@@ -19,25 +19,29 @@ export default function ReportLost() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <MistHero />
-      <div className="page">
+      <div className="shell">
         <SiteHeader />
         <main id="main" className="report-page">
-          <Link className="results__back" to="/">
+          <Link className="back-link" to="/">
             <Icon name="arrow_back" />
             Back to search
           </Link>
 
-          <h2 className="results__title" tabIndex={-1} ref={headingRef}>
-            Report a lost item
-          </h2>
-          <p className="report-page__lead">
-            Tell us what went missing and we will match it against items handed
-            in at city office counters. You do not need an account.
-          </p>
+          <div className="page-head">
+            <h1 tabIndex={-1} ref={headingRef}>
+              {received ? 'Report received' : 'Report a lost item'}
+            </h1>
+            {!received && (
+              <p className="lead">
+                Tell us what went missing. We will match it against items handed
+                in at city counters. No account needed.
+              </p>
+            )}
+          </div>
 
-          <LostReportForm />
+          <LostReportForm onReceiptChange={setReceived} />
         </main>
+        <SiteFooter />
       </div>
     </>
   );
