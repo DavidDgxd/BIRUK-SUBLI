@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import StaffGate from '../components/StaffGate.jsx';
 import StaffBar from '../components/StaffBar.jsx';
 import Icon from '../components/Icon.jsx';
@@ -9,6 +9,7 @@ import AddOfficeDialog from '../components/AddOfficeDialog.jsx';
 import ResetCredentialsDialog from '../components/ResetCredentialsDialog.jsx';
 import OfficeActionsMenu from '../components/OfficeActionsMenu.jsx';
 import { listOffices, listOfficeLogins } from '../lib/offices.js';
+import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /** Suspension wins over login state: a suspended office cannot sign in either way. */
 function accountStatus(office) {
@@ -20,15 +21,14 @@ function accountStatus(office) {
 }
 
 /*
- * Central admin: participating offices & logins (Wireframe Screen 20, US-01/US-03).
+ * Central admin: participating offices & logins (US-01/US-03).
  *
- * Lists every office in the directory, opens the "+ ADD AN OFFICE" dialog to
- * provision a new one, and resets an office's shared login when it is reported
- * lost or compromised. The list is read through the anon-readable `offices`
- * SELECT policy; every write goes through an Edge Function that re-checks the
- * caller's central-admin role.
+ * Lists every office, opens the add-office dialog to provision a new one, and
+ * resets an office's shared login when it is reported lost or compromised.
+ * Every write goes through an Edge Function that re-checks the caller's role.
  */
 export default function AdminOffices() {
+  const { status, isAdmin } = useStaffAuth();
   const headingRef = useRef(null);
   const [offices, setOffices] = useState(null); // null while the first load runs
   const [logins, setLogins] = useState(() => new Map()); // office id → login email
@@ -42,6 +42,8 @@ export default function AdminOffices() {
   }, []);
 
   useEffect(() => {
+    if (status !== 'authenticated' || !isAdmin) return undefined;
+
     const controller = new AbortController();
     let active = true;
 
@@ -72,7 +74,7 @@ export default function AdminOffices() {
       active = false;
       controller.abort();
     };
-  }, [reloadKey]);
+  }, [reloadKey, status, isAdmin]);
 
   function handleCreated() {
     setShowDialog(false);
@@ -81,24 +83,28 @@ export default function AdminOffices() {
 
   return (
     <>
-      <MistHero />
-      <div className="page">
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
+      <div className="shell">
         <SiteHeader />
-        <main className="report-page">
-          <Link className="results__back" to="/">
+        <main id="main" className="admin-page">
+          <Link className="back-link" to="/">
             <Icon name="arrow_back" />
             Back to search
           </Link>
 
-          <h2 className="results__title" tabIndex={-1} ref={headingRef}>
-            Participating offices
-          </h2>
-          <p className="report-page__lead">
-            Provision shared logins and directory entries for the offices that
-            hold found items, and reissue a login when one is reported lost or
-            compromised.
-          </p>
+          <div className="page-head">
+            <h1 tabIndex={-1} ref={headingRef}>
+              Participating offices
+            </h1>
+            <p className="lead">
+              Provision shared logins for offices that hold found items, and
+              reissue a login when one is lost or compromised.
+            </p>
+          </div>
 
+          <h2 className="visually-hidden">Directory access</h2>
           <StaffGate
             title="Admin sign-in required"
             message="Office provisioning is only available to the central admin."
@@ -110,14 +116,11 @@ export default function AdminOffices() {
             <>
               <StaffBar icon="admin_panel_settings" label="Central admin" />
 
-              <section
-                className="office-admin"
-                aria-label="Participating offices"
-              >
-                <div className="office-admin__toolbar">
+              <section className="office-admin" aria-label="Participating offices">
+                <div className="admin-toolbar">
                   <button
                     type="button"
-                    className="btn btn--filled"
+                    className="btn btn--primary"
                     onClick={() => setShowDialog(true)}
                   >
                     <Icon name="add" />
@@ -126,15 +129,10 @@ export default function AdminOffices() {
                 </div>
 
                 {loadError ? (
-                  <section
-                    className="state-card state-card--error"
-                    role="alert"
-                  >
-                    <h3 className="state-card__title">
-                      Could not load offices
-                    </h3>
-                    <p className="state-card__text">{loadError}</p>
-                    <div className="state-card__actions">
+                  <section className="state state--error" role="alert">
+                    <h3 className="state__title">Could not load offices</h3>
+                    <p className="state__text">{loadError}</p>
+                    <div className="state__actions">
                       <button
                         type="button"
                         className="btn"
@@ -156,33 +154,64 @@ export default function AdminOffices() {
                   </p>
                 ) : (
                   <div className="office-admin__table-wrap">
-                    <table className="office-table">
-                      <thead>
-                        <tr>
-                          <th scope="col">Office &amp; address</th>
-                          <th scope="col">Hours &amp; contact</th>
-                          <th scope="col">Login email</th>
-                          <th scope="col">Account status</th>
-                          <th scope="col" className="office-table__actions">
+                    <div
+                      className="office-table"
+                      role="table"
+                      aria-label="Participating offices and shared logins"
+                    >
+                      <div className="office-table__head" role="rowgroup">
+                        <div className="office-table__row" role="row">
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__office"
+                          >
+                            Office &amp; address
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__hours"
+                          >
+                            Hours &amp; contact
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__email"
+                          >
+                            Login email
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__status"
+                          >
+                            Account status
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__actions"
+                          >
                             <span className="visually-hidden">Actions</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="office-table__body" role="rowgroup">
                         {offices.map((office) => {
-                          const status = accountStatus(office);
+                          const account = accountStatus(office);
                           return (
-                            <tr key={office.id}>
-                              <th scope="row" className="office-table__office">
+                            <div key={office.id} className="office-table__row" role="row">
+                              <div
+                                role="rowheader"
+                                className="office-table__cell office-table__office"
+                              >
                                 <span className="office-table__primary">
                                   {office.name}
                                 </span>
                                 <span className="office-table__meta">
                                   {office.address}
                                 </span>
-                              </th>
-                              <td
-                                className="office-table__hours"
+                              </div>
+                              <div
+                                role="cell"
+                                className="office-table__cell office-table__hours"
                                 data-label="Hours & contact"
                               >
                                 <span className="office-table__primary">
@@ -191,9 +220,10 @@ export default function AdminOffices() {
                                 <span className="office-table__meta">
                                   {office.phone_number || '—'}
                                 </span>
-                              </td>
-                              <td
-                                className="office-table__email"
+                              </div>
+                              <div
+                                role="cell"
+                                className="office-table__cell office-table__email"
                                 data-label="Login email"
                               >
                                 {logins.get(office.id) ?? (
@@ -201,34 +231,39 @@ export default function AdminOffices() {
                                     Not provided
                                   </span>
                                 )}
-                              </td>
-                              <td
-                                className="office-table__status"
+                              </div>
+                              <div
+                                role="cell"
+                                className="office-table__cell office-table__status"
                                 data-label="Account status"
                               >
                                 <span
-                                  className={`office-status office-status--${status.key}`}
+                                  className={`office-status office-status--${account.key}`}
                                 >
-                                  {status.label}
+                                  {account.label}
                                 </span>
-                              </td>
-                              <td className="office-table__actions">
+                              </div>
+                              <div
+                                role="cell"
+                                className="office-table__cell office-table__actions"
+                              >
                                 <OfficeActionsMenu
                                   office={office}
                                   onReset={setResetTarget}
                                 />
-                              </td>
-                            </tr>
+                              </div>
+                            </div>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
                   </div>
                 )}
               </section>
             </>
           </StaffGate>
         </main>
+        <SiteFooter />
       </div>
 
       <AddOfficeDialog

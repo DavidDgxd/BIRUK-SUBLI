@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import FieldLabel from './FieldLabel.jsx';
+import PhotoDropzone from './PhotoDropzone.jsx';
 import { submitLostReport } from '../lib/lostReport.js';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -32,7 +34,7 @@ function todayIso() {
  * matched against held items behind the scenes; staff quote the code at the
  * counter, which is why it is the one thing we must give back.
  */
-export default function LostReportForm() {
+export default function LostReportForm({ onReceiptChange }) {
   const [description, setDescription] = useState('');
   const [areaRoute, setAreaRoute] = useState('');
   const [dateLost, setDateLost] = useState(todayIso);
@@ -57,6 +59,7 @@ export default function LostReportForm() {
   const contactId = useId();
   const contactHintId = useId();
   const photoId = useId();
+  const photoHintId = useId();
   const errorId = useId();
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
@@ -72,6 +75,11 @@ export default function LostReportForm() {
   useEffect(() => {
     if (status === 'done') receiptRef.current?.focus();
   }, [status]);
+
+  // Let the page swap its heading and lead for the receipt state.
+  useEffect(() => {
+    onReceiptChange?.(status === 'done');
+  }, [status, onReceiptChange]);
 
   function handleFileChange(event) {
     const file = event.target.files?.[0];
@@ -159,33 +167,31 @@ export default function LostReportForm() {
 
   if (status === 'done' && receipt) {
     return (
-      <section className="state-card state-card--success" role="status">
-        <h3 className="state-card__title" tabIndex={-1} ref={receiptRef}>
-          Report received
-        </h3>
-        <p className="state-card__text">
+      <section className="state state--success receipt-panel" role="status">
+        <p className="receipt" tabIndex={-1} ref={receiptRef}>
+          <span className="visually-hidden">Reference code </span>
+          {receipt.refCode}
+        </p>
+        <p className="state__text">
           Keep this reference code. Staff will ask for it when an item matching
           your description is handed in at a counter.
         </p>
-        <p className="receipt" aria-label={`Reference code ${receipt.refCode}`}>
-          {receipt.refCode}
-        </p>
         {photo && !receipt.usedPhoto && (
-          <p className="state-card__text">
+          <p className="state__text">
             We could not read your photo, so your report was matched on the
             description alone.
           </p>
         )}
-        <p className="state-card__text">
+        <p className="state__text">
           We will match new items against your description automatically. There
           is no need to file again.
         </p>
-        <div className="state-card__actions">
-          <Link className="btn btn--filled" to="/">
+        <div className="state__actions receipt-actions">
+          <Link className="btn btn--primary" to="/">
             <Icon name="search" />
             Search held items
           </Link>
-          <button type="button" className="btn" onClick={startAnother}>
+          <button type="button" className="btn btn--quiet" onClick={startAnother}>
             <Icon name="add" />
             Report another item
           </button>
@@ -198,15 +204,18 @@ export default function LostReportForm() {
 
   return (
     <form
-      className="report-form"
+      className="form"
+      aria-label="Report a lost item"
       onSubmit={handleSubmit}
       noValidate
       aria-busy={submitting}
     >
+      <p className="form__legend">Fields marked * are required.</p>
+
       <div className="field">
-        <label className="field__label" htmlFor={descriptionId}>
+        <FieldLabel htmlFor={descriptionId} required>
           What did you lose?
-        </label>
+        </FieldLabel>
         <textarea
           id={descriptionId}
           ref={descriptionRef}
@@ -214,6 +223,7 @@ export default function LostReportForm() {
           rows={4}
           maxLength={MAX_DESCRIPTION_LENGTH}
           placeholder="Blue backpack with a white logo, laptop inside"
+          required
           value={description}
           aria-describedby={
             error ? `${descriptionHintId} ${errorId}` : descriptionHintId
@@ -231,9 +241,9 @@ export default function LostReportForm() {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={areaId}>
+        <FieldLabel htmlFor={areaId} required>
           Where do you think you lost it?
-        </label>
+        </FieldLabel>
         <input
           id={areaId}
           ref={areaRouteRef}
@@ -241,6 +251,7 @@ export default function LostReportForm() {
           type="text"
           maxLength={MAX_SHORT_LENGTH}
           placeholder="Session Road, or jeepney to Aurora Hill"
+          required
           value={areaRoute}
           aria-describedby={error ? `${areaHintId} ${errorId}` : areaHintId}
           aria-invalid={error && !areaRoute.trim() ? 'true' : undefined}
@@ -250,20 +261,21 @@ export default function LostReportForm() {
           }}
         />
         <p className="field__hint" id={areaHintId}>
-          A street, landmark, or the route you were travelling.
+          A street, landmark or the route you were travelling.
         </p>
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={dateId}>
+        <FieldLabel htmlFor={dateId} required>
           When did you lose it?
-        </label>
+        </FieldLabel>
         <input
           id={dateId}
           ref={dateLostRef}
           className="field__control"
           type="date"
           max={todayIso()}
+          required
           value={dateLost}
           aria-invalid={error && !dateLost ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -275,9 +287,7 @@ export default function LostReportForm() {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={contactId}>
-          Contact information <span className="field__optional">Optional</span>
-        </label>
+        <FieldLabel htmlFor={contactId}>Contact information</FieldLabel>
         <input
           id={contactId}
           className="field__control"
@@ -296,73 +306,36 @@ export default function LostReportForm() {
       </div>
 
       <div className="field">
-        <span className="field__label">
-          Photo <span className="field__optional">Optional</span>
-        </span>
-        <input
-          ref={fileInputRef}
-          className="visually-hidden"
-          type="file"
+        <FieldLabel htmlFor={photoId}>Photo</FieldLabel>
+        <PhotoDropzone
+          id={photoId}
+          inputRef={fileInputRef}
           accept={ACCEPTED_TYPES.join(',')}
-          tabIndex={-1}
-          aria-hidden="true"
+          describedBy={error ? `${photoHintId} ${errorId}` : photoHintId}
+          photo={photo}
+          photoNote="Used once to improve matching"
           onChange={handleFileChange}
+          onRemove={() => setPhoto(null)}
         />
-        <button
-          type="button"
-          className="btn"
-          onClick={() => fileInputRef.current?.click()}
-          aria-describedby={photoId}
-        >
-          <Icon name="photo_camera" />
-          <span className="btn__label">
-            <span>Upload Photo</span>
-            <small>
-              {photo ? 'Change photo' : '(JPG, PNG or WebP, up to 8 MB)'}
-            </small>
-          </span>
-        </button>
-        <p className="field__hint" id={photoId}>
-          A photo is matched against your description. It is not stored with
-          your report.
+        <p className="field__hint" id={photoHintId}>
+          JPG, PNG or WebP, up to 8 MB. A photo is matched against your
+          description. It is not stored with your report.
         </p>
       </div>
 
-      {photo && (
-        <div className="photo-chip">
-          <img
-            className="photo-chip__img"
-            src={photo.url}
-            alt="Preview of the photo you selected"
-          />
-          <p className="photo-chip__name">
-            {photo.file.name}
-            <small>Used once to improve matching</small>
-          </p>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => setPhoto(null)}
-            aria-label="Remove photo"
-          >
-            <Icon name="close" />
-          </button>
-        </div>
-      )}
-
       <div aria-live="polite">
         {error && (
-          <p className="search__error" id={errorId}>
+          <p className="form-error" id={errorId}>
             <Icon name="error" />
             {error}
           </p>
         )}
       </div>
 
-      <div className="report-form__actions">
-        <button type="submit" className="btn btn--filled" disabled={submitting}>
+      <div className="form-actions">
+        <button type="submit" className="btn btn--primary" disabled={submitting}>
           <Icon name="send" />
-          {submitting ? 'Filing your report…' : 'Submit Report'}
+          {submitting ? 'Filing your report…' : 'Submit report'}
         </button>
       </div>
     </form>

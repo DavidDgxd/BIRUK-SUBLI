@@ -3,7 +3,7 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'playwright-report', 'test-results'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -24,7 +24,7 @@ export default [
     },
   },
   {
-    files: ['vite.config.js', 'eslint.config.js'],
+    files: ['vite.config.js', 'eslint.config.js', 'playwright.config.js', 'e2e/**'],
     languageOptions: { globals: globals.node },
   },
 ];

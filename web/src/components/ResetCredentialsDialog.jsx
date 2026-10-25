@@ -144,11 +144,8 @@ export default function ResetCredentialsDialog({ open, office, onClose }) {
               <p className="credential__email">{credential.email}</p>
 
               <p className="credential__label">New shared password</p>
-              <p
-                className="receipt credential__password"
-                ref={receiptRef}
-                aria-label="New shared password"
-              >
+              <p className="receipt credential__password" ref={receiptRef}>
+                <span className="visually-hidden">New shared password </span>
                 {credential.password}
               </p>
             </div>
@@ -164,7 +161,7 @@ export default function ResetCredentialsDialog({ open, office, onClose }) {
               {copyNote && <p className="state-card__text">{copyNote}</p>}
             </div>
 
-            <div className="report-form__actions">
+            <div className="dialog-actions">
               <button
                 type="button"
                 className="btn btn--filled"
@@ -195,14 +192,14 @@ export default function ResetCredentialsDialog({ open, office, onClose }) {
 
             <div aria-live="polite">
               {error && (
-                <p className="search__error" id={errorId}>
+                <p className="form-error" id={errorId}>
                   <Icon name="error" />
                   {error}
                 </p>
               )}
             </div>
 
-            <div className="report-form__actions">
+            <div className="dialog-actions">
               <button
                 type="button"
                 className="btn btn--filled"

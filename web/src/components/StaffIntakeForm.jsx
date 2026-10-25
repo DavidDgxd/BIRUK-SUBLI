@@ -303,23 +303,15 @@ export default function StaffIntakeForm({ office, staffEmail }) {
       )
       .join('');
 
+    const stylesheet = new URL('/print.css', document.baseURI).href;
+
     win.document.write(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Custody receipt ${escapeHtml(current.refCode)}</title>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 32px; color: #111; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .office { margin: 0 0 16px; color: #444; font-size: 13px; }
-  .ref { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 700;
-         letter-spacing: 0.08em; margin: 0 0 20px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 6px 0; vertical-align: top;
-           border-bottom: 1px solid #ddd; }
-  th { width: 38%; color: #555; font-weight: 600; }
-  .note { margin-top: 24px; font-size: 12px; color: #666; }
-</style>
+<link rel="stylesheet" href="${escapeHtml(stylesheet)}">
 </head>
 <body>
   <h1>Custody receipt</h1>
@@ -336,19 +328,16 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
   if (status === 'done' && receipt) {
     return (
-      <section className="state-card state-card--success" role="status">
-        <h3 className="state-card__title" tabIndex={-1} ref={receiptRef}>
+      <section className="state state--success receipt-panel" role="status">
+        <h2 className="state__title" tabIndex={-1} ref={receiptRef}>
           Item taken into custody
-        </h3>
-        <p className="state-card__text">
+        </h2>
+        <p className="state__text">
           The item is logged to {receipt.officeName} and is now searchable. Give
           the reference below to whoever handed it in.
         </p>
-        <p
-          className="receipt"
-          ref={refCodeRef}
-          aria-label={`Custody reference ${receipt.refCode}`}
-        >
+        <p className="receipt" ref={refCodeRef}>
+          <span className="visually-hidden">Custody reference </span>
           {receipt.refCode}
         </p>
         <dl className="receipt-details">
@@ -374,13 +363,13 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           </div>
         </dl>
         {!receipt.usedPhoto && (
-          <p className="state-card__text">
+          <p className="state__text">
             The photo was saved, but we could not read it for matching — this
             item is searchable by its text details alone.
           </p>
         )}
-        {copyNote && <p className="state-card__text">{copyNote}</p>}
-        <div className="state-card__actions">
+        {copyNote && <p className="state__text">{copyNote}</p>}
+        <div className="state__actions receipt-actions">
           <button
             type="button"
             className="btn btn--filled"
@@ -414,7 +403,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
   return (
     <form
-      className="report-form"
+      className="form"
+      aria-label="Log a found item into custody"
       onSubmit={handleSubmit}
       noValidate
       aria-busy={submitting}
@@ -430,6 +420,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           type="text"
           maxLength={MAX_TITLE_LENGTH}
           placeholder="Black leather wallet"
+          required
           value={title}
           aria-describedby={error ? `${titleHintId} ${errorId}` : titleHintId}
           aria-invalid={error && !title.trim() ? 'true' : undefined}
@@ -439,8 +430,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={titleHintId}>
-          Shown in public search results, so keep it generic (colour and type).
-          Put serial numbers and unique marks in the private notes below.
+          Shown publicly. Keep it generic; put serial numbers and marks in the
+          private notes.
         </p>
       </div>
 
@@ -453,6 +444,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           ref={categoryRef}
           className="field__control field__control--select"
           value={category}
+          required
           aria-describedby={error ? errorId : undefined}
           aria-invalid={error && !category ? 'true' : undefined}
           onChange={(event) => {
@@ -482,6 +474,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           type="text"
           maxLength={MAX_SHORT_LENGTH}
           placeholder="Locker 2, Bin B"
+          required
           value={storageLocation}
           aria-describedby={
             error ? `${storageHintId} ${errorId}` : storageHintId
@@ -493,8 +486,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={storageHintId}>
-          The exact shelf, locker or bin where you placed it. Staff-only — never
-          shown in the public search.
+          Staff-only. The exact shelf, locker or bin where you placed it.
         </p>
       </div>
 
@@ -509,6 +501,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           rows={4}
           maxLength={MAX_DESCRIPTION_LENGTH}
           placeholder="Well-worn bifold wallet, slight tear on the inner lining. Serial 67 Written on the inner flap. Contains a bus card."
+          required
           value={description}
           aria-describedby={
             error ? `${descriptionHintId} ${errorId}` : descriptionHintId
@@ -520,9 +513,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           }}
         />
         <p className="field__hint" id={descriptionHintId}>
-          Staff-only — never shown in public search. Record serial numbers,
-          unique marks, contents and condition here; this is what the desk uses
-          to verify a claim, so be specific.
+          Staff-only. Serial numbers, marks, contents and condition — what the
+          desk checks a claim against.
         </p>
       </div>
 
@@ -536,6 +528,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
           className="field__control"
           type="date"
           max={todayIso()}
+          required
           value={dateReceived}
           aria-invalid={error && !dateReceived ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -582,6 +575,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
               type="text"
               maxLength={MAX_SHORT_LENGTH}
               placeholder="Juan dela Cruz"
+              required={isCash}
               value={finderName}
               aria-describedby={
                 error ? `${finderHintId} ${errorId}` : finderHintId
@@ -637,21 +631,19 @@ export default function StaffIntakeForm({ office, staffEmail }) {
         >
           <Icon name="photo_camera" />
           <span className="btn__label">
-            <span>{photo ? 'Change Photo' : 'Add Photo'}</span>
+            <span>{photo ? 'Change photo' : 'Add photo'}</span>
             <small>(JPG, PNG or WebP, up to 8 MB)</small>
           </span>
         </button>
         <p className="field__hint" id={photoId}>
-          Required. The photo is uploaded and stored so the public can recognise
-          the item, and so it contributes to matching. Avoid photographing
+          Required. Stored so people can recognise the item. Avoid photographing
           people or personal details.
         </p>
         <p className="photo-tip">
           <Icon name="lightbulb" />
           <span>
-            Tip: Photograph the item as a whole. Avoid photographing private
-            identifiers like ID cards, serial number stickers, or passcode
-            screens.
+            Photograph the whole item, not ID cards, serial stickers or
+            passcode screens.
           </span>
         </p>
       </div>
@@ -662,6 +654,9 @@ export default function StaffIntakeForm({ office, staffEmail }) {
             className="photo-chip__img"
             src={photo.url}
             alt="Preview of the photo you selected"
+            width="48"
+            height="48"
+            decoding="async"
           />
           <p className="photo-chip__name">
             {photo.file.name}
@@ -680,17 +675,17 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
       <div aria-live="polite">
         {error && (
-          <p className="search__error" id={errorId}>
+          <p className="form-error" id={errorId}>
             <Icon name="error" />
             {error}
           </p>
         )}
       </div>
 
-      <div className="report-form__actions">
+      <div className="form-actions">
         <button type="submit" className="btn btn--filled" disabled={submitting}>
           <Icon name="login" />
-          {submitting ? 'Filing the custody record…' : 'Take into Custody'}
+          {submitting ? 'Filing the custody record…' : 'Take into custody'}
         </button>
       </div>
     </form>

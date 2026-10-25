@@ -1,29 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import MistHero from '../components/MistHero.jsx';
 import SiteHeader from '../components/SiteHeader.jsx';
+import SiteFooter from '../components/SiteFooter.jsx';
 import ResultCard from '../components/ResultCard.jsx';
 import Icon from '../components/Icon.jsx';
 import { searchItems } from '../lib/searchItems.js';
 
-const SKELETON_COUNT = 3;
-
 const ERROR_COPY = {
   'ai-unreachable':
     'Search is temporarily unavailable. Please try again in a moment.',
-  // Shown when the search service rejects the description itself. The service's
-  // own wording is more specific, but it is developer-facing ("text too long"),
-  // so the user sees this and the debug line below carries the detail in dev.
   'ai-failed':
-    'We could not search for that description. Try describing the item in a few words.',
+    'We could not search for that description. Try a few words instead.',
   'ai-bad-response': 'Search ran into a problem. Please try again.',
   db: 'We could not load results right now. Please try again.',
 };
 
 function requestKey(q, color, photo, attempt) {
-  return [q, color, photo ? `${photo.name}:${photo.size}` : '', attempt].join(
-    '|',
-  );
+  return [q, color, photo ? `${photo.name}:${photo.size}` : '', attempt].join('|');
 }
 
 export default function SearchResults() {
@@ -58,8 +51,7 @@ export default function SearchResults() {
   const loading =
     hasQuery && outcome?.key !== requestKey(q, color, photo, attempt);
   const error = !loading && outcome?.error;
-  const primary =
-    !loading && !error && outcome?.primary ? outcome.primary : null;
+  const primary = !loading && !error && outcome?.primary ? outcome.primary : null;
   const secondary =
     !loading && !error && outcome?.secondary ? outcome.secondary : null;
   const noMatches =
@@ -69,7 +61,6 @@ export default function SearchResults() {
   const onlySecondary =
     primary && secondary && primary.length === 0 && secondary.length > 0;
 
-  // Move focus to the heading when the page opens so screen readers start at the results.
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
@@ -82,113 +73,93 @@ export default function SearchResults() {
 
   return (
     <>
-      <MistHero />
-      <div className="page">
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
+      <div className="shell">
         <SiteHeader />
-        <main className="results">
-          <Link className="results__back" to="/">
+        <main id="main" className="results">
+          <Link className="back-link" to="/">
             <Icon name="arrow_back" />
             New search
           </Link>
 
-          <h2 className="results__title" tabIndex={-1} ref={headingRef}>
-            Search results
-          </h2>
-
-          {hasQuery && (
-            <ul className="results__summary" aria-label="Your search">
-              {q && (
-                <li className="summary-chip">
-                  <Icon name="search" />
-                  {q}
-                </li>
-              )}
-              {color && (
-                <li className="summary-chip">
-                  <Icon name="palette" />
-                  {color}
-                </li>
-              )}
-              {photo && (
-                <li className="summary-chip">
-                  <Icon name="photo_camera" />
-                  Photo attached
-                </li>
-              )}
-            </ul>
-          )}
-
-          {translated && (
-            <p className="results__translated">
-              Searching for &ldquo;{translated}&rdquo; (translated from your
-              Filipino text).
-            </p>
-          )}
+          <div className="page-head">
+            <h1 tabIndex={-1} ref={headingRef}>
+              Search results
+            </h1>
+            {hasQuery && (
+              <p className="results__query">
+                {q ? `“${q}”` : 'Photo search'}
+                {color && `, color ${color}`}
+                {photo && ', photo attached'}
+              </p>
+            )}
+            {translated && (
+              <p className="results__translated">
+                Also searching for “{translated}”.
+              </p>
+            )}
+          </div>
 
           {!hasQuery && (
-            <section className="state-card">
-              <h3 className="state-card__title">Nothing to search yet</h3>
-              <p className="state-card__text">
-                Describe your item in your own words, add a color, or upload a
-                photo to see which office is holding it.
+            <section className="state">
+              <h2 className="state__title">Nothing to search yet</h2>
+              <p className="state__text">
+                Describe your item, choose a color or add a photo to see which
+                office is holding it.
               </p>
-              <Link className="btn btn--filled" to="/">
-                <Icon name="search" />
-                Start a search
-              </Link>
+              <div className="state__actions">
+                <Link className="btn btn--primary" to="/">
+                  <Icon name="search" />
+                  Start a search
+                </Link>
+              </div>
             </section>
           )}
 
           {loading && (
-            <div role="status">
-              <p className="results__searching">
-                <Icon name="search" className="icon--pulse" />
-                Embedding your description&hellip;
-              </p>
-              <ul className="results__list" aria-hidden="true">
-                {Array.from({ length: SKELETON_COUNT }, (_, i) => (
-                  <li key={i} className="result-skeleton" />
-                ))}
-              </ul>
-            </div>
+            <p className="loading" role="status">
+              <Icon name="search" className="icon--pulse" />
+              Searching the ledger…
+            </p>
           )}
 
           {error && (
-            <section className="state-card state-card--error" role="alert">
-              <h3 className="state-card__title">Something went wrong</h3>
-              <p className="state-card__text">
+            <section className="state state--error" role="alert">
+              <h2 className="state__title">Something went wrong</h2>
+              <p className="state__text">
                 {ERROR_COPY[error.code] ?? ERROR_COPY.db}
               </p>
               {import.meta.env.DEV && (
-                <p className="state-card__debug">{error.message}</p>
+                <p className="state__debug">{error.message}</p>
               )}
-              <button
-                type="button"
-                className="btn btn--filled"
-                onClick={() => setAttempt((n) => n + 1)}
-              >
-                <Icon name="refresh" />
-                Try again
-              </button>
+              <div className="state__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setAttempt((n) => n + 1)}
+                >
+                  <Icon name="refresh" />
+                  Try again
+                </button>
+              </div>
             </section>
           )}
 
           {noMatches && (
-            <section className="state-card" role="status">
-              <h3 className="state-card__title">
-                Walang nakita (nothing found)
-              </h3>
-              <p className="state-card__text">
-                No held item matches that yet. Try fewer words, add a color, or
-                upload a photo. New items are logged at the counters every day,
-                and you can report your item so staff can watch for it.
+            <section className="state" role="status">
+              <h2 className="state__title">Nothing found yet</h2>
+              <p className="state__text">
+                No held item matches that. Try fewer words, add a color or a
+                photo — or report your item so staff can watch for it.
               </p>
-              <div className="state-card__actions">
-                <Link className="btn btn--filled" to="/report/lost">
+              <div className="state__actions">
+                <Link className="btn btn--primary" to="/report/lost">
                   <Icon name="description" />
-                  Report Lost Item
+                  Report a lost item
                 </Link>
-                <Link className="btn" to="/">
+                <Link className="btn btn--quiet" to="/">
                   <Icon name="search" />
                   Search again
                 </Link>
@@ -199,8 +170,8 @@ export default function SearchResults() {
           {primary && primary.length > 0 && (
             <>
               <p className="results__count" role="status">
-                {primary.length} possible{' '}
-                {primary.length === 1 ? 'match' : 'matches'}, best first
+                {primary.length} {primary.length === 1 ? 'match' : 'matches'},
+                best first
               </p>
               <ul className="results__list">
                 {primary.map((item) => (
@@ -213,32 +184,25 @@ export default function SearchResults() {
           )}
 
           {secondary && secondary.length > 0 && (
-            <>
+            <details className="more-matches" open={onlySecondary}>
+              <summary>Other possible matches ({secondary.length})</summary>
               {onlySecondary && (
-                <p className="results__secondary-note" role="status">
-                  No direct matches found. Showing lower-confidence
-                  possibilities:
+                <p role="status">
+                  No direct matches found. These are lower-confidence
+                  possibilities.
                 </p>
               )}
-              <details className="search-secondary" open={onlySecondary}>
-                <summary className="search-secondary__summary">
-                  Other possible matches ({secondary.length})
-                </summary>
-                <p className="search-secondary__caption">
-                  These items had lower similarity scores to your query but
-                  might still be relevant.
-                </p>
-                <ul className="results__list">
-                  {secondary.map((item) => (
-                    <li key={item.id}>
-                      <ResultCard item={item} />
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </>
+              <ul className="results__list">
+                {secondary.map((item) => (
+                  <li key={item.id}>
+                    <ResultCard item={item} />
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </main>
+        <SiteFooter />
       </div>
     </>
   );

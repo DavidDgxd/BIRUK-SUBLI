@@ -55,15 +55,21 @@ export default function StaffBar({ icon = 'corporate_fare', label }) {
             <Icon name="add_box" />
             Log an item
           </Link>
-          <Link className="staff-bar__nav-link" to="/">
-            <Icon name="search" />
-            Search held items
+          <Link
+            className="staff-bar__nav-link"
+            to="/staff/items"
+            aria-current={pathname === '/staff/items' ? 'page' : undefined}
+          >
+            <Icon name="inventory_2" />
+            Held items
           </Link>
         </nav>
       )}
       <div className="staff-bar__actions">
         {session.isMock && (
-          <span className="staff-bar__badge">Dev session &middot; not real auth</span>
+          <span className="staff-bar__badge">
+            Dev session &middot; not real auth
+          </span>
         )}
         {signOutError && (
           <span className="staff-bar__note" role="alert">
