@@ -1074,10 +1074,6 @@ input[type='search']::-webkit-search-decoration {
   padding-block: var(--space-5) var(--space-4);
 }
 
-.admin-page {
-  min-block-size: 100vh;
-}
-
 .page-head h1 {
   margin-block-start: var(--space-2);
 }
@@ -1833,7 +1829,7 @@ textarea {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
-  margin-block-start: var(--space-5);
+  margin-block: var(--space-5) var(--space-4);
 }
 
 .office-admin {
