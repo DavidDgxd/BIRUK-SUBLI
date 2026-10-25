@@ -93,6 +93,14 @@
   --border: 1px solid var(--rule);
   --border-strong: 1px solid var(--rule-strong);
   --shadow-overlay: 0 8px 24px rgb(16 21 17 / 14%);
+
+  /* Surface roles for the report forms. Aliases, so they follow either theme. */
+  --surface-canvas: var(--paper);
+  --surface-elevated: var(--raised);
+  --surface-subtle: var(--inset);
+  --text-primary: var(--ink);
+  /* Pine-tinted rule that still clears 3:1 against --surface-subtle. */
+  --border-subtle: color-mix(in srgb, var(--primary) 75%, var(--inset));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -479,7 +487,6 @@ h2[tabindex='-1']:focus,
   letter-spacing: 0.12em;
   line-height: 1.4;
   text-transform: uppercase;
-  opacity: 0.75;
 }
 
 .site-header__staff {
@@ -1047,6 +1054,12 @@ input[type='search']::-webkit-search-decoration {
   color: var(--ink-muted);
 }
 
+.photo-chip__file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .photo-chip .icon-btn {
   margin-inline-start: auto;
 }
@@ -1382,6 +1395,15 @@ input[type='search']::-webkit-search-decoration {
   font-weight: var(--weight-regular);
 }
 
+.field__required {
+  margin-inline-start: var(--space-1);
+  color: var(--error);
+}
+
+.form__legend {
+  color: var(--ink-muted);
+}
+
 .field__control {
   inline-size: 100%;
   min-block-size: 3rem;
@@ -1421,33 +1443,76 @@ input[type='search']::-webkit-search-decoration {
 }
 
 input[type='date'],
+input[type='file'],
 input[type='number'],
 input[type='email'],
 input[type='password'],
 input[type='search'],
 input[type='tel'],
-input[type='text'] {
+input[type='text'],
+textarea {
   scroll-margin-block-end: 7rem;
 }
 
-.form-extra {
-  border-block-start: var(--border);
-  padding-block-start: var(--space-3);
-}
-
-.form-extra > summary {
+.dropzone {
+  position: relative;
   display: flex;
   align-items: center;
-  min-block-size: 2.75rem;
-  color: var(--primary);
-  font-weight: var(--weight-strong);
+  justify-content: center;
+  gap: var(--space-3);
+  min-block-size: var(--space-8);
+  min-inline-size: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.dropzone:hover,
+.dropzone--drag {
+  border-color: var(--primary);
+  background: var(--primary-wash);
+}
+
+.dropzone--drag {
+  border-style: solid;
+}
+
+.dropzone:has(.dropzone__input:focus-visible) {
+  border-color: var(--primary);
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.dropzone:has(.dropzone__input[aria-invalid='true']) {
+  border-color: var(--error);
+}
+
+.dropzone__input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
   cursor: pointer;
 }
 
-.form-extra__body {
-  display: grid;
-  gap: var(--space-5);
-  padding-block-start: var(--space-3);
+.dropzone .icon {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  stroke-width: 1.5;
+  color: var(--primary);
+}
+
+.dropzone__status {
+  min-inline-size: 0;
+}
+
+.dropzone__text {
+  min-inline-size: 0;
+  font-weight: var(--weight-strong);
 }
 
 .form-actions {
@@ -2220,7 +2285,7 @@ input[type='text'] {
 /* Mobile submit dock ----------------------------------------------------- */
 
 .form {
-  padding-block-end: calc(5rem + env(safe-area-inset-bottom));
+  padding-block-end: calc(var(--space-9) + env(safe-area-inset-bottom));
 }
 
 .form-actions {

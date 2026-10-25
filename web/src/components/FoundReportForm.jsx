@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import FieldLabel from './FieldLabel.jsx';
+import PhotoDropzone from './PhotoDropzone.jsx';
 import { submitFoundReport } from '../lib/foundReport.js';
 import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from '../lib/storage.js';
 
@@ -51,7 +53,6 @@ export default function FoundReportForm({ onReceiptChange }) {
   const locationRef = useRef(null);
   const foundDateRef = useRef(null);
   const fileInputRef = useRef(null);
-  const uploadButtonRef = useRef(null);
   const receiptRef = useRef(null);
   const controllerRef = useRef(null);
 
@@ -63,6 +64,7 @@ export default function FoundReportForm({ onReceiptChange }) {
   const contactId = useId();
   const contactHintId = useId();
   const photoId = useId();
+  const photoHintId = useId();
   const errorId = useId();
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
@@ -130,7 +132,7 @@ export default function FoundReportForm({ onReceiptChange }) {
     }
     if (!photo) {
       setError('Add a photo of the item you found.');
-      uploadButtonRef.current?.focus();
+      fileInputRef.current?.focus();
       return;
     }
 
@@ -217,10 +219,12 @@ export default function FoundReportForm({ onReceiptChange }) {
       noValidate
       aria-busy={submitting}
     >
+      <p className="form__legend">Fields marked * are required.</p>
+
       <div className="field">
-        <label className="field__label" htmlFor={noteId}>
+        <FieldLabel htmlFor={noteId} required>
           What did you find?
-        </label>
+        </FieldLabel>
         <textarea
           id={noteId}
           ref={noteRef}
@@ -244,9 +248,9 @@ export default function FoundReportForm({ onReceiptChange }) {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={locationId}>
+        <FieldLabel htmlFor={locationId} required>
           Where did you find it?
-        </label>
+        </FieldLabel>
         <input
           id={locationId}
           ref={locationRef}
@@ -271,9 +275,9 @@ export default function FoundReportForm({ onReceiptChange }) {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={foundDateId}>
+        <FieldLabel htmlFor={foundDateId} required>
           When did you find it?
-        </label>
+        </FieldLabel>
         <input
           id={foundDateId}
           ref={foundDateRef}
@@ -292,87 +296,46 @@ export default function FoundReportForm({ onReceiptChange }) {
       </div>
 
       <div className="field">
-        <span className="field__label">Photo</span>
+        <FieldLabel htmlFor={contactId}>Contact information</FieldLabel>
         <input
-          ref={fileInputRef}
-          className="visually-hidden"
-          type="file"
-          accept={ACCEPTED_TYPES.join(',')}
-          tabIndex={-1}
-          aria-hidden="true"
-          onChange={handleFileChange}
+          id={contactId}
+          className="field__control"
+          type="text"
+          maxLength={MAX_SHORT_LENGTH}
+          placeholder="Phone number or email"
+          autoComplete="tel"
+          value={finderContact}
+          aria-describedby={contactHintId}
+          onChange={(event) => setFinderContact(event.target.value)}
         />
-        <button
-          type="button"
-          ref={uploadButtonRef}
-          className="btn"
-          onClick={() => fileInputRef.current?.click()}
-          aria-describedby={photoId}
-        >
-          <Icon name="photo_camera" />
-          <span className="btn__label">
-            <span>{photo ? 'Change photo' : 'Add photo'}</span>
-            <small>JPG, PNG or WebP, up to 8 MB</small>
-          </span>
-        </button>
-        <p className="field__hint" id={photoId}>
-          Required. The photo is stored with your report so counter staff can
-          identify the item. Do not photograph people, ID numbers or other
-          personal details.
+        <p className="field__hint" id={contactHintId}>
+          Only counter staff can see this. It is used to reach you about the
+          item you handed in.
         </p>
       </div>
 
-      {photo && (
-        <div className="photo-chip">
-          <img
-            className="photo-chip__img"
-            src={photo.url}
-            alt="Preview of the photo you selected"
-            width="48"
-            height="48"
-            decoding="async"
-          />
-          <p className="photo-chip__name">
-            {photo.file.name}
-            <small>Stored with your report</small>
-          </p>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => setPhoto(null)}
-            aria-label="Remove photo"
-          >
-            <Icon name="close" />
-          </button>
-        </div>
-      )}
-
-      <details className="form-extra">
-        <summary>Add contact details (optional)</summary>
-        <div className="form-extra__body">
-          <div className="field">
-            <label className="field__label" htmlFor={contactId}>
-              Contact information
-              <span className="field__optional">Optional</span>
-            </label>
-            <input
-              id={contactId}
-              className="field__control"
-              type="text"
-              maxLength={MAX_SHORT_LENGTH}
-              placeholder="Phone number or email"
-              autoComplete="tel"
-              value={finderContact}
-              aria-describedby={contactHintId}
-              onChange={(event) => setFinderContact(event.target.value)}
-            />
-            <p className="field__hint" id={contactHintId}>
-              Only counter staff can see this. It is used to reach you about the
-              item you handed in.
-            </p>
-          </div>
-        </div>
-      </details>
+      <div className="field">
+        <FieldLabel htmlFor={photoId} required>
+          Photo
+        </FieldLabel>
+        <PhotoDropzone
+          id={photoId}
+          inputRef={fileInputRef}
+          accept={ACCEPTED_TYPES.join(',')}
+          required
+          invalid={Boolean(error) && !photo}
+          describedBy={error ? `${photoHintId} ${errorId}` : photoHintId}
+          photo={photo}
+          photoNote="Stored with your report"
+          onChange={handleFileChange}
+          onRemove={() => setPhoto(null)}
+        />
+        <p className="field__hint" id={photoHintId}>
+          JPG, PNG or WebP, up to 8 MB. The photo is stored with your report so
+          counter staff can identify the item. Do not photograph people, ID
+          numbers or other personal details.
+        </p>
+      </div>
 
       <div aria-live="polite">
         {error && (

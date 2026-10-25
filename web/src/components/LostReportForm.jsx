@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import FieldLabel from './FieldLabel.jsx';
+import PhotoDropzone from './PhotoDropzone.jsx';
 import { submitLostReport } from '../lib/lostReport.js';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -57,6 +59,7 @@ export default function LostReportForm({ onReceiptChange }) {
   const contactId = useId();
   const contactHintId = useId();
   const photoId = useId();
+  const photoHintId = useId();
   const errorId = useId();
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
@@ -207,10 +210,12 @@ export default function LostReportForm({ onReceiptChange }) {
       noValidate
       aria-busy={submitting}
     >
+      <p className="form__legend">Fields marked * are required.</p>
+
       <div className="field">
-        <label className="field__label" htmlFor={descriptionId}>
+        <FieldLabel htmlFor={descriptionId} required>
           What did you lose?
-        </label>
+        </FieldLabel>
         <textarea
           id={descriptionId}
           ref={descriptionRef}
@@ -236,9 +241,9 @@ export default function LostReportForm({ onReceiptChange }) {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={areaId}>
+        <FieldLabel htmlFor={areaId} required>
           Where do you think you lost it?
-        </label>
+        </FieldLabel>
         <input
           id={areaId}
           ref={areaRouteRef}
@@ -261,9 +266,9 @@ export default function LostReportForm({ onReceiptChange }) {
       </div>
 
       <div className="field">
-        <label className="field__label" htmlFor={dateId}>
+        <FieldLabel htmlFor={dateId} required>
           When did you lose it?
-        </label>
+        </FieldLabel>
         <input
           id={dateId}
           ref={dateLostRef}
@@ -281,89 +286,42 @@ export default function LostReportForm({ onReceiptChange }) {
         />
       </div>
 
-      <details className="form-extra">
-        <summary>Add contact details or a photo (optional)</summary>
-        <div className="form-extra__body">
-          <div className="field">
-            <label className="field__label" htmlFor={contactId}>
-              Contact information
-              <span className="field__optional">Optional</span>
-            </label>
-            <input
-              id={contactId}
-              className="field__control"
-              type="text"
-              maxLength={MAX_SHORT_LENGTH}
-              placeholder="Phone number or email"
-              autoComplete="tel"
-              value={contactInfo}
-              aria-describedby={contactHintId}
-              onChange={(event) => setContactInfo(event.target.value)}
-            />
-            <p className="field__hint" id={contactHintId}>
-              Only counter staff can see this. It is used to reach you if your
-              item turns up.
-            </p>
-          </div>
+      <div className="field">
+        <FieldLabel htmlFor={contactId}>Contact information</FieldLabel>
+        <input
+          id={contactId}
+          className="field__control"
+          type="text"
+          maxLength={MAX_SHORT_LENGTH}
+          placeholder="Phone number or email"
+          autoComplete="tel"
+          value={contactInfo}
+          aria-describedby={contactHintId}
+          onChange={(event) => setContactInfo(event.target.value)}
+        />
+        <p className="field__hint" id={contactHintId}>
+          Only counter staff can see this. It is used to reach you if your item
+          turns up.
+        </p>
+      </div>
 
-          <div className="field">
-            <span className="field__label">
-              Photo
-              <span className="field__optional">Optional</span>
-            </span>
-            <input
-              ref={fileInputRef}
-              className="visually-hidden"
-              type="file"
-              accept={ACCEPTED_TYPES.join(',')}
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={handleFileChange}
-            />
-            <button
-              type="button"
-              className="btn"
-              onClick={() => fileInputRef.current?.click()}
-              aria-describedby={photoId}
-            >
-              <Icon name="photo_camera" />
-              <span className="btn__label">
-                <span>{photo ? 'Change photo' : 'Add photo'}</span>
-                <small>JPG, PNG or WebP, up to 8 MB</small>
-              </span>
-            </button>
-            <p className="field__hint" id={photoId}>
-              A photo is matched against your description. It is not stored with
-              your report.
-            </p>
-          </div>
-
-          {photo && (
-            <div className="photo-chip">
-              <img
-                className="photo-chip__img"
-                src={photo.url}
-                alt="Preview of the photo you selected"
-                width="48"
-                height="48"
-                decoding="async"
-              />
-              <p className="photo-chip__name">
-                {photo.file.name}
-                <small>Used once to improve matching</small>
-              </p>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setPhoto(null)}
-                aria-label="Remove photo"
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-          )}
-        </div>
-      </details>
+      <div className="field">
+        <FieldLabel htmlFor={photoId}>Photo</FieldLabel>
+        <PhotoDropzone
+          id={photoId}
+          inputRef={fileInputRef}
+          accept={ACCEPTED_TYPES.join(',')}
+          describedBy={error ? `${photoHintId} ${errorId}` : photoHintId}
+          photo={photo}
+          photoNote="Used once to improve matching"
+          onChange={handleFileChange}
+          onRemove={() => setPhoto(null)}
+        />
+        <p className="field__hint" id={photoHintId}>
+          JPG, PNG or WebP, up to 8 MB. A photo is matched against your
+          description. It is not stored with your report.
+        </p>
+      </div>
 
       <div aria-live="polite">
         {error && (
