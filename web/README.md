@@ -99,6 +99,13 @@ The color filter is prepended to the text before embedding. `MATCH_THRESHOLD` an
 `MATCH_COUNT` live in `searchItems.js`. The page has loading, empty, error (with retry)
 and no-query states.
 
+US-20 adds a filter bar on the results page. The holding-office and receipt-date
+range are applied by the `match_items` RPC (`filter_office`, `date_from`,
+`date_to`) before its match limit, so a narrow filter cannot be defeated by a
+full page of other matches. The applied values are kept in `/search` query
+parameters (`office`, `from`, `to`) so the filtered results survive a refresh or
+can be shared.
+
 ## Routes and the search hand-off
 
 | Path | Status |

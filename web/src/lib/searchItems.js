@@ -69,14 +69,25 @@ export function combineEmbeddings(vectors) {
 /**
  * Embeds the text and/or photo with the AI service, then ranks held items with
  * the match_items RPC. The color filter is added to the text so it is embedded
- * with the rest of the description.
+ * with the rest of the description. Office and receipt-date filters are passed
+ * to the RPC so they narrow the candidate set before the match limit applies;
+ * filtering the returned page instead would hide valid older/other-office items
+ * whenever the unfiltered top matches filled the limit.
  *
  * Resolves to { primary, secondary, all, queryText, translatedText }, where
  * primary holds the confident matches and secondary the low-confidence ones
  * kept for the "other possible matches" drawer. Both keep the RPC's descending
  * score order.
  */
-export async function searchItems({ text, color, photo, signal }) {
+export async function searchItems({
+  text,
+  color,
+  photo,
+  office,
+  dateFrom,
+  dateTo,
+  signal,
+}) {
   const trimmed = (text ?? '').trim();
   const needsColor =
     color && !trimmed.toLowerCase().includes(color.toLowerCase());
@@ -98,18 +109,24 @@ export async function searchItems({ text, color, photo, signal }) {
       query_embedding: embedding,
       match_threshold: MATCH_THRESHOLD,
       match_count: MATCH_COUNT,
+      filter_office: office || null,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
     })
     .abortSignal(signal);
 
   if (error) throw new SearchError('db', error.message);
 
-  // The RPC already applies the floor and excludes released rows; re-checking
-  // both here keeps the guarantee even if an older match_items is still
-  // deployed. A released item must never surface in a public listing, even if
-  // that function is stale or a row's status changed between the query and the
-  // read.
+  // The RPC already applies the floor, office filter and excludes released
+  // rows; re-checking them here keeps the guarantee even if an older
+  // match_items is still deployed. A released item must never surface in a
+  // public listing, even if that function is stale or a row's status changed
+  // between the query and the read.
   const all = (data ?? []).filter(
-    (item) => item.status === 'held' && item.similarity >= MATCH_THRESHOLD,
+    (item) =>
+      item.status === 'held' &&
+      item.similarity >= MATCH_THRESHOLD &&
+      (!office || item.holding_office_id === office),
   );
 
   return {

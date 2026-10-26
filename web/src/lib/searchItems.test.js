@@ -74,6 +74,56 @@ describe('searchItems public listing', () => {
     );
   });
 
+  it('passes office and receipt-date filters to the RPC', async () => {
+    rpc.mockReturnValue(resolvedRpc());
+
+    await searchItems({
+      text: 'wallet',
+      office: 'BCPIO',
+      dateFrom: '2026-09-01',
+      dateTo: '2026-09-30',
+      signal: new AbortController().signal,
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'match_items',
+      expect.objectContaining({
+        filter_office: 'BCPIO',
+        date_from: '2026-09-01',
+        date_to: '2026-09-30',
+      }),
+    );
+  });
+
+  it('drops rows from another office even if a stale RPC ignores the filter', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          {
+            id: 'kept',
+            status: 'held',
+            similarity: 0.7,
+            holding_office_id: 'BCPIO',
+          },
+          {
+            id: 'elsewhere',
+            status: 'held',
+            similarity: 0.7,
+            holding_office_id: 'CITY_HALL_INFO',
+          },
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      office: 'BCPIO',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.all.map((item) => item.id)).toEqual(['kept']);
+  });
+
   it('surfaces an RPC failure as a SearchError', async () => {
     rpc.mockReturnValue(
       resolvedRpc({ error: { code: 'XX000', message: 'database offline' } }),
