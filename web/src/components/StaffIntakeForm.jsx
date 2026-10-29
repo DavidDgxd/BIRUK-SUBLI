@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { submitStaffCustody } from '../lib/staffIntake.js';
+import { intakePrefillFromReport } from '../lib/foundReports.js';
 import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from '../lib/storage.js';
 
 const ACCEPTED_TYPES = ACCEPTED_IMAGE_TYPES;
@@ -37,6 +38,8 @@ const ERROR_COPY = {
   'image-convert':
     'We could not process that photo. Please try a different one.',
   'image-upload': 'We could not upload the photo. Please try again.',
+  'report-taken':
+    'That self-report was already taken at a counter. Select another pending report.',
   db: 'We could not file the custody record right now. Please try again.',
 };
 
@@ -71,7 +74,12 @@ function escapeHtml(value) {
  * what makes the item findable and traceable later. On success the ref_code the
  * database generated is shown as the custody receipt, with copy and print.
  */
-export default function StaffIntakeForm({ office, staffEmail }) {
+export default function StaffIntakeForm({
+  office,
+  staffEmail,
+  prefillReport,
+  onConverted,
+}) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [storageLocation, setStorageLocation] = useState('');
@@ -80,7 +88,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
   const [cashAmount, setCashAmount] = useState('');
   const [finderName, setFinderName] = useState('');
   const [finderContact, setFinderContact] = useState('');
-  const [photo, setPhoto] = useState(null); // { file, url }
+  const [photo, setPhoto] = useState(null); // { file, url, existingUrl, label }
+  const [prefill, setPrefill] = useState(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'submitting' | 'done'
   const [receipt, setReceipt] = useState(null);
@@ -97,6 +106,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
   const fileInputRef = useRef(null);
   const uploadButtonRef = useRef(null);
   const receiptRef = useRef(null);
+  const prefillNoticeRef = useRef(null);
   const refCodeRef = useRef(null);
   const controllerRef = useRef(null);
 
@@ -120,7 +130,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
   useEffect(() => {
-    if (!photo) return undefined;
+    if (!photo?.file) return undefined;
     return () => URL.revokeObjectURL(photo.url);
   }, [photo]);
 
@@ -131,6 +141,43 @@ export default function StaffIntakeForm({ office, staffEmail }) {
   useEffect(() => {
     if (status === 'done') receiptRef.current?.focus();
   }, [status]);
+
+  // Copy a selected self-report into the form for review (US-10). Category,
+  // storage and the cash fields are deliberately cleared: the online report did
+  // not collect them, so the counter officer still has to record them locally.
+  useEffect(() => {
+    if (!prefillReport) return;
+
+    const values = intakePrefillFromReport(prefillReport);
+    setTitle(values.title);
+    setCategory('');
+    setStorageLocation('');
+    setDescription(values.description);
+    setDateReceived(todayIso());
+    setCashAmount('');
+    setFinderName('');
+    setFinderContact(values.finderContact);
+    setPhoto(
+      values.photoUrl
+        ? {
+            file: null,
+            url: values.photoUrl,
+            existingUrl: values.photoUrl,
+            label: `Photo from ${values.refCode}`,
+          }
+        : null,
+    );
+    setPrefill({ reportId: values.reportId, refCode: values.refCode });
+    setReceipt(null);
+    setError('');
+    setCopied(false);
+    setCopyNote('');
+    setStatus('idle');
+  }, [prefillReport]);
+
+  useEffect(() => {
+    if (prefillReport) prefillNoticeRef.current?.focus();
+  }, [prefillReport]);
 
   function handleFileChange(event) {
     const file = event.target.files?.[0];
@@ -146,7 +193,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
       return;
     }
     setError('');
-    setPhoto({ file, url: URL.createObjectURL(file) });
+    setPhoto({ file, url: URL.createObjectURL(file), existingUrl: null });
   }
 
   async function handleSubmit(event) {
@@ -215,6 +262,8 @@ export default function StaffIntakeForm({ office, staffEmail }) {
         finderName,
         finderContact,
         photo: photo.file,
+        photoUrl: photo.existingUrl,
+        foundReportId: prefill?.reportId ?? null,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -228,6 +277,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
         staffEmail,
       });
       setStatus('done');
+      onConverted?.(prefill);
     } catch (submitError) {
       if (controller.signal.aborted || submitError.name === 'AbortError')
         return;
@@ -255,6 +305,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
     setFinderName('');
     setFinderContact('');
     setPhoto(null);
+    setPrefill(null);
     setReceipt(null);
     setError('');
     setCopied(false);
@@ -362,7 +413,7 @@ export default function StaffIntakeForm({ office, staffEmail }) {
             <dd>{receipt.staffEmail}</dd>
           </div>
         </dl>
-        {!receipt.usedPhoto && (
+        {!receipt.usedPhoto && !receipt.reusedPhoto && (
           <p className="state__text">
             The photo was saved, but we could not read it for matching — this
             item is searchable by its text details alone.
@@ -409,6 +460,27 @@ export default function StaffIntakeForm({ office, staffEmail }) {
       noValidate
       aria-busy={submitting}
     >
+      {prefill && (
+        <div
+          className="intake-prefill"
+          ref={prefillNoticeRef}
+          tabIndex={-1}
+          role="status"
+        >
+          <Icon name="assignment_turned_in" />
+          <div>
+            <p className="intake-prefill__title">
+              Pre-filled from self-report {prefill.refCode}
+            </p>
+            <p className="intake-prefill__text">
+              Check the photo and note against the item the finder handed in,
+              then complete the category, storage location and any notes you
+              need.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="field">
         <label className="field__label" htmlFor={titleId}>
           Item title
@@ -659,8 +731,14 @@ export default function StaffIntakeForm({ office, staffEmail }) {
             decoding="async"
           />
           <p className="photo-chip__name">
-            {photo.file.name}
-            <small>Stored with the custody record</small>
+            <span className="photo-chip__file">
+              {photo.file?.name ?? photo.label ?? 'Selected photo'}
+            </span>
+            <small>
+              {photo.file
+                ? 'Stored with the custody record'
+                : 'Copied from the self-report'}
+            </small>
           </p>
           <button
             type="button"
