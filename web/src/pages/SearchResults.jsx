@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
 import ResultCard from '../components/ResultCard.jsx';
+import SearchFilters from '../components/SearchFilters.jsx';
 import Icon from '../components/Icon.jsx';
+import { listOffices } from '../lib/offices.js';
 import { searchItems } from '../lib/searchItems.js';
 
 const ERROR_COPY = {
@@ -15,28 +22,56 @@ const ERROR_COPY = {
   db: 'We could not load results right now. Please try again.',
 };
 
-function requestKey(q, color, photo, attempt) {
-  return [q, color, photo ? `${photo.name}:${photo.size}` : '', attempt].join('|');
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function readDate(value) {
+  return DATE_PATTERN.test(value ?? '') ? value : '';
+}
+
+function requestKey(q, color, photo, office, dateFrom, dateTo, attempt) {
+  return [
+    q,
+    color,
+    photo ? `${photo.name}:${photo.size}` : '',
+    office,
+    dateFrom,
+    dateTo,
+    attempt,
+  ].join('|');
 }
 
 export default function SearchResults() {
   const [params] = useSearchParams();
   const { state } = useLocation();
+  const navigate = useNavigate();
   const q = (params.get('q') ?? '').trim();
   const color = params.get('color') ?? '';
+  const office = (params.get('office') ?? '').trim();
+  const dateFrom = readDate(params.get('from'));
+  const dateTo = readDate(params.get('to'));
   const photo = state?.photo instanceof File ? state.photo : null;
   const hasQuery = Boolean(q || photo);
+  const hasFilters = Boolean(office || dateFrom || dateTo);
 
   const [attempt, setAttempt] = useState(0);
   const [outcome, setOutcome] = useState(null); // { key, items, translatedText } or { key, error }
+  const [officeOptions, setOfficeOptions] = useState(null);
   const headingRef = useRef(null);
 
   useEffect(() => {
     if (!hasQuery) return undefined;
     const controller = new AbortController();
-    const key = requestKey(q, color, photo, attempt);
+    const key = requestKey(q, color, photo, office, dateFrom, dateTo, attempt);
 
-    searchItems({ text: q, color, photo, signal: controller.signal })
+    searchItems({
+      text: q,
+      color,
+      photo,
+      office: office || null,
+      dateFrom: dateFrom || null,
+      dateTo: dateTo || null,
+      signal: controller.signal,
+    })
       .then((result) => {
         if (!controller.signal.aborted) setOutcome({ key, ...result });
       })
@@ -46,10 +81,50 @@ export default function SearchResults() {
       });
 
     return () => controller.abort();
-  }, [hasQuery, q, color, photo, attempt]);
+  }, [hasQuery, q, color, photo, office, dateFrom, dateTo, attempt]);
+
+  // The filter only needs the public office directory. A failure leaves the
+  // office select with "All offices"; the other filters and the search itself
+  // still work.
+  useEffect(() => {
+    if (!hasQuery) return undefined;
+    const controller = new AbortController();
+
+    listOffices({ signal: controller.signal })
+      .then((rows) => {
+        if (!controller.signal.aborted) setOfficeOptions(rows);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || error.name === 'AbortError') return;
+        setOfficeOptions([]);
+      });
+
+    return () => controller.abort();
+  }, [hasQuery]);
+
+  function applyFilters(next) {
+    const nextParams = new URLSearchParams(params);
+
+    if (next.office) nextParams.set('office', next.office);
+    else nextParams.delete('office');
+    if (next.dateFrom) nextParams.set('from', next.dateFrom);
+    else nextParams.delete('from');
+    if (next.dateTo) nextParams.set('to', next.dateTo);
+    else nextParams.delete('to');
+
+    navigate(
+      { pathname: '/search', search: nextParams.toString() },
+      { replace: true, state },
+    );
+  }
+
+  function clearFilters() {
+    applyFilters({ office: '', dateFrom: '', dateTo: '' });
+  }
 
   const loading =
-    hasQuery && outcome?.key !== requestKey(q, color, photo, attempt);
+    hasQuery &&
+    outcome?.key !== requestKey(q, color, photo, office, dateFrom, dateTo, attempt);
   const error = !loading && outcome?.error;
   const primary = !loading && !error && outcome?.primary ? outcome.primary : null;
   const secondary =
@@ -102,6 +177,17 @@ export default function SearchResults() {
             )}
           </div>
 
+          {hasQuery && (
+            <SearchFilters
+              offices={officeOptions}
+              office={office}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onApply={applyFilters}
+              onClear={clearFilters}
+            />
+          )}
+
           {!hasQuery && (
             <section className="state">
               <h2 className="state__title">Nothing to search yet</h2>
@@ -149,16 +235,30 @@ export default function SearchResults() {
 
           {noMatches && (
             <section className="state" role="status">
-              <h2 className="state__title">Nothing found yet</h2>
+              <h2 className="state__title">
+                {hasFilters ? 'No items in that range' : 'Nothing found yet'}
+              </h2>
               <p className="state__text">
-                No held item matches that. Try fewer words, add a color or a
-                photo — or report your item so staff can watch for it.
+                {hasFilters
+                  ? 'No held item matches those filters. Try a wider date range or another office.'
+                  : 'No held item matches that. Try fewer words, add a color or a photo — or report your item so staff can watch for it.'}
               </p>
               <div className="state__actions">
-                <Link className="btn btn--primary" to="/report/lost">
-                  <Icon name="description" />
-                  Report a lost item
-                </Link>
+                {hasFilters ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={clearFilters}
+                  >
+                    <Icon name="close" />
+                    Clear filters
+                  </button>
+                ) : (
+                  <Link className="btn btn--primary" to="/report/lost">
+                    <Icon name="description" />
+                    Report a lost item
+                  </Link>
+                )}
                 <Link className="btn btn--quiet" to="/">
                   <Icon name="search" />
                   Search again

@@ -219,13 +219,15 @@ create table if not exists public.dismissed_matches (
 -- Dropped first because removing `description` changes the return type, which
 -- `create or replace` refuses to alter. Safe to re-run: absent on a fresh DB.
 drop function if exists public.match_items(vector, double precision, integer, text, date);
+drop function if exists public.match_items(vector, double precision, integer, text, date, date);
 
 create or replace function public.match_items (
     query_embedding vector(512),
     match_threshold float default 0.55,
     match_count int default 15,
     filter_office text default null,
-    date_from date default null
+    date_from date default null,
+    date_to date default null
 )
 returns table (
     id uuid,
@@ -265,14 +267,15 @@ as $$
         and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
+        and (date_to is null or items.date_received <= date_to)
         -- Hard floor: callers may raise the bar but never drop below 0.55.
         and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.55)
     order by similarity desc
     limit match_count;
 $$;
 
-revoke all on function public.match_items(vector, double precision, integer, text, date) from public;
-grant execute on function public.match_items(vector, double precision, integer, text, date)
+revoke all on function public.match_items(vector, double precision, integer, text, date, date) from public;
+grant execute on function public.match_items(vector, double precision, integer, text, date, date)
     to anon, authenticated, service_role;
 
 
