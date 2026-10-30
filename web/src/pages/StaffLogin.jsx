@@ -20,6 +20,7 @@ export default function StaffLogin() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -135,21 +136,34 @@ export default function StaffLogin() {
               <label className="field__label" htmlFor={passwordId}>
                 Site password
               </label>
-              <input
-                id={passwordId}
-                ref={passwordRef}
-                className="field__control"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                aria-invalid={error && !password ? 'true' : undefined}
-                aria-describedby={error ? errorId : undefined}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  if (error) setError('');
-                }}
-              />
+              <div className="field__control-wrap">
+                <input
+                  id={passwordId}
+                  ref={passwordRef}
+                  className="field__control"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  aria-invalid={error && !password ? 'true' : undefined}
+                  aria-describedby={error ? errorId : undefined}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (error) setError('');
+                  }}
+                />
+                <button
+                  type="button"
+                  className="icon-btn field__toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  aria-controls={passwordId}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  <Icon name={showPassword ? 'visibility_off' : 'visibility'} />
+                </button>
+              </div>
             </div>
 
             <div aria-live="polite">
