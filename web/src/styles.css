@@ -1808,6 +1808,206 @@ textarea {
   color: var(--error);
 }
 
+/* Pending self-reports at intake (US-10) --------------------------------- */
+
+.staff-intake {
+  display: grid;
+  gap: var(--space-6);
+  margin-block-start: var(--space-5);
+}
+
+.staff-intake .form {
+  margin-block-start: 0;
+}
+
+.pending-reports {
+  min-inline-size: 0;
+}
+
+.pending-reports__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pending-reports__title {
+  font-size: var(--text-title);
+}
+
+.pending-reports__count {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-weight: var(--weight-strong);
+}
+
+.pending-reports__hint {
+  margin-block-start: var(--space-2);
+  color: var(--ink-muted);
+  max-inline-size: 60ch;
+}
+
+.pending-reports__list {
+  margin-block-start: var(--space-4);
+  border-block-start: var(--border);
+  list-style: none;
+}
+
+.pending-report {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: 100%;
+  min-block-size: 4.5rem;
+  padding-block: var(--space-3);
+  border: 0;
+  border-block-end: var(--border);
+  background: none;
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+}
+
+.pending-report:hover {
+  background: var(--inset);
+}
+
+.pending-report[aria-pressed='true'] {
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.pending-report__photo {
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--inset);
+}
+
+.pending-report__body {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.pending-report__ref {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+}
+
+.pending-report__note {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: var(--weight-strong);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pending-report__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.pending-report__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--primary);
+  font-weight: var(--weight-strong);
+}
+
+.pending-reports__error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--error-wash);
+  color: var(--error);
+}
+
+.pending-reports__empty {
+  margin-block-start: var(--space-4);
+  padding-block: var(--space-3);
+  border-block: var(--border);
+  color: var(--ink-muted);
+}
+
+.pending-reports__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.pending-reports__more-count {
+  color: var(--ink-muted);
+}
+
+.pending-reports__more-error {
+  flex-basis: 100%;
+  color: var(--error);
+  font-weight: var(--weight-strong);
+}
+
+.intake-prefill {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.intake-prefill:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.intake-prefill .icon {
+  flex: none;
+  margin-block-start: 0.1em;
+}
+
+.intake-prefill__title {
+  font-weight: var(--weight-strong);
+}
+
+.intake-prefill__text {
+  margin-block-start: var(--space-1);
+}
+
+@media (min-width: 60rem) {
+  .staff-intake {
+    grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-7);
+  }
+
+  .pending-reports {
+    position: sticky;
+    inset-block-start: var(--space-4);
+    max-block-size: calc(100dvh - var(--space-8));
+    overflow: auto;
+  }
+}
+
 /* Held items (US-31) ----------------------------------------------------- */
 
 .staff-items {

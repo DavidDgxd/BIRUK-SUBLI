@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
 import StaffGate from '../components/StaffGate.jsx';
 import StaffBar from '../components/StaffBar.jsx';
 import StaffIntakeForm from '../components/StaffIntakeForm.jsx';
+import PendingSelfReports from '../components/PendingSelfReports.jsx';
 import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
@@ -16,10 +17,23 @@ import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 export default function StaffIntake() {
   const headingRef = useRef(null);
   const { office, session } = useStaffAuth();
+  const [prefillReport, setPrefillReport] = useState(null);
+  const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
 
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  function handleSelect(report) {
+    setPrefillReport((current) =>
+      current?.id === report.id ? current : { ...report },
+    );
+  }
+
+  function handleConverted() {
+    setPrefillReport(null);
+    setReportsRefreshKey((key) => key + 1);
+  }
 
   return (
     <>
@@ -54,7 +68,19 @@ export default function StaffIntake() {
           >
             <>
               <StaffBar />
-              <StaffIntakeForm office={office} staffEmail={session?.staffEmail} />
+              <div className="staff-intake">
+                <PendingSelfReports
+                  selectedId={prefillReport?.id}
+                  onSelect={handleSelect}
+                  refreshKey={reportsRefreshKey}
+                />
+                <StaffIntakeForm
+                  office={office}
+                  staffEmail={session?.staffEmail}
+                  prefillReport={prefillReport}
+                  onConverted={handleConverted}
+                />
+              </div>
             </>
           </StaffGate>
         </main>
