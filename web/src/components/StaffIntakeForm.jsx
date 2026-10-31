@@ -142,20 +142,16 @@ export default function StaffIntakeForm({
     if (status === 'done') receiptRef.current?.focus();
   }, [status]);
 
-  // Copy a selected self-report into the form for review (US-10). Category,
-  // storage and the cash fields are deliberately cleared: the online report did
-  // not collect them, so the counter officer still has to record them locally.
+  // Copy a selected self-report into the form for review (US-10). Only the
+  // fields the online report actually collected are replaced. Category,
+  // storage, date and cash stay as the officer entered them, so selecting a
+  // report does not wipe local work.
   useEffect(() => {
     if (!prefillReport) return;
 
     const values = intakePrefillFromReport(prefillReport);
     setTitle(values.title);
-    setCategory('');
-    setStorageLocation('');
     setDescription(values.description);
-    setDateReceived(todayIso());
-    setCashAmount('');
-    setFinderName('');
     setFinderContact(values.finderContact);
     setPhoto(
       values.photoUrl
@@ -176,7 +172,7 @@ export default function StaffIntakeForm({
   }, [prefillReport]);
 
   useEffect(() => {
-    if (prefillReport) prefillNoticeRef.current?.focus();
+    if (prefillReport) prefillNoticeRef.current?.focus({ preventScroll: true });
   }, [prefillReport]);
 
   function handleFileChange(event) {

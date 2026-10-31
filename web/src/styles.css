@@ -1928,6 +1928,25 @@ textarea {
   color: var(--ink-muted);
 }
 
+.pending-reports__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.pending-reports__more-count {
+  color: var(--ink-muted);
+}
+
+.pending-reports__more-error {
+  flex-basis: 100%;
+  color: var(--error);
+  font-weight: var(--weight-strong);
+}
+
 .intake-prefill {
   display: flex;
   align-items: flex-start;

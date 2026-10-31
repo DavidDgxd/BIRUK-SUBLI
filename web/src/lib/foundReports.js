@@ -20,6 +20,8 @@ const PENDING_COLUMNS = [
   'created_at',
 ].join(', ');
 
+export const PENDING_REPORT_PAGE_SIZE = 20;
+
 /**
  * Self-reports waiting for the finder to hand the item in at a counter (US-10).
  *
@@ -28,20 +30,31 @@ const PENDING_COLUMNS = [
  * and found_reports has no public SELECT policy. The list is citywide because
  * the finder may drop the item at any participating office.
  */
-export async function listPendingFoundReports({ signal } = {}) {
+export async function listPendingFoundReports({
+  signal,
+  offset = 0,
+  limit = PENDING_REPORT_PAGE_SIZE,
+} = {}) {
+  const from = Math.max(0, offset);
+  const size = Math.max(1, limit);
+
   let query = supabase
     .from('found_reports')
-    .select(PENDING_COLUMNS)
+    .select(PENDING_COLUMNS, { count: 'exact' })
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
-    .order('ref_code', { ascending: true });
+    .order('ref_code', { ascending: true })
+    .range(from, from + size - 1);
 
   if (signal) query = query.abortSignal(signal);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw new FoundReportsError('db', error.message);
 
-  return data ?? [];
+  return {
+    reports: data ?? [],
+    total: count ?? data?.length ?? 0,
+  };
 }
 
 /**

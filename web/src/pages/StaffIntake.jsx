@@ -24,6 +24,12 @@ export default function StaffIntake() {
     headingRef.current?.focus();
   }, []);
 
+  function handleSelect(report) {
+    setPrefillReport((current) =>
+      current?.id === report.id ? current : { ...report },
+    );
+  }
+
   function handleConverted() {
     setPrefillReport(null);
     setReportsRefreshKey((key) => key + 1);
@@ -65,7 +71,7 @@ export default function StaffIntake() {
               <div className="staff-intake">
                 <PendingSelfReports
                   selectedId={prefillReport?.id}
-                  onSelect={(report) => setPrefillReport({ ...report })}
+                  onSelect={handleSelect}
                   refreshKey={reportsRefreshKey}
                 />
                 <StaffIntakeForm

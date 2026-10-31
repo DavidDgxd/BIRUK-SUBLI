@@ -10,12 +10,13 @@ import {
   listPendingFoundReports,
 } from './foundReports.js';
 
-function queryResult({ data = [], error = null } = {}) {
+function queryResult({ data = [], error = null, count = data.length } = {}) {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     order: vi.fn(() => query),
-    abortSignal: vi.fn().mockResolvedValue({ data, error }),
+    range: vi.fn(() => query),
+    abortSignal: vi.fn().mockResolvedValue({ data, error, count }),
   };
   return query;
 }
@@ -26,15 +27,19 @@ describe('listPendingFoundReports', () => {
   });
 
   it('reads only pending reports, oldest first', async () => {
-    const query = queryResult({ data: [{ id: 'report-1' }] });
+    const query = queryResult({ data: [{ id: 'report-1' }], count: 3 });
     from.mockReturnValue(query);
     const signal = new AbortController().signal;
 
-    await expect(listPendingFoundReports({ signal })).resolves.toEqual([
-      { id: 'report-1' },
-    ]);
+    await expect(listPendingFoundReports({ signal })).resolves.toEqual({
+      reports: [{ id: 'report-1' }],
+      total: 3,
+    });
 
     expect(from).toHaveBeenCalledWith('found_reports');
+    expect(query.select).toHaveBeenCalledWith(expect.any(String), {
+      count: 'exact',
+    });
     expect(query.eq).toHaveBeenCalledWith('status', 'pending');
     expect(query.order).toHaveBeenNthCalledWith(1, 'created_at', {
       ascending: true,
@@ -42,7 +47,17 @@ describe('listPendingFoundReports', () => {
     expect(query.order).toHaveBeenNthCalledWith(2, 'ref_code', {
       ascending: true,
     });
+    expect(query.range).toHaveBeenCalledWith(0, 19);
     expect(query.abortSignal).toHaveBeenCalledWith(signal);
+  });
+
+  it('requests the next page with an offset', async () => {
+    const query = queryResult({ data: [], count: 25 });
+    from.mockReturnValue(query);
+
+    await listPendingFoundReports({ offset: 20, limit: 10 });
+
+    expect(query.range).toHaveBeenCalledWith(20, 29);
   });
 
   it('surfaces a read failure', async () => {
