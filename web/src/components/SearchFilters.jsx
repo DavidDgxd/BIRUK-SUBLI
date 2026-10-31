@@ -91,7 +91,7 @@ export default function SearchFilters({
 
         <div className="field">
           <label className="field__label" htmlFor={fromId}>
-            Received from
+            Received on or after
           </label>
           <input
             id={fromId}
@@ -107,7 +107,7 @@ export default function SearchFilters({
 
         <div className="field">
           <label className="field__label" htmlFor={toId}>
-            Received to
+            Received on or before
           </label>
           <input
             id={toId}
