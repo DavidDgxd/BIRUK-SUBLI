@@ -839,6 +839,12 @@ using (bucket_id = 'item-photos');
 -- calculate_cash_reward_date() sets reward_date to receipt date + 6 months
 -- whenever is_cash is true, so a 'Cash' category is normalised and flagged here.
 -- ============================================================================
+-- US-5 adds p_ai_caption. Drop first because adding a parameter would otherwise
+-- leave the old 11-argument overload in place alongside the new one.
+drop function if exists public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text
+);
+
 create or replace function public.submit_staff_custody(
     p_office_id        text,
     p_title            text,
@@ -850,7 +856,8 @@ create or replace function public.submit_staff_custody(
     p_date_received    date default current_date,
     p_cash_amount      numeric default null,
     p_finder_name      text default null,
-    p_finder_contact   text default null
+    p_finder_contact   text default null,
+    p_ai_caption       text default null
 )
 returns text
 language plpgsql
@@ -909,7 +916,8 @@ begin
         image_url, date_received,
         holding_office_id, logging_office_id,
         storage_location, embedding,
-        is_cash, cash_amount, finder_name, finder_contact
+        is_cash, cash_amount, finder_name, finder_contact,
+        ai_caption
     ) values (
         btrim(p_title),
         btrim(p_description),
@@ -924,7 +932,8 @@ begin
         v_is_cash,
         v_amount,
         nullif(btrim(coalesce(p_finder_name, '')), ''),
-        nullif(btrim(coalesce(p_finder_contact, '')), '')
+        nullif(btrim(coalesce(p_finder_contact, '')), ''),
+        nullif(btrim(coalesce(p_ai_caption, '')), '')
     )
     returning ref_code into v_ref_code;
 
@@ -933,7 +942,7 @@ end;
 $$;
 
 revoke all on function public.submit_staff_custody(
-    text, text, text, text, text, text, vector, date, numeric, text, text
+    text, text, text, text, text, text, vector, date, numeric, text, text, text
 ) from public;
 
 -- TEMPORARY (dev mock auth): the web client runs on the anon key because real
@@ -942,5 +951,5 @@ revoke all on function public.submit_staff_custody(
 -- session log intake. Revoke the `anon` grant and keep only `authenticated`
 -- once the staff provider signs in for real.
 grant execute on function public.submit_staff_custody(
-    text, text, text, text, text, text, vector, date, numeric, text, text
+    text, text, text, text, text, text, vector, date, numeric, text, text, text
 ) to anon, authenticated;
