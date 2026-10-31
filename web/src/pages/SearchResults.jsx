@@ -9,6 +9,7 @@ import SiteHeader from '../components/SiteHeader.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
 import ResultCard from '../components/ResultCard.jsx';
 import SearchFilters from '../components/SearchFilters.jsx';
+import SearchPanel from '../components/SearchPanel.jsx';
 import Icon from '../components/Icon.jsx';
 import { listOffices } from '../lib/offices.js';
 import { searchItems } from '../lib/searchItems.js';
@@ -154,20 +155,18 @@ export default function SearchResults() {
       <div className="shell">
         <SiteHeader />
         <main id="main" className="results">
-          <Link className="back-link" to="/">
-            <Icon name="arrow_back" />
-            New search
-          </Link>
-
           <div className="page-head">
             <h1 tabIndex={-1} ref={headingRef}>
               Search results
             </h1>
             {hasQuery && (
+              <SearchPanel compact initialQuery={q} />
+            )}
+            {hasQuery && (color || photo) && (
               <p className="results__query">
-                {q ? `“${q}”` : 'Photo search'}
-                {color && `, color ${color}`}
-                {photo && ', photo attached'}
+                {color && `Color ${color}`}
+                {color && photo && ' · '}
+                {photo && 'Photo attached'}
               </p>
             )}
             {translated && (
