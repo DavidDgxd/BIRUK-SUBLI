@@ -32,6 +32,10 @@ import { uploadItemImage } from './storage.js';
  * matches on text alone — the counter must never be blocked from taking custody.
  * If the text half fails the submission fails, because an unsearchable item is
  * worse than a retry.
+ *
+ * US-5: `aiCaption` is the raw suggestion produced from the photo. The staffer
+ * may edit it before submitting, so it is stored separately from the confirmed
+ * verification notes in items.ai_caption.
  */
 
 /**
@@ -53,11 +57,13 @@ export async function submitStaffCustody({
   finderName,
   finderContact,
   photo,
+  aiCaption,
   signal,
 }) {
   const cleanTitle = title.trim();
   const cleanDescription = description.trim();
   const cleanStorage = storageLocation.trim();
+  const cleanCaption = aiCaption?.trim() || null;
   const isCash = category === 'Cash';
 
   // Storage location is deliberately left out: where a shelf is says nothing
@@ -93,6 +99,7 @@ export async function submitStaffCustody({
     p_cash_amount: isCash ? Number(cashAmount) || 0 : null,
     p_finder_name: isCash ? finderName?.trim() || null : null,
     p_finder_contact: finderContact?.trim() || null,
+    p_ai_caption: cleanCaption,
   });
   if (signal) query = query.abortSignal(signal);
 
