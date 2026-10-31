@@ -78,8 +78,8 @@ test('filters results by holding office and receipt-date range', async ({
   await expect(page.getByText('2 matches, best first')).toBeVisible();
 
   await page.getByLabel('Holding office').selectOption('BCPIO');
-  await page.getByLabel('Received from').fill('2026-09-01');
-  await page.getByLabel('Received to').fill('2026-09-30');
+  await page.getByLabel('Received on or after').fill('2026-09-01');
+  await page.getByLabel('Received on or before').fill('2026-09-30');
   await page.getByRole('button', { name: 'Apply filters' }).click();
 
   await expect(page.getByText('1 match, best first')).toBeVisible();
@@ -127,8 +127,8 @@ test('rejects a date range whose start is after its end', async ({ page }) => {
 
   await openRoute(page, '/search?q=umbrella');
 
-  await page.getByLabel('Received from').fill('2026-09-30');
-  await page.getByLabel('Received to').fill('2026-09-01');
+  await page.getByLabel('Received on or after').fill('2026-09-30');
+  await page.getByLabel('Received on or before').fill('2026-09-01');
   await page.getByRole('button', { name: 'Apply filters' }).click();
 
   await expect(
