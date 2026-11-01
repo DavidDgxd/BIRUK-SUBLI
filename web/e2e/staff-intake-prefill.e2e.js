@@ -143,7 +143,9 @@ test.describe('staff intake prefill (US-10)', () => {
     await expect(page.getByLabel('Storage location')).toHaveValue('Locker 10');
   });
 
-  test('loads pending self-reports a page at a time', async ({ page }) => {
+  test('loads pending self-reports a page at a time', async ({
+    page,
+  }, testInfo) => {
     const reports = Array.from({ length: 25 }, (_, index) => ({
       id: `report-${index + 1}`,
       ref_code: `FR-${String(index + 1).padStart(4, '0')}`,
@@ -187,5 +189,22 @@ test.describe('staff intake prefill (US-10)', () => {
     await expect(
       page.getByRole('button', { name: /Show .* more/ }),
     ).toHaveCount(0);
+
+    if (testInfo.project.name === 'w1280') {
+      const queue = page.locator('.pending-reports');
+      const overflowY = await queue.evaluate(
+        (node) => getComputedStyle(node).overflowY,
+      );
+      expect(overflowY).toBe('visible');
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.locator('.pending-report').first().hover();
+      await page.mouse.wheel(0, 600);
+
+      await expect
+        .poll(() => page.evaluate(() => window.scrollY))
+        .toBeGreaterThan(0);
+      expect(await queue.evaluate((node) => node.scrollTop)).toBe(0);
+    }
   });
 });

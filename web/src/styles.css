@@ -1982,13 +1982,6 @@ textarea {
     align-items: start;
     gap: var(--space-7);
   }
-
-  .pending-reports {
-    position: sticky;
-    inset-block-start: var(--space-4);
-    max-block-size: calc(100dvh - var(--space-8));
-    overflow: auto;
-  }
 }
 
 /* Held items (US-31) ----------------------------------------------------- */
