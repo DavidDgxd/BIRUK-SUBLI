@@ -91,9 +91,15 @@ holds the assumed service contract:
 
 - `POST /embed/text` with form field `text` returns `{ "vector": number[512] }`
 - `POST /embed/image` with form field `file` returns `{ "vector": number[512] }`
+- `POST /caption/image` with form field `file` returns `{ "caption": string }`
 
 The service does not translate Filipino yet. If `/embed/text` starts returning
 `translated_text`, the results page shows it.
+
+US-5: the staff intake form sends a newly selected photo to `/caption/image`.
+The returned caption pre-fills the private verification notes when they are
+empty and is always shown as a suggestion the staffer can edit or re-apply. The
+raw caption is stored separately in `items.ai_caption`.
 
 The color filter is prepended to the text before embedding. `MATCH_THRESHOLD` and
 `MATCH_COUNT` live in `searchItems.js`. The page has loading, empty, error (with retry)

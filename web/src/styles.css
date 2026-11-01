@@ -1606,6 +1606,40 @@ textarea {
   margin-block-start: 0.2em;
 }
 
+/* AI photo caption suggestion (US-5) ------------------------------------- */
+
+.caption-suggestion {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--primary-wash);
+}
+
+.caption-suggestion__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--primary-ink);
+  font-weight: var(--weight-strong);
+}
+
+.caption-suggestion__label .icon {
+  flex: none;
+}
+
+.caption-suggestion__text {
+  margin: 0;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.caption-suggestion .btn {
+  justify-self: start;
+}
+
 /* Receipt ---------------------------------------------------------------- */
 
 .receipt-panel {

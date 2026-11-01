@@ -3,9 +3,10 @@
  *
  *   POST {BASE}/embed/text   form field "text"  -> { "vector": number[512], "dim": 512 }
  *   POST {BASE}/embed/image  form field "file"  -> { "vector": number[512], "dim": 512 }
+ *   POST {BASE}/caption/image form field "file" -> { "caption": string }
  *
  * A rejected call answers {"detail": "..."} with 422 (blank or over-long text)
- * or 503 (the model failed); postForEmbedding surfaces that sentence to the user.
+ * or 503 (the model failed); postForJson surfaces that sentence to the user.
  *
  * The service does not translate yet. If it later returns "translated_text" from
  * /embed/text, the results page shows it to the user.
@@ -99,7 +100,7 @@ async function failureMessage(response, path) {
   return fallback;
 }
 
-async function postForEmbedding(path, init, signal) {
+async function postForJson(path, init, signal) {
   let response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
@@ -119,15 +120,18 @@ async function postForEmbedding(path, init, signal) {
     throw new SearchError('ai-failed', await failureMessage(response, path));
   }
 
-  let body;
   try {
-    body = await response.json();
+    return await response.json();
   } catch {
     throw new SearchError(
       'ai-bad-response',
       `AI service sent invalid JSON for ${path}`,
     );
   }
+}
+
+async function postForEmbedding(path, init, signal) {
+  const body = await postForJson(path, init, signal);
 
   if (!Array.isArray(body.vector) || body.vector.length !== EMBEDDING_DIM) {
     throw new SearchError(
@@ -177,6 +181,67 @@ export async function embedImage(file, signal) {
   form.append('file', file);
   const body = await postForEmbedding('/embed/image', { body: form }, signal);
   return { embedding: body.vector };
+}
+
+/**
+ * Suggests a short description for a newly logged photo (US-5).
+ *
+ * The returned caption is only a starting point: staff confirm or edit it in
+ * the intake form before the record is filed. It is never written to the public
+ * title automatically.
+ */
+export async function captionImage(file, signal) {
+  const form = new FormData();
+  form.append('file', file);
+  const body = await postForJson('/caption/image', { body: form }, signal);
+
+  if (typeof body.caption !== 'string' || !body.caption.trim()) {
+    throw new SearchError(
+      'ai-bad-response',
+      'Expected a non-empty "caption" from /caption/image',
+    );
+  }
+
+  return { caption: body.caption.trim(), model: body.model ?? null };
+}
+
+/**
+ * Best-effort captioning for callers that must never block on the AI service.
+ * Resolves to the caption text, or null when the photo cannot be described.
+ * A genuine cancel — the caller's own signal — still propagates.
+ */
+export async function captionImageOrNull(
+  file,
+  signal,
+  { timeoutMs = 20000, label = 'aiService' } = {},
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () =>
+      controller.abort(
+        new DOMException('Photo captioning timed out', 'TimeoutError'),
+      ),
+    timeoutMs,
+  );
+  const forwardAbort = () => controller.abort(signal?.reason);
+  if (signal) {
+    if (signal.aborted) controller.abort(signal.reason);
+    else signal.addEventListener('abort', forwardAbort, { once: true });
+  }
+
+  try {
+    const { caption } = await captionImage(file, controller.signal);
+    return caption;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (import.meta.env.DEV) {
+      console.warn(`[${label}] photo captioning failed:`, error.message);
+    }
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', forwardAbort);
+  }
 }
 
 /**

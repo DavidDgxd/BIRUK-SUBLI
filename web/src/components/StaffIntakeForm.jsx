@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import { captionImage } from '../lib/aiService.js';
 import { submitStaffCustody } from '../lib/staffIntake.js';
 import { intakePrefillFromReport } from '../lib/foundReports.js';
 import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from '../lib/storage.js';
@@ -90,6 +91,8 @@ export default function StaffIntakeForm({
   const [finderContact, setFinderContact] = useState('');
   const [photo, setPhoto] = useState(null); // { file, url, existingUrl, label }
   const [prefill, setPrefill] = useState(null);
+  const [captionSuggestion, setCaptionSuggestion] = useState(null);
+  const [captionAttempt, setCaptionAttempt] = useState(0);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'submitting' | 'done'
   const [receipt, setReceipt] = useState(null);
@@ -109,6 +112,9 @@ export default function StaffIntakeForm({
   const prefillNoticeRef = useRef(null);
   const refCodeRef = useRef(null);
   const controllerRef = useRef(null);
+  const captionControllerRef = useRef(null);
+  const descriptionValueRef = useRef('');
+  const autoFilledCaptionRef = useRef('');
 
   const titleId = useId();
   const titleHintId = useId();
@@ -127,12 +133,86 @@ export default function StaffIntakeForm({
   const errorId = useId();
 
   const isCash = category === 'Cash';
+  const suggestionApplied =
+    captionSuggestion?.status === 'ready' &&
+    description.trim() === captionSuggestion.text.trim();
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
   useEffect(() => {
     if (!photo?.file) return undefined;
     return () => URL.revokeObjectURL(photo.url);
   }, [photo]);
+
+  // Keep the latest description available to the async caption handler, which
+  // may finish after the staffer has started typing.
+  useEffect(() => {
+    descriptionValueRef.current = description;
+  }, [description]);
+
+  // US-5: read a newly selected photo and offer a starting description. The
+  // suggestion only fills the private notes when they are empty (or still hold
+  // the previous suggestion), so a staffer's own words are never overwritten.
+  useEffect(() => {
+    captionControllerRef.current?.abort();
+
+    if (!photo?.file) {
+      setCaptionSuggestion(null);
+      if (autoFilledCaptionRef.current) {
+        setDescription((current) =>
+          current.trim() === autoFilledCaptionRef.current ? '' : current,
+        );
+        autoFilledCaptionRef.current = '';
+      }
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    captionControllerRef.current = controller;
+    setCaptionSuggestion({ status: 'loading' });
+
+    captionImage(photo.file, controller.signal)
+      .then(({ caption }) => {
+        if (controller.signal.aborted) return;
+
+        const text = caption.trim().slice(0, MAX_DESCRIPTION_LENGTH);
+        if (!text) {
+          setCaptionSuggestion({
+            status: 'error',
+            message:
+              'We could not read this photo. Write the description yourself.',
+          });
+          return;
+        }
+
+        const current = descriptionValueRef.current.trim();
+        const shouldApply =
+          !current || current === autoFilledCaptionRef.current;
+        if (shouldApply) {
+          autoFilledCaptionRef.current = text;
+          descriptionValueRef.current = text;
+          setDescription(text);
+        }
+        setCaptionSuggestion({ status: 'ready', text });
+      })
+      .catch((captionError) => {
+        if (controller.signal.aborted || captionError.name === 'AbortError')
+          return;
+        if (import.meta.env.DEV)
+          console.warn('[StaffIntakeForm] caption', captionError);
+        setCaptionSuggestion({
+          status: 'error',
+          message:
+            'We could not read this photo automatically. Write the description yourself.',
+        });
+      })
+      .finally(() => {
+        if (captionControllerRef.current === controller) {
+          captionControllerRef.current = null;
+        }
+      });
+
+    return () => controller.abort();
+  }, [photo, captionAttempt]);
 
   // Abandon an in-flight submission if the page goes away.
   useEffect(() => () => controllerRef.current?.abort(), []);
@@ -150,6 +230,11 @@ export default function StaffIntakeForm({
     if (!prefillReport) return;
 
     const values = intakePrefillFromReport(prefillReport);
+    captionControllerRef.current?.abort();
+    autoFilledCaptionRef.current = '';
+    descriptionValueRef.current = values.description;
+    setCaptionSuggestion(null);
+    setCaptionAttempt(0);
     setTitle(values.title);
     setDescription(values.description);
     setFinderContact(values.finderContact);
@@ -190,6 +275,14 @@ export default function StaffIntakeForm({
     }
     setError('');
     setPhoto({ file, url: URL.createObjectURL(file), existingUrl: null });
+  }
+
+  function applyCaptionSuggestion() {
+    if (captionSuggestion?.status !== 'ready') return;
+    autoFilledCaptionRef.current = captionSuggestion.text;
+    descriptionValueRef.current = captionSuggestion.text;
+    setDescription(captionSuggestion.text);
+    descriptionRef.current?.focus();
   }
 
   async function handleSubmit(event) {
@@ -260,6 +353,8 @@ export default function StaffIntakeForm({
         photo: photo.file,
         photoUrl: photo.existingUrl,
         foundReportId: prefill?.reportId ?? null,
+        aiCaption:
+          captionSuggestion?.status === 'ready' ? captionSuggestion.text : null,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -292,6 +387,11 @@ export default function StaffIntakeForm({
   }
 
   function startAnother() {
+    captionControllerRef.current?.abort();
+    autoFilledCaptionRef.current = '';
+    descriptionValueRef.current = '';
+    setCaptionSuggestion(null);
+    setCaptionAttempt(0);
     setTitle('');
     setCategory('');
     setStorageLocation('');
@@ -576,6 +676,7 @@ export default function StaffIntakeForm({
           }
           aria-invalid={error && !description.trim() ? 'true' : undefined}
           onChange={(event) => {
+            descriptionValueRef.current = event.target.value;
             setDescription(event.target.value);
             if (error) setError('');
           }}
@@ -584,6 +685,52 @@ export default function StaffIntakeForm({
           Staff-only. Serial numbers, marks, contents and condition — what the
           desk checks a claim against.
         </p>
+        {photo && captionSuggestion && (
+          <div className="caption-suggestion" aria-live="polite">
+            <p className="caption-suggestion__label">
+              <Icon name="lightbulb" />
+              Suggested description from the photo
+            </p>
+            {captionSuggestion.status === 'loading' && (
+              <p className="field__hint">Reading the photo…</p>
+            )}
+            {captionSuggestion.status === 'ready' && (
+              <>
+                <p className="caption-suggestion__text">
+                  {captionSuggestion.text}
+                </p>
+                {suggestionApplied ? (
+                  <p className="field__hint">
+                    Added to the private verification notes. Edit or confirm it
+                    before taking custody.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--quiet"
+                    onClick={applyCaptionSuggestion}
+                  >
+                    <Icon name="check" />
+                    Use this description
+                  </button>
+                )}
+              </>
+            )}
+            {captionSuggestion.status === 'error' && (
+              <>
+                <p className="field__hint">{captionSuggestion.message}</p>
+                <button
+                  type="button"
+                  className="btn btn--quiet"
+                  onClick={() => setCaptionAttempt((attempt) => attempt + 1)}
+                >
+                  <Icon name="refresh" />
+                  Try again
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="field">

@@ -11,6 +11,8 @@ const { rpc, embedText, embedImageOrNull, uploadItemImage, combineEmbeddings } =
 
 vi.mock('./supabase.js', () => ({ supabase: { rpc } }));
 
+vi.mock('./storage.js', () => ({ uploadItemImage }));
+
 vi.mock('./aiService.js', () => ({
   embedText,
   embedImageOrNull,
@@ -24,7 +26,6 @@ vi.mock('./aiService.js', () => ({
   },
 }));
 
-vi.mock('./storage.js', () => ({ uploadItemImage }));
 vi.mock('./searchItems.js', () => ({ combineEmbeddings }));
 
 import { submitStaffCustody } from './staffIntake.js';
@@ -44,6 +45,20 @@ const baseIntake = {
   finderName: '',
   finderContact: '0917 000 0000',
   signal: new AbortController().signal,
+};
+
+const CUSTODY = {
+  officeId: 'BCPIO',
+  title: 'Brown wallet',
+  description: 'Brown leather bifold with a torn lining.',
+  category: 'Bags & Wallets',
+  storageLocation: 'Locker 2, Bin B',
+  dateReceived: '2026-10-30',
+  cashAmount: '',
+  finderName: '',
+  finderContact: '',
+  photo: new Blob(['photo'], { type: 'image/png' }),
+  aiCaption: 'A brown leather wallet on a table.',
 };
 
 describe('submitStaffCustody self-report prefill', () => {
@@ -143,5 +158,62 @@ describe('submitStaffCustody self-report prefill', () => {
         foundReportId: '11111111-1111-1111-1111-111111111111',
       }),
     ).rejects.toMatchObject({ name: 'SearchError', code: 'report-taken' });
+  });
+
+  it('sends the report and caption parameters together', async () => {
+    rpc.mockReturnValue(resolvedRpc({ data: 'BS-0116' }));
+
+    await submitStaffCustody({
+      ...baseIntake,
+      photo: null,
+      photoUrl: 'https://example.test/found-reports/original.webp',
+      foundReportId: '11111111-1111-1111-1111-111111111111',
+      aiCaption: 'A black umbrella with a wooden handle.',
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'submit_staff_custody',
+      expect.objectContaining({
+        p_found_report_id: '11111111-1111-1111-1111-111111111111',
+        p_ai_caption: 'A black umbrella with a wooden handle.',
+      }),
+    );
+  });
+});
+
+describe('submitStaffCustody AI caption', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    uploadItemImage.mockReset();
+    embedText.mockReset();
+    embedImageOrNull.mockReset();
+    combineEmbeddings.mockReset();
+
+    rpc.mockReturnValue(resolvedRpc({ data: 'BS-0001' }));
+    uploadItemImage.mockResolvedValue('https://example.test/photo.webp');
+    embedText.mockResolvedValue({ embedding: [1, 0] });
+    embedImageOrNull.mockResolvedValue(null);
+    combineEmbeddings.mockImplementation((vectors) => vectors[0]);
+  });
+
+  it('stores the raw AI suggestion separately from the confirmed notes', async () => {
+    await submitStaffCustody(CUSTODY);
+
+    expect(rpc).toHaveBeenCalledWith(
+      'submit_staff_custody',
+      expect.objectContaining({
+        p_description: 'Brown leather bifold with a torn lining.',
+        p_ai_caption: 'A brown leather wallet on a table.',
+      }),
+    );
+  });
+
+  it('sends a null caption when none was suggested', async () => {
+    await submitStaffCustody({ ...CUSTODY, aiCaption: '   ' });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'submit_staff_custody',
+      expect.objectContaining({ p_ai_caption: null }),
+    );
   });
 });
