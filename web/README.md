@@ -168,6 +168,25 @@ filed and the photo still stored — it simply matches on text alone.
 `found_reports.embedding` is nullable, so rows logged by hand without a vector
 remain valid.
 
+## Staff intake and pending self-reports (`/staff/intake`)
+
+US-10: the counter shows the citywide queue of `found_reports` whose status is
+`pending`. A signed-in staff session reads the rows directly; anonymous visitors
+cannot, because `found_reports` has no public SELECT policy (`finder_contact` is
+PII). The queue is intentionally not scoped to one office — the finder can hand
+the item in at any participating counter.
+
+Selecting a report copies its `image_url` into the photo preview and its
+`short_note` into the item title and private notes. The officer still records
+the category, storage location and any verification notes the desk needs. If the
+report photo is kept, the existing public URL is reused instead of uploading a
+second copy; choosing a new file replaces it normally.
+
+Submitting calls `submit_staff_custody` with `p_found_report_id`. The RPC inserts
+the item and flips the report to `converted_at_intake` in one transaction. A
+stale selection (already converted at another counter) raises `P0002` and rolls
+the insert back.
+
 ## Office provisioning (`/admin/offices`)
 
 US-01: the central admin creates a participating office and its shared login.
