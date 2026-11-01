@@ -160,7 +160,7 @@ export default function SearchResults() {
               Search results
             </h1>
             {hasQuery && (
-              <SearchPanel compact initialQuery={q} />
+              <SearchPanel compact initialQuery={q} initialPhoto={photo} />
             )}
             {hasQuery && (color || photo) && (
               <p className="results__query">

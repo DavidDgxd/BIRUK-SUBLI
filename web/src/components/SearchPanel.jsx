@@ -16,15 +16,20 @@ const MAX_QUERY_LENGTH = 200;
  *
  * `compact` renders the query field, search button and photo control so the
  * results page can offer an editable search bar without the full helper copy.
- * It keeps the current office/date filters when the query is changed.
+ * It keeps the current office/date filters and photo when the query is changed.
  */
-export default function SearchPanel({ initialQuery = '', compact = false }) {
+export default function SearchPanel({
+  initialQuery = '',
+  initialPhoto = null,
+  compact = false,
+}) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef(null);
   const queryInputRef = useRef(null);
   const [query, setQuery] = useState(initialQuery);
-  const [photo, setPhoto] = useState(null); // { file, url }
+  const [photo, setPhoto] = useState(null); // newly selected { file, url }
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const [error, setError] = useState('');
 
   const inputId = useId();
@@ -36,6 +41,12 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
+
+  // A new results-page photo starts a fresh editing session, so a removal made
+  // against the previous photo no longer applies.
+  useEffect(() => {
+    setPhotoRemoved(false);
+  }, [initialPhoto]);
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
   useEffect(() => {
@@ -58,13 +69,21 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
     }
     setError('');
     setPhoto({ file, url: URL.createObjectURL(file) });
+    setPhotoRemoved(false);
+  }
+
+  function removePhoto() {
+    setPhoto(null);
+    setPhotoRemoved(true);
   }
 
   function handleSubmit(event) {
     event.preventDefault();
     const text = query.trim();
+    const submittedPhoto =
+      photo?.file ?? (compact && !photoRemoved ? initialPhoto : null);
 
-    if (!text && !photo) {
+    if (!text && !submittedPhoto) {
       setError('Describe your item or add a photo to search.');
       queryInputRef.current?.focus();
       return;
@@ -78,7 +97,7 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
 
     navigate(
       { pathname: '/search', search: params.toString() },
-      { state: photo ? { photo: photo.file } : undefined },
+      { state: submittedPhoto ? { photo: submittedPhoto } : undefined },
     );
   }
 
@@ -88,6 +107,7 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
   }
 
   const describedBy = error ? `${hintId} ${errorId}` : hintId;
+  const hasPhoto = Boolean(photo || (!photoRemoved && initialPhoto));
 
   if (compact) {
     return (
@@ -160,7 +180,7 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
           onClick={() => fileInputRef.current?.click()}
         >
           <Icon name="photo_camera" size={16} strokeWidth={1.5} />
-          <span>{photo ? 'Change photo' : 'Add photo'}</span>
+          <span>{hasPhoto ? 'Change photo' : 'Add photo'}</span>
         </button>
         {photo && (
           <div className="photo-chip search-inline__photo">
@@ -179,7 +199,7 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
             <button
               type="button"
               className="icon-btn"
-              onClick={() => setPhoto(null)}
+              onClick={removePhoto}
               aria-label="Remove photo"
             >
               <Icon name="close" />
@@ -276,7 +296,7 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
                 strokeWidth={1.5}
                 className="search-console__camera"
               />
-              <span>{photo ? 'Change photo' : 'Add photo'}</span>
+              <span>{hasPhoto ? 'Change photo' : 'Add photo'}</span>
             </button>
           </div>
         </div>
@@ -312,7 +332,7 @@ export default function SearchPanel({ initialQuery = '', compact = false }) {
             <button
               type="button"
               className="icon-btn"
-              onClick={() => setPhoto(null)}
+              onClick={removePhoto}
               aria-label="Remove photo"
             >
               <Icon name="close" />

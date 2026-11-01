@@ -145,26 +145,41 @@ test('rejects a date range whose start is after its end', async ({ page }) => {
 test('edits the search text from the results page and keeps filters', async ({
   page,
 }) => {
-  await page.route('**/embed/text', (route) =>
-    route.fulfill({
+  const rpcCalls = [];
+  const textQueries = [];
+
+  await page.route('**/embed/text', (route) => {
+    textQueries.push(route.request().postData() ?? '');
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ vector: EMBEDDING }),
-    }),
-  );
-  await page.route('**/rest/v1/rpc/match_items', (route) =>
-    route.fulfill({
+    });
+  });
+  await page.route('**/rest/v1/rpc/match_items', (route) => {
+    rpcCalls.push(route.request().postDataJSON());
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(ITEMS),
-    }),
-  );
+    });
+  });
 
   await openRoute(page, '/search?q=umbrella');
 
   await page.getByLabel('Holding office').selectOption('BCPIO');
+  await page.getByLabel('Received on or after').fill('2026-09-01');
+  await page.getByLabel('Received on or before').fill('2026-09-30');
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/from=2026-09-01/);
+  await expect(page).toHaveURL(/to=2026-09-30/);
+  await expect.poll(() => rpcCalls.at(-1)).toMatchObject({
+    filter_office: 'BCPIO',
+    date_from: '2026-09-01',
+    date_to: '2026-09-30',
+  });
+  const rpcCallsBeforeEdit = rpcCalls.length;
 
   await page
     .getByRole('searchbox', { name: 'Search held items' })
@@ -173,6 +188,82 @@ test('edits the search text from the results page and keeps filters', async ({
 
   await expect(page).toHaveURL(/q=wallet/);
   await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/from=2026-09-01/);
+  await expect(page).toHaveURL(/to=2026-09-30/);
+  await expect.poll(() => rpcCalls.length).toBeGreaterThan(rpcCallsBeforeEdit);
+  expect(rpcCalls.at(-1)).toMatchObject({
+    filter_office: 'BCPIO',
+    date_from: '2026-09-01',
+    date_to: '2026-09-30',
+  });
+  expect(textQueries.at(-1)).toContain('wallet');
+});
+
+test('keeps the photo when the query is edited from the results page', async ({
+  page,
+}) => {
+  const rpcCalls = [];
+  let imageEmbeds = 0;
+
+  await page.route('**/embed/text', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vector: EMBEDDING }),
+    }),
+  );
+  await page.route('**/embed/image', (route) => {
+    imageEmbeds += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vector: EMBEDDING }),
+    });
+  });
+  await page.route('**/rest/v1/rpc/match_items', (route) => {
+    rpcCalls.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ITEMS),
+    });
+  });
+
+  await openRoute(page, '/');
+  await page.getByLabel('Describe the item').fill('umbrella');
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Add photo' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: 'wallet.png',
+    mimeType: 'image/png',
+    buffer: PNG_1PX,
+  });
+  await expect(page.getByText('wallet.png')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page).toHaveURL(/q=umbrella/);
+  await expect(page.getByText('Photo attached')).toBeVisible();
+
+  await page.getByLabel('Holding office').selectOption('BCPIO');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByText('1 match, best first')).toBeVisible();
+  const imageEmbedsBeforeEdit = imageEmbeds;
+  const rpcCallsBeforeEdit = rpcCalls.length;
+  expect(imageEmbedsBeforeEdit).toBeGreaterThan(0);
+
+  await page
+    .getByRole('searchbox', { name: 'Search held items' })
+    .fill('wallet');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+  await expect(page).toHaveURL(/q=wallet/);
+  await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page.getByText('Photo attached')).toBeVisible();
+  await expect.poll(() => rpcCalls.length).toBeGreaterThan(rpcCallsBeforeEdit);
+  expect(imageEmbeds).toBeGreaterThan(imageEmbedsBeforeEdit);
+  expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'BCPIO' });
 });
 
 test('adds a photo from the results page and keeps filters', async ({ page }) => {
@@ -207,7 +298,10 @@ test('adds a photo from the results page and keeps filters', async ({ page }) =>
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page).toHaveURL(/office=BCPIO/);
 
-  await page.locator('.search-inline input[type=file]').setInputFiles({
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Add photo' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
     name: 'wallet.png',
     mimeType: 'image/png',
     buffer: PNG_1PX,
