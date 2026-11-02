@@ -8,6 +8,8 @@ import io
 import os
 import torch
 
+from caption_cleanup import clean_caption
+
 app = FastAPI(title="Biruk Subli CLIP Service")
 
 # CLIP ViT-B-32 encodes text and images into the same 512-dim space. The
@@ -20,7 +22,15 @@ MODEL_NAME = os.environ.get("CLIP_MODEL", "clip-ViT-B-32")
 # the first caption request rather than at startup so the search service does
 # not pay for a second model until the staff intake page actually needs it.
 CAPTION_MODEL = os.environ.get("CAPTION_MODEL", "Salesforce/blip-image-captioning-base")
-CAPTION_MAX_NEW_TOKENS = 40
+# Beam search plus n-gram blocking stops BLIP's repetition loops on unfamiliar
+# photos. The token range keeps captions short without making the model stop
+# before it has named the object.
+CAPTION_MAX_NEW_TOKENS = 32
+CAPTION_MIN_NEW_TOKENS = 8
+CAPTION_NUM_BEAMS = 4
+CAPTION_NO_REPEAT_NGRAM_SIZE = 2
+CAPTION_REPETITION_PENALTY = 1.2
+CAPTION_LENGTH_PENALTY = 1.2
 
 # Longest text accepted for embedding. The public search box allows 200
 # characters, but the report and staff-intake flows caption a photo with several
@@ -66,6 +76,27 @@ def load_caption_model():
     return _caption_processor, _caption_model
 
 
+def _caption_was_truncated(output, tokenizer):
+    """True when generation stopped on the token limit, possibly mid-word."""
+    token_ids = output[0].tolist()
+    special_ids = set(tokenizer.all_special_ids or [])
+    tokens = [
+        tokenizer.convert_ids_to_tokens(token_id)
+        for token_id in token_ids
+        if token_id not in special_ids
+    ]
+    if not tokens:
+        return False
+
+    if tokens[-1].startswith("##"):
+        return True
+
+    return (
+        tokenizer.eos_token_id not in token_ids
+        and len(tokens) >= CAPTION_MAX_NEW_TOKENS
+    )
+
+
 def generate_caption(image):
     """Returns a short, editable description for a PIL image."""
     processor, caption_model = load_caption_model()
@@ -74,11 +105,20 @@ def generate_caption(image):
         output = caption_model.generate(
             **inputs,
             max_new_tokens=CAPTION_MAX_NEW_TOKENS,
+            min_new_tokens=CAPTION_MIN_NEW_TOKENS,
+            num_beams=CAPTION_NUM_BEAMS,
+            no_repeat_ngram_size=CAPTION_NO_REPEAT_NGRAM_SIZE,
+            repetition_penalty=CAPTION_REPETITION_PENALTY,
+            length_penalty=CAPTION_LENGTH_PENALTY,
         )
     text = processor.decode(output[0], skip_special_tokens=True).strip()
-    if not text:
-        raise ValueError("The caption model returned an empty description.")
-    return text
+    caption = clean_caption(
+        text,
+        incomplete_tail=_caption_was_truncated(output, processor.tokenizer),
+    )
+    if caption is None:
+        raise ValueError("The caption model returned no usable description.")
+    return caption
 
 
 def encode(payload):
