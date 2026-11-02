@@ -157,4 +157,77 @@ test.describe('staff intake reused-photo caption', () => {
       p_ai_caption: suggestion,
     });
   });
+
+  test('does not submit the caption when staff ignore the suggestion', async ({
+    page,
+  }) => {
+    const suggestion = 'A black folding umbrella with a wooden handle.';
+    const submissions = [];
+
+    await mockReport(page, (body) => submissions.push(body));
+    await page.route('**/caption/image', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ caption: suggestion }),
+      }),
+    );
+
+    await openRoute(page, '/staff/intake');
+
+    const captionRequest = page.waitForResponse('**/caption/image');
+    await page.getByRole('button', { name: /FR-0201/ }).click();
+    await captionRequest;
+
+    await expect(page.locator('.caption-suggestion__text')).toHaveText(
+      suggestion,
+    );
+    await expect(
+      page.getByRole('button', { name: 'Use this description' }),
+    ).toBeVisible();
+
+    await fillRequiredFields(page);
+    await page.getByRole('button', { name: 'Take into custody' }).click();
+
+    await expect(page.getByText('BS-0201')).toBeVisible();
+    expect(submissions).toHaveLength(1);
+    expect(submissions[0]).toMatchObject({
+      p_found_report_id: REPORT.id,
+      p_ai_caption: null,
+    });
+  });
+
+  test('drops the suggestion and submits no caption when staff dismiss it', async ({
+    page,
+  }) => {
+    const submissions = [];
+
+    await mockReport(page, (body) => submissions.push(body));
+    await page.route('**/caption/image', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ caption: 'A black folding umbrella.' }),
+      }),
+    );
+
+    await openRoute(page, '/staff/intake');
+
+    const captionRequest = page.waitForResponse('**/caption/image');
+    await page.getByRole('button', { name: /FR-0201/ }).click();
+    await captionRequest;
+
+    await page.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(page.locator('.caption-suggestion')).toHaveCount(0);
+
+    await fillRequiredFields(page);
+    await page.getByRole('button', { name: 'Take into custody' }).click();
+
+    await expect(page.getByText('BS-0201')).toBeVisible();
+    expect(submissions).toHaveLength(1);
+    expect(submissions[0]).toMatchObject({
+      p_found_report_id: REPORT.id,
+      p_ai_caption: null,
+    });
+  });
 });

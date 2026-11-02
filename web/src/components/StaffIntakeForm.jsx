@@ -2,7 +2,12 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { captionImage, captionImageFromUrlOrNull } from '../lib/aiService.js';
-import { captionSource, shouldApplyCaption } from '../lib/captionSuggestion.js';
+import {
+  captionForSubmission,
+  captionSource,
+  shouldApplyCaption,
+  truncateAtWordBoundary,
+} from '../lib/captionSuggestion.js';
 import { submitStaffCustody } from '../lib/staffIntake.js';
 import { intakePrefillFromReport } from '../lib/foundReports.js';
 import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from '../lib/storage.js';
@@ -93,6 +98,7 @@ export default function StaffIntakeForm({
   const [photo, setPhoto] = useState(null); // { file, url, existingUrl, label }
   const [prefill, setPrefill] = useState(null);
   const [captionSuggestion, setCaptionSuggestion] = useState(null);
+  const [captionAccepted, setCaptionAccepted] = useState(false);
   const [captionAttempt, setCaptionAttempt] = useState(0);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'submitting' | 'done'
@@ -161,6 +167,7 @@ export default function StaffIntakeForm({
     const source = captionSource(photo);
     if (!source) {
       setCaptionSuggestion(null);
+      setCaptionAccepted(false);
       if (autoFilledCaptionRef.current) {
         setDescription((current) =>
           current.trim() === autoFilledCaptionRef.current ? '' : current,
@@ -173,6 +180,7 @@ export default function StaffIntakeForm({
     const controller = new AbortController();
     captionControllerRef.current = controller;
     setCaptionSuggestion({ status: 'loading' });
+    setCaptionAccepted(false);
 
     const caption = source.file
       ? captionImage(source.file, controller.signal).then(
@@ -184,7 +192,7 @@ export default function StaffIntakeForm({
       .then((suggestion) => {
         if (controller.signal.aborted) return;
 
-        const text = (suggestion ?? '').trim().slice(0, MAX_DESCRIPTION_LENGTH);
+        const text = truncateAtWordBoundary(suggestion, MAX_DESCRIPTION_LENGTH);
         if (!text) {
           // Both newly selected and reused (pending-report) photos surface the
           // same error state so the staffer can retry or type the description.
@@ -209,6 +217,7 @@ export default function StaffIntakeForm({
           return;
         if (import.meta.env.DEV)
           console.warn('[StaffIntakeForm] caption', captionError);
+        setCaptionAccepted(false);
         setCaptionSuggestion({
           status: 'error',
           message:
@@ -244,6 +253,7 @@ export default function StaffIntakeForm({
     autoFilledCaptionRef.current = '';
     descriptionValueRef.current = values.description;
     setCaptionSuggestion(null);
+    setCaptionAccepted(false);
     setCaptionAttempt(0);
     setTitle(values.title);
     setDescription(values.description);
@@ -292,7 +302,20 @@ export default function StaffIntakeForm({
     autoFilledCaptionRef.current = captionSuggestion.text;
     descriptionValueRef.current = captionSuggestion.text;
     setDescription(captionSuggestion.text);
+    setCaptionAccepted(true);
     descriptionRef.current?.focus();
+  }
+
+  function dismissCaptionSuggestion() {
+    captionControllerRef.current?.abort();
+    setCaptionAccepted(false);
+    setCaptionSuggestion(null);
+    if (autoFilledCaptionRef.current) {
+      setDescription((current) =>
+        current.trim() === autoFilledCaptionRef.current ? '' : current,
+      );
+      autoFilledCaptionRef.current = '';
+    }
   }
 
   async function handleSubmit(event) {
@@ -363,8 +386,7 @@ export default function StaffIntakeForm({
         photo: photo.file,
         photoUrl: photo.existingUrl,
         foundReportId: prefill?.reportId ?? null,
-        aiCaption:
-          captionSuggestion?.status === 'ready' ? captionSuggestion.text : null,
+        aiCaption: captionForSubmission(captionSuggestion, captionAccepted),
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -401,6 +423,7 @@ export default function StaffIntakeForm({
     autoFilledCaptionRef.current = '';
     descriptionValueRef.current = '';
     setCaptionSuggestion(null);
+    setCaptionAccepted(false);
     setCaptionAttempt(0);
     setTitle('');
     setCategory('');
@@ -709,12 +732,18 @@ export default function StaffIntakeForm({
                 <p className="caption-suggestion__text">
                   {captionSuggestion.text}
                 </p>
-                {suggestionApplied ? (
+                {captionAccepted ? (
                   <p className="field__hint">
-                    Added to the private verification notes. Edit or confirm it
-                    before taking custody.
+                    Suggestion accepted. Edit the notes if needed; the accepted
+                    caption is saved with the item.
                   </p>
-                ) : (
+                ) : suggestionApplied ? (
+                  <p className="field__hint">
+                    Suggested text is in the notes. Use this description to
+                    save it with the item, or edit the notes yourself.
+                  </p>
+                ) : null}
+                {!captionAccepted && (
                   <button
                     type="button"
                     className="btn btn--quiet"
@@ -724,6 +753,14 @@ export default function StaffIntakeForm({
                     Use this description
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="btn btn--quiet"
+                  onClick={dismissCaptionSuggestion}
+                >
+                  <Icon name="close" />
+                  Dismiss
+                </button>
               </>
             )}
             {captionSuggestion.status === 'error' && (
