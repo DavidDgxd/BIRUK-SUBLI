@@ -556,6 +556,9 @@ export default function StaffIntakeForm({
       noValidate
       aria-busy={submitting}
     >
+      <p className="form__legend form__legend--required">
+        All fields are required unless marked optional.
+      </p>
       {prefill && (
         <div
           className="intake-prefill"
@@ -851,8 +854,8 @@ export default function StaffIntakeForm({
           </span>
         </button>
         <p className="field__hint" id={photoId}>
-          Required. Stored so people can recognise the item. Avoid photographing
-          people or personal details.
+          Stored so people can recognise the item. Avoid photographing people or
+          personal details.
         </p>
         <p className="photo-tip">
           <Icon name="lightbulb" />

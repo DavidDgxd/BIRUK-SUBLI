@@ -1542,6 +1542,15 @@ input[type='search']::-webkit-search-decoration {
   color: var(--ink-muted);
 }
 
+.form__legend--required {
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 4px solid var(--primary);
+  border-radius: var(--radius-control);
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-weight: var(--weight-strong);
+}
+
 .field__control {
   inline-size: 100%;
   min-block-size: 3rem;
