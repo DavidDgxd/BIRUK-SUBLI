@@ -1472,6 +1472,23 @@ input[type='search']::-webkit-search-decoration {
   border-color: var(--error);
 }
 
+.field__control-wrap {
+  position: relative;
+}
+
+.field__control-wrap .field__control {
+  padding-inline-end: 3rem;
+}
+
+.field__toggle {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.125rem;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  transform: translateY(-50%);
+}
+
 .field__control--area {
   min-block-size: 8rem;
   resize: vertical;
