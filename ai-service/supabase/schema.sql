@@ -838,7 +838,27 @@ using (bucket_id = 'item-photos');
 -- Cash is the one category with a statutory rule: the trigger
 -- calculate_cash_reward_date() sets reward_date to receipt date + 6 months
 -- whenever is_cash is true, so a 'Cash' category is normalised and flagged here.
+--
+-- p_found_report_id is optional. When the finder already submitted an online
+-- report, the same transaction marks it converted_at_intake so it leaves the
+-- pending queue. A stale selection (another counter got there first) raises
+-- P0002 and rolls the whole insert back.
 -- ============================================================================
+-- US-5 adds p_ai_caption and US-10 adds p_found_report_id. Drop every prior
+-- overload first so only the combined 13-argument signature remains.
+drop function if exists public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text
+);
+drop function if exists public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text, uuid
+);
+drop function if exists public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text, text
+);
+drop function if exists public.submit_staff_custody(
+    text, text, text, text, text, text, vector, date, numeric, text, text, uuid, text
+);
+
 create or replace function public.submit_staff_custody(
     p_office_id        text,
     p_title            text,
@@ -850,7 +870,9 @@ create or replace function public.submit_staff_custody(
     p_date_received    date default current_date,
     p_cash_amount      numeric default null,
     p_finder_name      text default null,
-    p_finder_contact   text default null
+    p_finder_contact   text default null,
+    p_found_report_id  uuid default null,
+    p_ai_caption       text default null
 )
 returns text
 language plpgsql
@@ -893,6 +915,18 @@ begin
             using errcode = '22023';
     end if;
 
+    if p_found_report_id is not null then
+        update public.found_reports
+           set status = 'converted_at_intake'
+         where id = p_found_report_id
+           and status = 'pending';
+
+        if not found then
+            raise exception 'That self-report is no longer pending.'
+                using errcode = 'P0002';
+        end if;
+    end if;
+
     v_category := coalesce(nullif(btrim(p_category), ''), 'General');
     if lower(v_category) = 'cash' then
         v_is_cash := true;
@@ -909,7 +943,8 @@ begin
         image_url, date_received,
         holding_office_id, logging_office_id,
         storage_location, embedding,
-        is_cash, cash_amount, finder_name, finder_contact
+        is_cash, cash_amount, finder_name, finder_contact,
+        ai_caption
     ) values (
         btrim(p_title),
         btrim(p_description),
@@ -924,7 +959,8 @@ begin
         v_is_cash,
         v_amount,
         nullif(btrim(coalesce(p_finder_name, '')), ''),
-        nullif(btrim(coalesce(p_finder_contact, '')), '')
+        nullif(btrim(coalesce(p_finder_contact, '')), ''),
+        nullif(btrim(coalesce(p_ai_caption, '')), '')
     )
     returning ref_code into v_ref_code;
 
@@ -933,7 +969,7 @@ end;
 $$;
 
 revoke all on function public.submit_staff_custody(
-    text, text, text, text, text, text, vector, date, numeric, text, text
+    text, text, text, text, text, text, vector, date, numeric, text, text, uuid, text
 ) from public;
 
 -- TEMPORARY (dev mock auth): the web client runs on the anon key because real
@@ -942,5 +978,5 @@ revoke all on function public.submit_staff_custody(
 -- session log intake. Revoke the `anon` grant and keep only `authenticated`
 -- once the staff provider signs in for real.
 grant execute on function public.submit_staff_custody(
-    text, text, text, text, text, text, vector, date, numeric, text, text
+    text, text, text, text, text, text, vector, date, numeric, text, text, uuid, text
 ) to anon, authenticated;

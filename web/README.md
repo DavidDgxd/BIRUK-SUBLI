@@ -91,9 +91,15 @@ holds the assumed service contract:
 
 - `POST /embed/text` with form field `text` returns `{ "vector": number[512] }`
 - `POST /embed/image` with form field `file` returns `{ "vector": number[512] }`
+- `POST /caption/image` with form field `file` returns `{ "caption": string }`
 
 The service does not translate Filipino yet. If `/embed/text` starts returning
 `translated_text`, the results page shows it.
+
+US-5: the staff intake form sends a newly selected photo to `/caption/image`.
+The returned caption pre-fills the private verification notes when they are
+empty and is always shown as a suggestion the staffer can edit or re-apply. The
+raw caption is stored separately in `items.ai_caption`.
 
 The color filter is prepended to the text before embedding. `MATCH_THRESHOLD` and
 `MATCH_COUNT` live in `searchItems.js`. The page has loading, empty, error (with retry)
@@ -167,6 +173,25 @@ filed and the photo still stored — it simply matches on text alone.
 
 `found_reports.embedding` is nullable, so rows logged by hand without a vector
 remain valid.
+
+## Staff intake and pending self-reports (`/staff/intake`)
+
+US-10: the counter shows the citywide queue of `found_reports` whose status is
+`pending`. A signed-in staff session reads the rows directly; anonymous visitors
+cannot, because `found_reports` has no public SELECT policy (`finder_contact` is
+PII). The queue is intentionally not scoped to one office — the finder can hand
+the item in at any participating counter.
+
+Selecting a report copies its `image_url` into the photo preview and its
+`short_note` into the item title and private notes. The officer still records
+the category, storage location and any verification notes the desk needs. If the
+report photo is kept, the existing public URL is reused instead of uploading a
+second copy; choosing a new file replaces it normally.
+
+Submitting calls `submit_staff_custody` with `p_found_report_id`. The RPC inserts
+the item and flips the report to `converted_at_intake` in one transaction. A
+stale selection (already converted at another counter) raises `P0002` and rolls
+the insert back.
 
 ## Office provisioning (`/admin/offices`)
 
