@@ -11,6 +11,9 @@ import { test as base, expect } from '@playwright/test';
 
 const PROJECT_REF = 'vwegcexuyznfsbgzurxa';
 const STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
+const EMBEDDING = Array.from({ length: 512 }, (_, index) =>
+  index === 0 ? 1 : 0,
+);
 
 const OFFICE = {
   id: 'BCPIO',
@@ -90,10 +93,16 @@ async function mockBackends(page, role) {
     return json(route, {});
   });
 
-  // The AI service resolves to the page's own host on port 8000.
-  await page.route(/:8000\//, (route) =>
-    json(route, { detail: 'Not available in tests' }, 503),
-  );
+  // The AI service resolves to the page's own host on port 8000. Routes that
+  // start a search need a usable embedding; everything else still gets the
+  // service-unavailable response.
+  await page.route(/:8000\//, (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/embed/text' || path === '/embed/image') {
+      return json(route, { vector: EMBEDDING });
+    }
+    return json(route, { detail: 'Not available in tests' }, 503);
+  });
 
   if (user) {
     await page.addInitScript(
@@ -131,6 +140,7 @@ export { expect };
 export const ROUTES = [
   { path: '/', role: null },
   { path: '/search', role: null },
+  { path: '/search?q=umbrella', role: null },
   { path: '/report/lost', role: null },
   { path: '/report/found', role: null },
   { path: '/staff/login', role: null },
