@@ -50,12 +50,12 @@ export default function StaffLogin() {
 
     const siteEmail = email.trim();
     if (!siteEmail) {
-      setError('Enter your office’s site email.');
+      setError('Enter your email.');
       emailRef.current?.focus();
       return;
     }
     if (!password) {
-      setError('Enter the site password.');
+      setError('Enter your password.');
       passwordRef.current?.focus();
       return;
     }
@@ -110,7 +110,7 @@ export default function StaffLogin() {
           >
             <div className="field">
               <label className="field__label" htmlFor={emailId}>
-                Site email
+                Email
               </label>
               <input
                 id={emailId}
@@ -134,7 +134,7 @@ export default function StaffLogin() {
 
             <div className="field">
               <label className="field__label" htmlFor={passwordId}>
-                Site password
+                Password
               </label>
               <div className="field__control-wrap">
                 <input
