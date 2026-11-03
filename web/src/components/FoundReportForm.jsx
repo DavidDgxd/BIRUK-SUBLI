@@ -219,7 +219,9 @@ export default function FoundReportForm({ onReceiptChange }) {
       noValidate
       aria-busy={submitting}
     >
-      <p className="form__legend">Fields marked * are required.</p>
+      <p className="form__legend form__legend--required">
+        Fields marked * are required.
+      </p>
 
       <div className="field">
         <FieldLabel htmlFor={noteId} required>
