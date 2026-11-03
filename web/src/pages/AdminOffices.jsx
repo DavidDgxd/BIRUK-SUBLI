@@ -9,6 +9,7 @@ import AddOfficeDialog from '../components/AddOfficeDialog.jsx';
 import ResetCredentialsDialog from '../components/ResetCredentialsDialog.jsx';
 import OfficeActionsMenu from '../components/OfficeActionsMenu.jsx';
 import { listOffices, listOfficeLogins } from '../lib/offices.js';
+import { listOfficeHeldCounts } from '../lib/usageReport.js';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /** Suspension wins over login state: a suspended office cannot sign in either way. */
@@ -32,6 +33,8 @@ export default function AdminOffices() {
   const headingRef = useRef(null);
   const [offices, setOffices] = useState(null); // null while the first load runs
   const [logins, setLogins] = useState(() => new Map()); // office id → login email
+  const [heldCounts, setHeldCounts] = useState(() => new Map()); // office id → held items
+  const [heldCountsError, setHeldCountsError] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [showDialog, setShowDialog] = useState(false);
   const [resetTarget, setResetTarget] = useState(null);
@@ -49,6 +52,7 @@ export default function AdminOffices() {
 
     setLoadError('');
     setOffices(null);
+    setHeldCountsError(false);
     Promise.all([
       listOffices({ signal: controller.signal }),
       // Login emails are a nice-to-have: if they cannot be read, the table
@@ -57,11 +61,19 @@ export default function AdminOffices() {
         if (import.meta.env.DEV) console.warn('[AdminOffices]', loginErr);
         return new Map();
       }),
+      // Held counts come from an admin-only RPC. A failure leaves the
+      // directory usable and marks the column unavailable.
+      listOfficeHeldCounts({ signal: controller.signal }).catch((countErr) => {
+        if (import.meta.env.DEV) console.warn('[AdminOffices]', countErr);
+        return null;
+      }),
     ])
-      .then(([rows, emails]) => {
+      .then(([rows, emails, counts]) => {
         if (!active) return;
         setOffices(rows);
         setLogins(emails);
+        setHeldCounts(counts ?? new Map());
+        setHeldCountsError(counts === null);
       })
       .catch((loadErr) => {
         if (!active || loadErr.name === 'AbortError') return;
@@ -99,8 +111,8 @@ export default function AdminOffices() {
               Participating offices
             </h1>
             <p className="lead">
-              Provision shared logins for offices that hold found items, and
-              reissue a login when one is lost or compromised.
+              Track how many items each office is holding, provision shared
+              logins, and reissue one when it is lost or compromised.
             </p>
           </div>
 
@@ -157,7 +169,7 @@ export default function AdminOffices() {
                     <div
                       className="office-table"
                       role="table"
-                      aria-label="Participating offices and shared logins"
+                      aria-label="Participating offices, held items and shared logins"
                     >
                       <div className="office-table__head" role="rowgroup">
                         <div className="office-table__row" role="row">
@@ -172,6 +184,12 @@ export default function AdminOffices() {
                             className="office-table__cell office-table__hours"
                           >
                             Hours &amp; contact
+                          </div>
+                          <div
+                            role="columnheader"
+                            className="office-table__cell office-table__held"
+                          >
+                            Held items
                           </div>
                           <div
                             role="columnheader"
@@ -196,6 +214,7 @@ export default function AdminOffices() {
                       <div className="office-table__body" role="rowgroup">
                         {offices.map((office) => {
                           const account = accountStatus(office);
+                          const held = heldCounts.get(office.id) ?? 0;
                           return (
                             <div key={office.id} className="office-table__row" role="row">
                               <div
@@ -220,6 +239,21 @@ export default function AdminOffices() {
                                 <span className="office-table__meta">
                                   {office.phone_number || '—'}
                                 </span>
+                              </div>
+                              <div
+                                role="cell"
+                                className="office-table__cell office-table__held"
+                                data-label="Held items"
+                              >
+                                {heldCountsError ? (
+                                  <span className="office-table__none">
+                                    Unavailable
+                                  </span>
+                                ) : (
+                                  <span className="office-table__primary">
+                                    {held} {held === 1 ? 'item' : 'items'}
+                                  </span>
+                                )}
                               </div>
                               <div
                                 role="cell"

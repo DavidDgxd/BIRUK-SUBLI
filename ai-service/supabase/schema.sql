@@ -576,21 +576,40 @@ returns table (
     items_currently_held bigint,
     avg_days_held numeric
 )
-language sql stable
+language plpgsql
+stable
+security definer
 set search_path = public, pg_temp
 as $$
-    select 
-        o.id as office_id,
-        o.name as office_name,
-        count(i.id) filter (where i.date_received between p_start_date and p_end_date) as items_logged,
-        count(i.id) filter (where i.released_at::date between p_start_date and p_end_date) as items_released,
-        count(i.id) filter (where i.status = 'held') as items_currently_held,
-        round(coalesce(avg(i.released_at::date - i.date_received) filter (where i.status = 'released'), 0), 1) as avg_days_held
-    from public.offices o
-    left join public.items i on o.id = i.holding_office_id
-    where (p_office_id is null or o.id = p_office_id)
-    group by o.id, o.name;
+begin
+    -- The usage report spans every office and exposes aggregate custody data,
+    -- so it is reserved for the central admin. Ordinary office logins only see
+    -- their own held items through the counter pages.
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin' then
+        raise exception 'Only the central admin can view the usage report.'
+            using errcode = '42501';
+    end if;
+
+    return query
+        select
+            o.id as office_id,
+            o.name as office_name,
+            count(i.id) filter (where i.date_received between p_start_date and p_end_date) as items_logged,
+            count(i.id) filter (where i.released_at::date between p_start_date and p_end_date) as items_released,
+            count(i.id) filter (where i.status = 'held') as items_currently_held,
+            round(coalesce(avg(i.released_at::date - i.date_received) filter (where i.status = 'released'), 0), 1) as avg_days_held
+        from public.offices o
+        left join public.items i on o.id = i.holding_office_id
+        where (p_office_id is null or o.id = p_office_id)
+        group by o.id, o.name
+        order by o.name;
+end;
 $$;
+
+revoke all on function public.get_usage_report(date, date, text)
+    from public, anon;
+grant execute on function public.get_usage_report(date, date, text)
+    to authenticated;
 
 -- Central admin only: the login email behind each office's shared account.
 -- The address lives in auth.users, not on the anon-readable offices table, so

@@ -2255,6 +2255,7 @@ textarea {
   grid-template-areas:
     'office actions'
     'hours hours'
+    'held held'
     'email email'
     'status status';
   gap: var(--space-2);
@@ -2273,6 +2274,10 @@ textarea {
 
 .office-table__hours {
   grid-area: hours;
+}
+
+.office-table__held {
+  grid-area: held;
 }
 
 .office-table__email {
@@ -2305,6 +2310,7 @@ textarea {
 }
 
 .office-table__hours,
+.office-table__held,
 .office-table__email,
 .office-table__status {
   display: flex;
@@ -2314,6 +2320,7 @@ textarea {
 }
 
 .office-table__hours::before,
+.office-table__held::before,
 .office-table__email::before,
 .office-table__status::before {
   content: attr(data-label);
@@ -2621,8 +2628,8 @@ textarea {
 
   .office-table__row {
     grid-template-columns:
-      minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.3fr)
-      minmax(0, 0.9fr) auto;
+      minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 0.7fr)
+      minmax(0, 1.2fr) minmax(0, 0.9fr) auto;
     grid-template-areas: none;
     align-items: start;
     gap: var(--space-4);
@@ -2630,6 +2637,7 @@ textarea {
 
   .office-table__office,
   .office-table__hours,
+  .office-table__held,
   .office-table__email,
   .office-table__status,
   .office-table__actions {
@@ -2637,12 +2645,14 @@ textarea {
   }
 
   .office-table__hours,
+  .office-table__held,
   .office-table__email,
   .office-table__status {
     display: block;
   }
 
   .office-table__hours::before,
+  .office-table__held::before,
   .office-table__email::before,
   .office-table__status::before {
     content: none;

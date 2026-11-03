@@ -214,6 +214,14 @@ supabase secrets set SUPABASE_URL=https://vwegcexuyznfsbgzurxa.supabase.co \
 Both functions are at `supabase/functions/`, with the shared caller check in
 `supabase/functions/_shared/adminAuth.ts`.
 
+## Held items per office (`/admin/offices`)
+
+US-29: the same directory shows each office's current held count. The count comes
+from `get_usage_report`, a `SECURITY DEFINER` RPC that checks the
+`central_admin` claim, pins `search_path`, and is executable only by
+`authenticated` callers. It returns aggregate custody counts, never item rows or
+the staff verification notes.
+
 ## Credential reset (`/admin/offices`)
 
 US-03: when an office reports its shared login lost or compromised, the admin
