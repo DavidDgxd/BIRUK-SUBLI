@@ -99,28 +99,50 @@ test.describe('staff intake reused-photo caption', () => {
     });
   });
 
-  test('continues intake with no caption when the caption service fails', async ({
+  test('surfaces retry for a reused photo when the caption service fails', async ({
     page,
   }) => {
+    const suggestion = 'A black folding umbrella with a wooden handle.';
     const submissions = [];
+    let attempts = 0;
 
     await mockReport(page, (body) => submissions.push(body));
-    await page.route('**/caption/image', (route) =>
-      route.fulfill({
-        status: 503,
+    await page.route('**/caption/image', (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        return route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'model offline' }),
+        });
+      }
+      return route.fulfill({
+        status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ detail: 'model offline' }),
-      }),
-    );
+        body: JSON.stringify({ caption: suggestion }),
+      });
+    });
 
     await openRoute(page, '/staff/intake');
 
-    const captionRequest = page.waitForResponse('**/caption/image');
+    const firstRequest = page.waitForResponse('**/caption/image');
     await page.getByRole('button', { name: /FR-0201/ }).click();
-    expect((await captionRequest).status()).toBe(503);
+    expect((await firstRequest).status()).toBe(503);
 
-    await expect(page.locator('.caption-suggestion')).toHaveCount(0);
+    await expect(page.getByText('We could not read this photo.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.locator('.form-error')).toHaveCount(0);
+    await expect(page.getByLabel('Private verification notes')).toHaveValue(
+      REPORT.short_note,
+    );
+
+    const retryRequest = page.waitForResponse('**/caption/image');
+    await page.getByRole('button', { name: 'Try again' }).click();
+    expect((await retryRequest).status()).toBe(200);
+
+    await expect(page.locator('.caption-suggestion__text')).toHaveText(
+      suggestion,
+    );
     await expect(page.getByLabel('Private verification notes')).toHaveValue(
       REPORT.short_note,
     );
@@ -132,7 +154,7 @@ test.describe('staff intake reused-photo caption', () => {
     expect(submissions).toHaveLength(1);
     expect(submissions[0]).toMatchObject({
       p_found_report_id: REPORT.id,
-      p_ai_caption: null,
+      p_ai_caption: suggestion,
     });
   });
 });

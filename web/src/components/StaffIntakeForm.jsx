@@ -186,17 +186,13 @@ export default function StaffIntakeForm({
 
         const text = (suggestion ?? '').trim().slice(0, MAX_DESCRIPTION_LENGTH);
         if (!text) {
-          // A reused photo that cannot be read is not an error to act on:
-          // intake continues with manual notes.
-          setCaptionSuggestion(
-            source.file
-              ? {
-                  status: 'error',
-                  message:
-                    'We could not read this photo. Write the description yourself.',
-                }
-              : null,
-          );
+          // Both newly selected and reused (pending-report) photos surface the
+          // same error state so the staffer can retry or type the description.
+          setCaptionSuggestion({
+            status: 'error',
+            message:
+              'We could not read this photo. Write the description yourself.',
+          });
           return;
         }
 
