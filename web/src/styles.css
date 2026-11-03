@@ -438,9 +438,10 @@ h2[tabindex='-1']:focus,
 
 .site-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding-block: var(--space-4);
   border-block-end: var(--border);
 }
@@ -489,7 +490,16 @@ h2[tabindex='-1']:focus,
   text-transform: uppercase;
 }
 
-.site-header__staff {
+.site-header__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.site-header__link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -501,7 +511,7 @@ h2[tabindex='-1']:focus,
   border-radius: var(--radius-control);
 }
 
-.site-header__staff:hover {
+.site-header__link:hover {
   background: var(--primary-wash);
   color: var(--primary-ink);
 }
@@ -1163,6 +1173,7 @@ input[type='search']::-webkit-search-decoration {
 .results,
 .item-page,
 .report-page,
+.offices-page,
 .auth-page,
 .admin-page {
   padding-block: var(--space-5) var(--space-4);
@@ -1436,6 +1447,32 @@ input[type='search']::-webkit-search-decoration {
 .checklist .icon {
   margin-block-start: 0.2em;
   color: var(--primary);
+}
+
+/* Public drop-off directory (US-9) --------------------------------------- */
+
+.office-directory {
+  margin-block-start: var(--space-6);
+}
+
+.office-directory__lead {
+  margin-block-start: var(--space-2);
+  color: var(--ink-muted);
+  max-inline-size: 52ch;
+}
+
+.office-directory__list {
+  margin-block-start: var(--space-4);
+}
+
+.office-directory__hours {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.office-directory__hours .icon {
+  flex: none;
 }
 
 .staff-tools {

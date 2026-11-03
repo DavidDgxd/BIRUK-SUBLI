@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import OfficeDirectory from './OfficeDirectory.jsx';
 import FieldLabel from './FieldLabel.jsx';
 import PhotoDropzone from './PhotoDropzone.jsx';
 import { submitFoundReport } from '../lib/foundReport.js';
@@ -195,6 +196,10 @@ export default function FoundReportForm({ onReceiptChange }) {
         <p className="state__text">
           Until you hand the item in, it will not appear in the public search.
         </p>
+        <OfficeDirectory
+          title="Where to hand it in"
+          intro="Bring the item and your reference code to any participating office counter."
+        />
         <div className="state__actions receipt-actions">
           <Link className="btn btn--primary" to="/">
             <Icon name="search" />

@@ -120,6 +120,7 @@ can be shared.
 | `/search` | Search results (built) |
 | `/report/lost` | Lost-item report form (built) |
 | `/report/found` | Found-item report form (built) |
+| `/offices` | Public drop-off office directory (built) |
 | `/admin/offices` | Central admin — participating offices, logins & credential reset (built) |
 | `/staff/login` | Shared office login, and the central admin's sign-in (built) |
 | `/staff/intake` | Staff counter intake (built) |
@@ -173,6 +174,14 @@ filed and the photo still stored — it simply matches on text alone.
 
 `found_reports.embedding` is nullable, so rows logged by hand without a vector
 remain valid.
+
+## Drop-off offices (`/offices`)
+
+US-9: the public directory lists each participating counter with its address and
+counter hours. It reads `offices` through `listOffices()` — the table has a
+public `SELECT` policy, so no login, RPC or Edge Function is needed. Suspended
+offices are hidden, and the same `OfficeDirectory` component appears on the
+found-report receipt. The site header links to the page.
 
 ## Staff intake and pending self-reports (`/staff/intake`)
 

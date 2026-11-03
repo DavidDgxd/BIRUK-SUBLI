@@ -15,7 +15,7 @@ const EMBEDDING = Array.from({ length: 512 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 
-const OFFICE = {
+export const OFFICE = {
   id: 'BCPIO',
   name: 'Baguio City Public Information Office',
   address: 'City Hall, Baguio City',
@@ -143,6 +143,7 @@ export const ROUTES = [
   { path: '/search?q=umbrella', role: null },
   { path: '/report/lost', role: null },
   { path: '/report/found', role: null },
+  { path: '/offices', role: null },
   { path: '/staff/login', role: null },
   { path: '/staff/intake', role: 'office' },
   { path: '/admin/offices', role: 'admin' },

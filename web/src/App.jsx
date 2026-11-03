@@ -8,10 +8,11 @@ import StaffItems from './pages/StaffItems.jsx';
 import StaffLogin from './pages/StaffLogin.jsx';
 import AdminOffices from './pages/AdminOffices.jsx';
 import ItemDetails from './pages/ItemDetails.jsx';
+import Offices from './pages/Offices.jsx';
 import RoutePlaceholder from './pages/RoutePlaceholder.jsx';
 
 /*
- * Route table. "/", "/search", "/report/lost", "/report/found",
+ * Route table. "/", "/search", "/report/lost", "/report/found", "/offices",
  * "/staff/login", "/staff/intake", "/staff/items", "/admin/offices" and
  * "/items/:id" are built.
  * The remaining paths are linked from the landing page and render a placeholder
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/items/:id" element={<ItemDetails />} />
       <Route path="/report/lost" element={<ReportLost />} />
       <Route path="/report/found" element={<ReportFound />} />
+      <Route path="/offices" element={<Offices />} />
       <Route path="/staff/intake" element={<StaffIntake />} />
       <Route path="/staff/items" element={<StaffItems />} />
       <Route path="/admin/offices" element={<AdminOffices />} />
