@@ -32,12 +32,15 @@ describe('searchItems public listing', () => {
     embedText.mockResolvedValue({ embedding: [1, 0, 0] });
   });
 
-  it('drops released rows and below-floor matches from the public results', async () => {
+  it('drops released, resolved and other terminal rows from public results', async () => {
     rpc.mockReturnValue(
       resolvedRpc({
         data: [
           { id: 'held-primary', status: 'held', similarity: 0.7 },
           { id: 'released', status: 'released', similarity: 0.95 },
+          { id: 'resolved', status: 'resolved', similarity: 0.94 },
+          { id: 'transferred', status: 'transferred', similarity: 0.93 },
+          { id: 'disposed', status: 'disposed', similarity: 0.92 },
           { id: 'held-secondary', status: 'held', similarity: 0.56 },
           { id: 'below-floor', status: 'held', similarity: 0.4 },
         ],
