@@ -109,9 +109,9 @@ create index if not exists items_status_idx on public.items (status);
 create index if not exists items_holding_office_idx on public.items (holding_office_id);
 create index if not exists items_date_received_idx on public.items (date_received);
 
--- Public search only reads held items (match_items and get_item_public). This
--- smaller partial index keeps released rows out of the office-filter path and
--- gives the release audit a narrow lookup for the holding desk.
+-- Public search only reads live custody (match_items and get_item_public).
+-- This smaller partial index keeps terminal rows out of the office-filter path
+-- and gives the release audit a narrow lookup for the holding desk.
 create index if not exists items_held_holding_office_idx
 on public.items (holding_office_id)
 where status = 'held';
@@ -199,8 +199,10 @@ create table if not exists public.dismissed_matches (
 
 -- ============================================================================
 -- 6. RPC: CITIZEN VECTOR SEARCH
--- Computes cosine similarity between a user query vector and held inventory.
--- Joins with offices to provide physical counter details and supports metadata filters.
+-- Computes cosine similarity between a user query vector and live inventory.
+-- Joins with offices to provide physical counter details and supports metadata
+-- filters. Released and resolved items keep their embeddings but are never
+-- eligible for matching (US-15).
 --
 -- Similarity here is calibrated against the photo-backed distribution:
 -- unrelated queries ("bottle", "wallet") score 0.55-0.58, a semantic synonym
@@ -263,7 +265,9 @@ as $$
     from public.items
     join public.offices on items.holding_office_id = offices.id
     where
-        items.status = 'held'                          -- Excludes released/disposed items
+        -- Released/resolved rows (and the other terminal custody states) are
+        -- not live results, even though their embeddings remain stored.
+        items.status not in ('released', 'resolved', 'transferred', 'disposed')
         and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
@@ -290,8 +294,8 @@ grant execute on function public.match_items(vector, double precision, integer, 
 -- storage_location, cash and claimant fields stay out for the reason in
 -- section 12: a claimant who can read the marks can pass the counter check.
 --
--- The status filter matches match_items too. A released, transferred or
--- disposed item is not a live result, and it must not be readable by link
+-- The status filter matches match_items too. A released, resolved, transferred
+-- or disposed item is not a live result, and it must not be readable by link
 -- either — otherwise the page would outlive the search that hides it.
 --
 -- Idempotent: `drop` first so a changed return type can be re-applied, the same
@@ -332,7 +336,7 @@ as $$
     from public.items
     join public.offices on items.holding_office_id = offices.id
     where items.id = item_id_input
-      and items.status = 'held';
+      and items.status not in ('released', 'resolved', 'transferred', 'disposed');
 $$;
 
 revoke all on function public.get_item_public(uuid) from public;
