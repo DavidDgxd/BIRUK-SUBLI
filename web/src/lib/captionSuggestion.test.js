@@ -21,9 +21,9 @@ describe('captionSource', () => {
   it('resets when the photo is removed or the selected report changes', () => {
     expect(captionSource(null)).toBeNull();
     expect(captionSource({ file: null, url: '' })).toBeNull();
-    expect(captionSource({ url: 'https://example.test/first.webp' })).not.toEqual(
-      captionSource({ url: 'https://example.test/second.webp' }),
-    );
+    expect(
+      captionSource({ url: 'https://example.test/first.webp' }),
+    ).not.toEqual(captionSource({ url: 'https://example.test/second.webp' }));
   });
 });
 
@@ -78,10 +78,9 @@ describe('captionForSubmission', () => {
     expect(captionForSubmission(ready, false)).toBeNull();
   });
 
-  it('keeps the accepted caption after the staffer edits the notes', () => {
-    // Editing notes changes description, not the accepted suggestion flag.
-    expect(captionForSubmission(ready, true)).toBe('A black umbrella.');
-  });
+  // "Accept, then edit the notes" is covered by the staff-intake-reused-caption
+  // e2e, which submits the form and asserts p_ai_caption stays the accepted
+  // suggestion while p_description carries the edit.
 
   it('does not submit after the suggestion is dismissed', () => {
     expect(captionForSubmission(null, false)).toBeNull();
