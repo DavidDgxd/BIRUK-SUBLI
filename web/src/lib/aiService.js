@@ -206,12 +206,14 @@ export async function captionImage(file, signal) {
 }
 
 /**
- * Best-effort captioning for callers that must never block on the AI service.
- * Resolves to the caption text, or null when the photo cannot be described.
- * A genuine cancel — the caller's own signal — still propagates.
+ * Runs a best-effort caption task that must never block intake.
+ *
+ * The task gets a signal with its own timeout. Resolves to whatever the task
+ * returns, or null on any failure. A genuine cancel — the caller's own signal —
+ * still propagates. `label` only tags the development warning.
  */
-export async function captionImageOrNull(
-  file,
+async function captionOrNull(
+  task,
   signal,
   { timeoutMs = 20000, label = 'aiService' } = {},
 ) {
@@ -230,8 +232,7 @@ export async function captionImageOrNull(
   }
 
   try {
-    const { caption } = await captionImage(file, controller.signal);
-    return caption;
+    return await task(controller.signal);
   } catch (error) {
     if (signal?.aborted) throw error;
     if (import.meta.env.DEV) {
@@ -242,6 +243,43 @@ export async function captionImageOrNull(
     clearTimeout(timer);
     signal?.removeEventListener('abort', forwardAbort);
   }
+}
+
+/**
+ * Best-effort captioning for callers that must never block on the AI service.
+ * Resolves to the caption text, or null when the photo cannot be described.
+ * A genuine cancel — the caller's own signal — still propagates.
+ */
+export async function captionImageOrNull(file, signal, options) {
+  return captionOrNull(
+    async (captionSignal) => (await captionImage(file, captionSignal)).caption,
+    signal,
+    options,
+  );
+}
+
+/**
+ * Captions a photo that already lives at a URL, such as the photo reused from a
+ * pending self-report (US-10). /caption/image only accepts an upload, so the
+ * image is fetched first and posted as a blob.
+ *
+ * The shared item-photos bucket serves public, non-expiring URLs. A missing
+ * object, stale URL or blocked request resolves to null, so intake continues
+ * without a caption just like a newly selected photo whose model is unavailable.
+ */
+export async function captionImageFromUrlOrNull(url, signal, options) {
+  return captionOrNull(
+    async (captionSignal) => {
+      const response = await fetch(url, { signal: captionSignal });
+      if (!response.ok) {
+        throw new Error(`Photo request returned ${response.status}`);
+      }
+      const blob = await response.blob();
+      return (await captionImage(blob, captionSignal)).caption;
+    },
+    signal,
+    options,
+  );
 }
 
 /**

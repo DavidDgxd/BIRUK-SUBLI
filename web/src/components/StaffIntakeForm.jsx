@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
-import { captionImage } from '../lib/aiService.js';
+import { captionImage, captionImageFromUrlOrNull } from '../lib/aiService.js';
+import { captionSource, shouldApplyCaption } from '../lib/captionSuggestion.js';
 import { submitStaffCustody } from '../lib/staffIntake.js';
 import { intakePrefillFromReport } from '../lib/foundReports.js';
 import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from '../lib/storage.js';
@@ -149,13 +150,16 @@ export default function StaffIntakeForm({
     descriptionValueRef.current = description;
   }, [description]);
 
-  // US-5: read a newly selected photo and offer a starting description. The
-  // suggestion only fills the private notes when they are empty (or still hold
-  // the previous suggestion), so a staffer's own words are never overwritten.
+  // US-5: offer a starting description from the photo. The photo may be a new
+  // file or one reused from a pending self-report (US-10); a reused photo is
+  // fetched and posted to the caption endpoint. The suggestion only fills the
+  // private notes when they are empty (or still hold the previous suggestion),
+  // so a staffer's own words or prefilled report note are never overwritten.
   useEffect(() => {
     captionControllerRef.current?.abort();
 
-    if (!photo?.file) {
+    const source = captionSource(photo);
+    if (!source) {
       setCaptionSuggestion(null);
       if (autoFilledCaptionRef.current) {
         setDescription((current) =>
@@ -170,12 +174,20 @@ export default function StaffIntakeForm({
     captionControllerRef.current = controller;
     setCaptionSuggestion({ status: 'loading' });
 
-    captionImage(photo.file, controller.signal)
-      .then(({ caption }) => {
+    const caption = source.file
+      ? captionImage(source.file, controller.signal).then(
+          (result) => result.caption,
+        )
+      : captionImageFromUrlOrNull(source.url, controller.signal);
+
+    caption
+      .then((suggestion) => {
         if (controller.signal.aborted) return;
 
-        const text = caption.trim().slice(0, MAX_DESCRIPTION_LENGTH);
+        const text = (suggestion ?? '').trim().slice(0, MAX_DESCRIPTION_LENGTH);
         if (!text) {
+          // Both newly selected and reused (pending-report) photos surface the
+          // same error state so the staffer can retry or type the description.
           setCaptionSuggestion({
             status: 'error',
             message:
@@ -184,10 +196,8 @@ export default function StaffIntakeForm({
           return;
         }
 
-        const current = descriptionValueRef.current.trim();
-        const shouldApply =
-          !current || current === autoFilledCaptionRef.current;
-        if (shouldApply) {
+        const current = descriptionValueRef.current;
+        if (shouldApplyCaption(current, autoFilledCaptionRef.current)) {
           autoFilledCaptionRef.current = text;
           descriptionValueRef.current = text;
           setDescription(text);
