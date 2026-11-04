@@ -45,6 +45,15 @@ test.describe('staff login credential errors', () => {
     await expect(
       passwordField.getByText(PASSWORD_ERROR, { exact: true }),
     ).toBeVisible();
+
+    const emailErrorId = await emailField
+      .locator('.form-error')
+      .getAttribute('id');
+    const passwordErrorId = await passwordField
+      .locator('.form-error')
+      .getAttribute('id');
+    await expect(email).toHaveAttribute('aria-describedby', emailErrorId);
+    await expect(password).toHaveAttribute('aria-describedby', passwordErrorId);
   });
 
   test('shows only the email error when the password is filled', async ({
