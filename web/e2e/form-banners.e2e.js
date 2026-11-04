@@ -22,10 +22,10 @@ for (const { path, role, text } of BANNERS) {
   test.describe(`required-field banner on ${path}`, () => {
     test.use({ signedInAs: role });
 
-    test('is visible at the top of the form', async ({ page }) => {
+    test('is the first element in the form', async ({ page }) => {
       await openRoute(page, path);
 
-      const banner = page.locator('form .form__legend--required');
+      const banner = page.locator('form > .form__legend--required:first-child');
       await expect(banner).toBeVisible();
       await expect(banner).toHaveText(text);
     });
