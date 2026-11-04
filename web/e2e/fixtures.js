@@ -15,7 +15,7 @@ const EMBEDDING = Array.from({ length: 512 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 
-const OFFICE = {
+export const OFFICE = {
   id: 'BCPIO',
   name: 'Baguio City Public Information Office',
   address: 'City Hall, Baguio City',
@@ -86,6 +86,15 @@ async function mockBackends(page, role) {
     }
     if (url.pathname === '/rest/v1/rpc/list_office_logins') {
       return json(route, [{ office_id: OFFICE.id, email: USERS.office.email }]);
+    }
+    if (url.pathname === '/rest/v1/rpc/get_usage_report') {
+      return json(route, [
+        {
+          office_id: OFFICE.id,
+          office_name: OFFICE.name,
+          items_currently_held: 1,
+        },
+      ]);
     }
     if (url.pathname.startsWith('/rest/v1/')) {
       return json(route, wantsObject ? null : []);
