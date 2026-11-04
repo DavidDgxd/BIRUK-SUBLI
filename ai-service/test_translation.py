@@ -4,41 +4,98 @@ import unittest
 from unittest import mock
 
 import translation
-from translation import is_material_translation, normalise, translate_to_english
+from translation import (
+    is_material_translation,
+    looks_filipino,
+    normalise,
+    translate_to_english,
+)
+
+# Regression table from the PR #79 review. Each English query was rewritten
+# into unrelated text by opus-mt-tl-en; each Filipino one was missed by the
+# old similarity gate. Model outputs are real ones from that review.
+ENGLISH_QUERIES = [
+    "ring",
+    "lost ring",
+    "charger",
+    "tumbler",
+    "eyeglasses",
+    "Nike shoes size 9",
+    "iPhone 13 with cracked screen",
+    "umbrella left in jeep",
+    "black wallet",
+    "bag",
+    "shoes",
+    # English words that look like Tagalog stems plus a linker.
+    "sing",
+    "sang",
+    "nag",
+    "sag",
+    # English words and names deliberately left off the list.
+    "May 3 at SM",
+    "tabi socks",
+    "polo shirt",
+    "Kay's wallet",
+]
+
+FILIPINO_TRANSLATIONS = [
+    ("sapatos", "shoes"),
+    ("tsinelas", "slippers"),
+    ("singsing", "ring"),
+    ("pantalon", "pants"),
+    ("rosaryo", "rosaries"),
+    ("pitaka", "wallet"),
+    ("itim na pitaka", "Black purse"),
+    ("susi ng kotse", "car key"),
+    ("pulang payong", "red umbrella"),
+    ("cellphone na may itim na case", "Black - case mobile phone"),
+    ("black wallet na may ID", "black wallet with ID"),
+]
+
+
+class LanguageGateTests(unittest.TestCase):
+    def test_english_queries_are_not_filipino(self):
+        for query in ENGLISH_QUERIES:
+            with self.subTest(query=query):
+                self.assertFalse(looks_filipino(query))
+
+    def test_english_queries_never_reach_the_provider(self):
+        with mock.patch.object(translation, "_provider_translate") as provider:
+            for query in ENGLISH_QUERIES:
+                with self.subTest(query=query):
+                    self.assertIsNone(translate_to_english(query))
+        provider.assert_not_called()
+
+    def test_filipino_queries_are_translated(self):
+        for query, output in FILIPINO_TRANSLATIONS:
+            with (
+                self.subTest(query=query),
+                mock.patch.object(
+                    translation, "_provider_translate", return_value=output
+                ),
+            ):
+                self.assertEqual(translate_to_english(query), output)
+
+    def test_linker_suffixes_are_recognised(self):
+        self.assertTrue(looks_filipino("bagong sapatos"))
+        self.assertTrue(looks_filipino("malaking bag"))
 
 
 class EchoTests(unittest.TestCase):
     def test_identical_output_is_not_a_translation(self):
-        self.assertFalse(is_material_translation("black wallet", "black wallet"))
+        self.assertFalse(is_material_translation("itim", "itim"))
 
     def test_case_and_punctuation_differences_alone_are_not_a_translation(self):
-        self.assertFalse(is_material_translation("black wallet", "Black wallet."))
-        self.assertFalse(is_material_translation("ID", "I.D"))
+        self.assertFalse(is_material_translation("Itim na bag", "itim na bag."))
 
     def test_whitespace_differences_alone_are_not_a_translation(self):
-        self.assertFalse(is_material_translation("black   wallet ", "black wallet"))
+        self.assertFalse(is_material_translation("itim  na bag ", "itim na bag"))
 
-    def test_garbled_english_is_not_a_translation(self):
-        # Real opus-mt-tl-en outputs for English queries.
-        self.assertFalse(is_material_translation("eyeglasses", "hyeglasts"))
-        self.assertFalse(is_material_translation("Nike shoes size 9", "Nikes cpaper 9"))
-        self.assertFalse(
-            is_material_translation(
-                "iPhone 13 with cracked screen", "iPhone 13 wath cracked screen"
-            )
-        )
-
-
-class FilipinoTests(unittest.TestCase):
-    def test_filipino_queries_are_translations(self):
-        self.assertTrue(is_material_translation("itim na pitaka", "Black purse"))
-        self.assertTrue(is_material_translation("susi ng kotse", "car key"))
-        self.assertTrue(is_material_translation("salamin", "mirror"))
-
-    def test_mixed_query_with_a_tagalog_function_word_is_a_translation(self):
-        self.assertTrue(
-            is_material_translation("black wallet na may ID", "black wallet with ID")
-        )
+    def test_an_echo_from_the_provider_returns_none(self):
+        with mock.patch.object(
+            translation, "_provider_translate", return_value="Itim na bag."
+        ):
+            self.assertIsNone(translate_to_english("itim na bag"))
 
 
 class BlankInputTests(unittest.TestCase):
@@ -57,18 +114,6 @@ class BlankInputTests(unittest.TestCase):
             self.assertIsNone(translate_to_english(""))
             self.assertIsNone(translate_to_english("   "))
         provider.assert_not_called()
-
-
-class EntryPointTests(unittest.TestCase):
-    def test_returns_translation_only_when_it_is_material(self):
-        with mock.patch.object(
-            translation, "_provider_translate", return_value=" Black purse "
-        ):
-            self.assertEqual(translate_to_english("itim na pitaka"), "Black purse")
-        with mock.patch.object(
-            translation, "_provider_translate", return_value="Black wallet."
-        ):
-            self.assertIsNone(translate_to_english("black wallet"))
 
 
 class ProviderTests(unittest.TestCase):

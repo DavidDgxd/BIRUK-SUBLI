@@ -181,13 +181,16 @@ def health():
 
 
 @app.post("/embed/text")
-async def embed_text(text: str = Form(...)):
+def embed_text(text: str = Form(...)):
     """Encodes a typed search query into a 512-dim vector.
 
     Accepts free-form natural language — English or Filipino, a phrase or a
     sentence. The caller does not need to know the item categories or tags.
     A Filipino query is translated to English first (US-22) so it lands in the
     same CLIP space as an English one; translated_text is null otherwise.
+
+    A plain def, not async: FastAPI then runs it in its threadpool, so loading
+    the translation model and running CLIP do not block the event loop.
     """
     cleaned = clean_query_text(text)
     translated = translate_query(cleaned)
