@@ -16,6 +16,15 @@ const PNG_1PX = Buffer.from(
   'base64',
 );
 
+// Distinct vectors: p_embedding can only be their average if the reused photo
+// was embedded.
+const TEXT_VECTOR = Array.from({ length: 512 }, (_, index) =>
+  index === 0 ? 1 : 0,
+);
+const IMAGE_VECTOR = Array.from({ length: 512 }, (_, index) =>
+  index === 1 ? 1 : 0,
+);
+
 test.describe('staff intake prefill (US-10)', () => {
   test.use({ signedInAs: 'office' });
 
@@ -23,6 +32,7 @@ test.describe('staff intake prefill (US-10)', () => {
     page,
   }) => {
     let converted = false;
+    let imageEmbeds = 0;
     const submissions = [];
 
     await page.route('https://example.test/found-report.webp', (route) =>
@@ -62,9 +72,18 @@ test.describe('staff intake prefill (US-10)', () => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ vector: Array.from({ length: 512 }, () => 0) }),
+        body: JSON.stringify({ vector: TEXT_VECTOR }),
       }),
     );
+
+    await page.route('**/embed/image', (route) => {
+      imageEmbeds += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ vector: IMAGE_VECTOR }),
+      });
+    });
 
     await openRoute(page, '/staff/intake');
 
@@ -95,11 +114,21 @@ test.describe('staff intake prefill (US-10)', () => {
 
     await expect(page.getByText('BS-0115')).toBeVisible();
     expect(submissions).toHaveLength(1);
+    expect(imageEmbeds).toBe(1);
     expect(submissions[0]).toMatchObject({
       p_found_report_id: REPORT.id,
       p_image_url: REPORT.image_url,
       p_title: REPORT.short_note,
     });
+
+    // Normalized average of text and photo, not the text vector alone.
+    const submittedEmbedding = submissions[0].p_embedding;
+    expect(submittedEmbedding).toHaveLength(512);
+    expect(submittedEmbedding[0]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(submittedEmbedding[1]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(
+      submittedEmbedding.slice(2).every((value) => Math.abs(value) < 1e-12),
+    ).toBe(true);
 
     await expect(
       page.getByText('No pending self-reports. Start the intake form below.'),

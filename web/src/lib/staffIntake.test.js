@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpc, embedText, embedImageOrNull, uploadItemImage, combineEmbeddings } =
-  vi.hoisted(() => ({
-    rpc: vi.fn(),
-    embedText: vi.fn(),
-    embedImageOrNull: vi.fn(),
-    uploadItemImage: vi.fn(),
-    combineEmbeddings: vi.fn(),
-  }));
+const {
+  rpc,
+  embedText,
+  embedImageOrNull,
+  embedImageFromUrlOrNull,
+  uploadItemImage,
+  combineEmbeddings,
+} = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  embedText: vi.fn(),
+  embedImageOrNull: vi.fn(),
+  embedImageFromUrlOrNull: vi.fn(),
+  uploadItemImage: vi.fn(),
+  combineEmbeddings: vi.fn(),
+}));
 
 vi.mock('./supabase.js', () => ({ supabase: { rpc } }));
 
@@ -16,6 +23,7 @@ vi.mock('./storage.js', () => ({ uploadItemImage }));
 vi.mock('./aiService.js', () => ({
   embedText,
   embedImageOrNull,
+  embedImageFromUrlOrNull,
   MAX_EMBED_TEXT_LENGTH: 1000,
   SearchError: class SearchError extends Error {
     constructor(code, message) {
@@ -66,20 +74,24 @@ describe('submitStaffCustody self-report prefill', () => {
     rpc.mockReset();
     embedText.mockReset();
     embedImageOrNull.mockReset();
+    embedImageFromUrlOrNull.mockReset();
     uploadItemImage.mockReset();
     combineEmbeddings.mockReset();
 
     embedText.mockResolvedValue({ embedding: [1, 0, 0] });
     embedImageOrNull.mockResolvedValue([0, 1, 0]);
+    embedImageFromUrlOrNull.mockResolvedValue([0, 1, 0]);
     uploadItemImage.mockResolvedValue(
       'https://example.test/staff-intake/new.webp',
     );
     combineEmbeddings.mockImplementation((vectors) => vectors[0]);
   });
 
-  it('reuses the report photo and converts the report in the same RPC', async () => {
+  it('embeds the reused report photo and converts the report in the same RPC', async () => {
     rpc.mockReturnValue(resolvedRpc());
+    combineEmbeddings.mockReturnValue([Math.SQRT1_2, Math.SQRT1_2, 0]);
     const photoUrl = 'https://example.test/found-reports/original.webp';
+    const expectedEmbedding = [Math.SQRT1_2, Math.SQRT1_2, 0];
 
     const result = await submitStaffCustody({
       ...baseIntake,
@@ -90,19 +102,55 @@ describe('submitStaffCustody self-report prefill', () => {
 
     expect(uploadItemImage).not.toHaveBeenCalled();
     expect(embedImageOrNull).not.toHaveBeenCalled();
+    expect(embedImageFromUrlOrNull).toHaveBeenCalledWith(
+      photoUrl,
+      baseIntake.signal,
+      expect.objectContaining({ label: 'staffIntake' }),
+    );
+    expect(combineEmbeddings).toHaveBeenCalledWith([
+      [1, 0, 0],
+      [0, 1, 0],
+    ]);
     expect(rpc).toHaveBeenCalledWith(
       'submit_staff_custody',
       expect.objectContaining({
         p_image_url: photoUrl,
         p_found_report_id: '11111111-1111-1111-1111-111111111111',
+        p_embedding: expectedEmbedding,
       }),
     );
     expect(result).toEqual({
       refCode: 'BS-0115',
       imageUrl: photoUrl,
-      usedPhoto: false,
+      usedPhoto: true,
       reusedPhoto: true,
     });
+  });
+
+  it('falls back to the text embedding when the reused photo cannot be read', async () => {
+    rpc.mockReturnValue(resolvedRpc());
+    embedImageFromUrlOrNull.mockResolvedValue(null);
+    const photoUrl = 'https://example.test/found-reports/original.webp';
+
+    const result = await submitStaffCustody({
+      ...baseIntake,
+      photo: null,
+      photoUrl,
+      foundReportId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    expect(embedImageFromUrlOrNull).toHaveBeenCalledWith(
+      photoUrl,
+      baseIntake.signal,
+      expect.objectContaining({ label: 'staffIntake' }),
+    );
+    expect(combineEmbeddings).toHaveBeenCalledWith([[1, 0, 0]]);
+    expect(rpc).toHaveBeenCalledWith(
+      'submit_staff_custody',
+      expect.objectContaining({ p_embedding: [1, 0, 0] }),
+    );
+    expect(result.usedPhoto).toBe(false);
+    expect(result.reusedPhoto).toBe(true);
   });
 
   it('uploads and embeds a replacement photo selected at the counter', async () => {
@@ -187,6 +235,7 @@ describe('submitStaffCustody AI caption', () => {
     uploadItemImage.mockReset();
     embedText.mockReset();
     embedImageOrNull.mockReset();
+    embedImageFromUrlOrNull.mockReset();
     combineEmbeddings.mockReset();
 
     rpc.mockReturnValue(resolvedRpc({ data: 'BS-0001' }));
