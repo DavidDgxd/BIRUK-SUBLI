@@ -21,12 +21,16 @@ export default function StaffLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const emailId = useId();
   const passwordId = useId();
-  const errorId = useId();
+  const emailErrorId = useId();
+  const passwordErrorId = useId();
+  const formErrorId = useId();
 
   // Where the officer was headed before the gate sent them here. Only a path
   // within this app is honoured, never an absolute URL.
@@ -48,27 +52,29 @@ export default function StaffLogin() {
     event.preventDefault();
     if (submitting) return;
 
-    const siteEmail = email.trim();
-    if (!siteEmail) {
-      setError('Enter your email.');
-      emailRef.current?.focus();
-      return;
-    }
-    if (!password) {
-      setError('Enter your password.');
-      passwordRef.current?.focus();
+    const trimmedEmail = email.trim();
+    const nextEmailError = trimmedEmail ? '' : 'Enter your email.';
+    const nextPasswordError = password ? '' : 'Enter your password.';
+
+    setEmailError(nextEmailError);
+    setPasswordError(nextPasswordError);
+
+    if (nextEmailError || nextPasswordError) {
+      setFormError('');
+      if (nextEmailError) emailRef.current?.focus();
+      else passwordRef.current?.focus();
       return;
     }
 
-    setError('');
+    setFormError('');
     setSubmitting(true);
     try {
-      await signIn(siteEmail, password);
+      await signIn(trimmedEmail, password);
       // The provider flips isAuthenticated, which renders the redirect below.
     } catch (signInError) {
       if (import.meta.env.DEV) console.error('[StaffLogin]', signInError);
       setSubmitting(false);
-      setError(
+      setFormError(
         signInError?.message ??
           'We could not sign you in right now. Please try again.',
       );
@@ -123,13 +129,20 @@ export default function StaffLogin() {
                 spellCheck="false"
                 required
                 value={email}
-                aria-invalid={error && !email.trim() ? 'true' : undefined}
-                aria-describedby={error ? errorId : undefined}
+                aria-invalid={emailError ? 'true' : undefined}
+                aria-describedby={emailError ? emailErrorId : undefined}
                 onChange={(event) => {
                   setEmail(event.target.value);
-                  if (error) setError('');
+                  if (emailError) setEmailError('');
+                  if (formError) setFormError('');
                 }}
               />
+              {emailError && (
+                <p className="form-error" id={emailErrorId}>
+                  <Icon name="error" />
+                  {emailError}
+                </p>
+              )}
             </div>
 
             <div className="field">
@@ -145,11 +158,19 @@ export default function StaffLogin() {
                   autoComplete="current-password"
                   required
                   value={password}
-                  aria-invalid={error && !password ? 'true' : undefined}
-                  aria-describedby={error ? errorId : undefined}
+                  aria-invalid={passwordError ? 'true' : undefined}
+                  aria-describedby={
+                    [
+                      passwordError ? passwordErrorId : '',
+                      formError ? formErrorId : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                   onChange={(event) => {
                     setPassword(event.target.value);
-                    if (error) setError('');
+                    if (passwordError) setPasswordError('');
+                    if (formError) setFormError('');
                   }}
                 />
                 <button
@@ -164,13 +185,19 @@ export default function StaffLogin() {
                   <Icon name={showPassword ? 'visibility_off' : 'visibility'} />
                 </button>
               </div>
+              {passwordError && (
+                <p className="form-error" id={passwordErrorId}>
+                  <Icon name="error" />
+                  {passwordError}
+                </p>
+              )}
             </div>
 
             <div aria-live="polite">
-              {error && (
-                <p className="form-error" id={errorId}>
+              {formError && (
+                <p className="form-error" id={formErrorId}>
                   <Icon name="error" />
-                  {error}
+                  {formError}
                 </p>
               )}
             </div>
