@@ -1,34 +1,31 @@
 import { supabase } from './supabase.js';
 import { embedImage, embedText, SearchError } from './aiService.js';
 
-// Score bands passed to match_items, plus the primary/secondary split.
+// Confidence tiers passed to match_items, plus the best/possible split.
 //
-// These are calibrated against the photo-backed distribution: an unrelated
-// query ("bottle", "wallet") scores 0.55-0.58, a semantic synonym ("blower")
-// lands near 0.604, and a direct match ("fan") near 0.675. So 0.60 is the
-// confidence cutoff between results we show up front and the low-confidence
-// "other possible matches" drawer, and 0.55 is how far below that we reach to
-// fill the drawer. calibrateMatchScore() maps both bands onto readable
-// percentages so nothing shows a flat "55%".
+// Tuned on the 20 held items with ai-service/eval_search_tiers.py (36 labeled
+// queries): 0.64/0.05 gives precision 0.967, recall 0.784 and no result for any
+// of the "none" queries; the possible tier (0.55/0.07) restores the baseline
+// recall. Re-run that eval whenever the inventory changes materially.
 export const MATCH_THRESHOLD = 0.55;
-export const PRIMARY_THRESHOLD = 0.6;
 export const MATCH_COUNT = 15;
+export const BEST_FLOOR = 0.64;
+export const BEST_DELTA = 0.05;
+export const POSSIBLE_FLOOR = 0.55;
+export const POSSIBLE_DELTA = 0.07;
+export const POSSIBLE_LIMIT = 3;
+export const POSSIBLE_ONLY_LIMIT = 5;
+
+// Absorbs the binary rounding in a delta comparison, e.g. 0.664 - 0.07 is
+// 0.5940000000000001, which would otherwise drop an item sitting on 0.594.
+const EPSILON = 1e-9;
 
 /**
- * Turns a raw cosine similarity into the percentage shown on a result card and
- * the tier that colours it.
+ * Turns a raw cosine similarity into a readable percentage and colour tier.
+ * Only best matches display it; possible matches hide it because 0.64 (the best
+ * floor) would otherwise show as 81% — too confident for a maybe.
  *
- * Primary band, [0.60, 0.70] -> [70%, 98%]:
- *   0.60  -> 70%   (moderate)
- *   0.604 -> 71%   (moderate)
- *   0.65  -> 84%   (moderate)
- *   0.675 -> 91%   (strong)
- *   0.70+ -> 98%   (strong)
- *
- * Secondary drawer band, [0.55, 0.599] -> [45%, 69%], always 'weak':
- *   0.55  -> 45%
- *   0.575 -> 57%
- *   0.599 -> 69%
+ * 0.55-0.599 -> 45-69% (weak); 0.60-0.70 -> 70-98% (moderate/strong).
  */
 export function calibrateMatchScore(similarity) {
   const PRIMARY_MIN = 0.6;
@@ -74,10 +71,12 @@ export function combineEmbeddings(vectors) {
  * filtering the returned page instead would hide valid older/other-office items
  * whenever the unfiltered top matches filled the limit.
  *
- * Resolves to { primary, secondary, all, queryText, translatedText }, where
- * primary holds the confident matches and secondary the low-confidence ones
- * kept for the "other possible matches" drawer. Both keep the RPC's descending
- * score order.
+ * Resolves to { best, possible, state, queryText, translatedText }. `best` holds
+ * the confident matches; `possible` holds up to POSSIBLE_LIMIT weaker ones (or
+ * POSSIBLE_ONLY_LIMIT when no best exists) for the "possible matches" section.
+ * `state` is 'results' | 'possible' | 'none' so
+ * the page can show the "no close match" copy without an empty list. Both lists
+ * keep the RPC's descending score order.
  */
 export async function searchItems({
   text,
@@ -129,10 +128,30 @@ export async function searchItems({
       (!office || item.holding_office_id === office),
   );
 
+  // The RPC already sorts, but sorting here keeps the cap deterministic if a
+  // stale function or a test fixture returns rows in another order.
+  const ordered = [...all].sort((a, b) => b.similarity - a.similarity);
+  const top = ordered.length ? ordered[0].similarity : 0;
+  const best = ordered.filter(
+    (item) =>
+      item.similarity >= BEST_FLOOR &&
+      item.similarity >= top - BEST_DELTA - EPSILON,
+  );
+  const possibleLimit = best.length ? POSSIBLE_LIMIT : POSSIBLE_ONLY_LIMIT;
+  const possible = ordered
+    .filter(
+      (item) =>
+        !best.includes(item) &&
+        item.similarity >= POSSIBLE_FLOOR &&
+        item.similarity >= top - POSSIBLE_DELTA - EPSILON,
+    )
+    .slice(0, possibleLimit);
+  const state = best.length ? 'results' : possible.length ? 'possible' : 'none';
+
   return {
-    primary: all.filter((item) => item.similarity >= PRIMARY_THRESHOLD),
-    secondary: all.filter((item) => item.similarity < PRIMARY_THRESHOLD),
-    all,
+    best,
+    possible,
+    state,
     queryText,
     translatedText: textResult?.translatedText ?? null,
   };

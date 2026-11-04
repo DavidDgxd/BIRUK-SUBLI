@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { calibrateMatchScore } from '../lib/searchItems.js';
 
-export default function ResultCard({ item }) {
+export default function ResultCard({ item, possible = false }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = item.image_url && !imageFailed;
   const { percent } = calibrateMatchScore(item.similarity);
@@ -33,7 +33,7 @@ export default function ResultCard({ item }) {
       )}
 
       <div className="result__body">
-        <h2 className="result__title">
+        <h3 className="result__title">
           {/* The link owns the whole row through a stretched overlay, so one
               control opens the details and its name is the item. A real anchor
               keeps open-in-new-tab and middle-click working. The score rides
@@ -41,17 +41,19 @@ export default function ResultCard({ item }) {
           <Link
             className="result__link"
             to={`/items/${item.id}`}
-            state={{ similarity: item.similarity }}
+            state={{ similarity: possible ? null : item.similarity }}
           >
             {item.title}
           </Link>
-        </h2>
+        </h3>
         <p className="result__office">{item.holding_office_name}</p>
         <p className="result__status">
           <span className="dot" aria-hidden="true" />
           <span>
             {status}
-            {typeof percent === 'number' ? `, ${percent}% match` : ''}
+            {!possible && typeof percent === 'number'
+              ? `, ${percent}% match`
+              : ''}
           </span>
         </p>
       </div>

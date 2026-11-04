@@ -1235,6 +1235,12 @@ input[type='search']::-webkit-search-decoration {
   }
 }
 
+.results__heading {
+  margin-block: var(--space-5) var(--space-1);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-strong);
+}
+
 .results__count {
   margin-block: var(--space-4) var(--space-2);
   color: var(--ink-muted);

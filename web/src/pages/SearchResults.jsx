@@ -29,6 +29,18 @@ function readDate(value) {
   return DATE_PATTERN.test(value ?? '') ? value : '';
 }
 
+function ResultList({ items, possible = false }) {
+  return (
+    <ul className="results__list">
+      {items.map((item) => (
+        <li key={item.id}>
+          <ResultCard item={item} possible={possible} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function requestKey(q, color, photo, office, dateFrom, dateTo, attempt) {
   return [
     q,
@@ -43,20 +55,22 @@ function requestKey(q, color, photo, office, dateFrom, dateTo, attempt) {
 
 export default function SearchResults() {
   const [params] = useSearchParams();
-  const { state } = useLocation();
+  const { state: locationState } = useLocation();
   const navigate = useNavigate();
   const q = (params.get('q') ?? '').trim();
   const color = params.get('color') ?? '';
   const office = (params.get('office') ?? '').trim();
   const dateFrom = readDate(params.get('from'));
   const dateTo = readDate(params.get('to'));
-  const photo = state?.photo instanceof File ? state.photo : null;
+  const photo =
+    locationState?.photo instanceof File ? locationState.photo : null;
   const hasQuery = Boolean(q || photo);
   const hasFilters = Boolean(office || dateFrom || dateTo);
 
   const [attempt, setAttempt] = useState(0);
-  const [outcome, setOutcome] = useState(null); // { key, items, translatedText } or { key, error }
+  const [outcome, setOutcome] = useState(null); // { key, best, possible, state, translatedText } or { key, error }
   const [officeOptions, setOfficeOptions] = useState(null);
+  const [focusToken, setFocusToken] = useState(0);
   const headingRef = useRef(null);
 
   useEffect(() => {
@@ -115,7 +129,7 @@ export default function SearchResults() {
 
     navigate(
       { pathname: '/search', search: nextParams.toString() },
-      { replace: true, state },
+      { replace: true, state: locationState },
     );
   }
 
@@ -127,15 +141,26 @@ export default function SearchResults() {
     hasQuery &&
     outcome?.key !== requestKey(q, color, photo, office, dateFrom, dateTo, attempt);
   const error = !loading && outcome?.error;
-  const primary = !loading && !error && outcome?.primary ? outcome.primary : null;
-  const secondary =
-    !loading && !error && outcome?.secondary ? outcome.secondary : null;
-  const noMatches =
-    primary && secondary && primary.length === 0 && secondary.length === 0;
-  // Nothing cleared the confidence cutoff, but the drawer has candidates: lead
-  // with the drawer open so the user is not shown an empty page.
-  const onlySecondary =
-    primary && secondary && primary.length === 0 && secondary.length > 0;
+  const best = !loading && !error && outcome?.best ? outcome.best : null;
+  const possible =
+    !loading && !error && outcome?.possible ? outcome.possible : null;
+  const state = !loading && !error ? outcome?.state : null;
+  const announcement =
+    state === 'results'
+      ? `${best.length} best ${best.length === 1 ? 'match' : 'matches'}${
+          possible.length
+            ? ` and ${possible.length} possible ${
+                possible.length === 1 ? 'match' : 'matches'
+              }`
+            : ''
+        } found.`
+      : state === 'possible'
+        ? `No confident match. Showing ${possible.length} possible ${
+            possible.length === 1 ? 'match' : 'matches'
+          }.`
+        : state === 'none'
+          ? 'No close match found.'
+          : '';
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -160,7 +185,12 @@ export default function SearchResults() {
               Search results
             </h1>
             {hasQuery && (
-              <SearchPanel compact initialQuery={q} initialPhoto={photo} />
+              <SearchPanel
+                compact
+                initialQuery={q}
+                initialPhoto={photo}
+                focusToken={focusToken}
+              />
             )}
             {hasQuery && (color || photo) && (
               <p className="results__query">
@@ -232,18 +262,55 @@ export default function SearchResults() {
             </section>
           )}
 
-          {noMatches && (
-            <section className="state" role="status">
+          <p className="visually-hidden" role="status">
+            {announcement}
+          </p>
+
+          {state === 'results' && (
+            <>
+              <h2 className="results__heading">Best matches</h2>
+              <p className="results__count">
+                {best.length} {best.length === 1 ? 'match' : 'matches'}, best
+                first
+              </p>
+              <ResultList items={best} />
+              {possible.length > 0 && (
+                <details className="more-matches">
+                  <summary>Other possible matches ({possible.length})</summary>
+                  <p className="state__text">
+                    Weaker matches — check the details before claiming.
+                  </p>
+                  <ResultList items={possible} possible />
+                </details>
+              )}
+            </>
+          )}
+
+          {state === 'possible' && (
+            <section className="state" aria-labelledby="possible-matches">
+              <h2 id="possible-matches" className="state__title">
+                Possible matches
+              </h2>
+              <p className="state__text">
+                We couldn&apos;t find a confident match in the held items. These
+                are the closest, but they may not be yours.
+              </p>
+              <ResultList items={possible} possible />
+            </section>
+          )}
+
+          {state === 'none' && (
+            <section className="state">
               <h2 className="state__title">
-                {hasFilters ? 'No items in that range' : 'Nothing found yet'}
+                {hasFilters ? 'No items in that range' : 'No close match'}
               </h2>
               <p className="state__text">
                 {hasFilters
                   ? 'No held item matches those filters. Try a wider date range or another office.'
-                  : 'No held item matches that. Try fewer words, add a color or a photo — or report your item so staff can watch for it.'}
+                  : 'Nothing in the held inventory is close to that description. Try adding a colour, brand or size, or check back later — new items are added as they are handed in.'}
               </p>
               <div className="state__actions">
-                {hasFilters ? (
+                {hasFilters && (
                   <button
                     type="button"
                     className="btn btn--primary"
@@ -252,53 +319,23 @@ export default function SearchResults() {
                     <Icon name="close" />
                     Clear filters
                   </button>
-                ) : (
-                  <Link className="btn btn--primary" to="/report/lost">
-                    <Icon name="description" />
-                    Report a lost item
-                  </Link>
                 )}
-                <Link className="btn btn--quiet" to="/">
+                <button
+                  type="button"
+                  className={hasFilters ? 'btn' : 'btn btn--primary'}
+                  onClick={() => setFocusToken((n) => n + 1)}
+                >
                   <Icon name="search" />
                   Search again
-                </Link>
+                </button>
+                {!hasFilters && (
+                  <Link className="btn btn--quiet" to="/report/lost">
+                    <Icon name="description" />
+                    Report it lost
+                  </Link>
+                )}
               </div>
             </section>
-          )}
-
-          {primary && primary.length > 0 && (
-            <>
-              <p className="results__count" role="status">
-                {primary.length} {primary.length === 1 ? 'match' : 'matches'},
-                best first
-              </p>
-              <ul className="results__list">
-                {primary.map((item) => (
-                  <li key={item.id}>
-                    <ResultCard item={item} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          {secondary && secondary.length > 0 && (
-            <details className="more-matches" open={onlySecondary}>
-              <summary>Other possible matches ({secondary.length})</summary>
-              {onlySecondary && (
-                <p role="status">
-                  No direct matches found. These are lower-confidence
-                  possibilities.
-                </p>
-              )}
-              <ul className="results__list">
-                {secondary.map((item) => (
-                  <li key={item.id}>
-                    <ResultCard item={item} />
-                  </li>
-                ))}
-              </ul>
-            </details>
           )}
         </main>
         <SiteFooter />
