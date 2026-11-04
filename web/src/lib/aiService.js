@@ -8,8 +8,8 @@
  * A rejected call answers {"detail": "..."} with 422 (blank or over-long text)
  * or 503 (the model failed); postForJson surfaces that sentence to the user.
  *
- * The service does not translate yet. If it later returns "translated_text" from
- * /embed/text, the results page shows it to the user.
+ * /embed/text also returns "translated_text": the English translation of a
+ * Filipino query (US-22), or null. The results page shows it to the user.
  *
  * Set VITE_AI_SERVICE_URL in web/.env to override the service location.
  * Otherwise the service is assumed to run on the same host that served this
