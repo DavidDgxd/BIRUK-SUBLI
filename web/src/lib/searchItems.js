@@ -105,6 +105,7 @@ export async function searchItems({
   office,
   dateFrom,
   dateTo,
+  translate,
   signal,
 }) {
   const trimmed = (text ?? '').trim();
@@ -115,7 +116,7 @@ export async function searchItems({
     .join(' ');
 
   const [textResult, imageResult] = await Promise.all([
-    queryText ? embedText(queryText, signal) : null,
+    queryText ? embedText(queryText, signal, { translate }) : null,
     photo ? embedImage(photo, signal) : null,
   ]);
 

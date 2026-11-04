@@ -41,9 +41,19 @@ function ResultList({ items, possible = false }) {
   );
 }
 
-function requestKey(q, color, photo, office, dateFrom, dateTo, attempt) {
+function requestKey(
+  q,
+  exact,
+  color,
+  photo,
+  office,
+  dateFrom,
+  dateTo,
+  attempt,
+) {
   return [
     q,
+    exact,
     color,
     photo ? `${photo.name}:${photo.size}` : '',
     office,
@@ -62,6 +72,10 @@ export default function SearchResults() {
   const office = (params.get('office') ?? '').trim();
   const dateFrom = readDate(params.get('from'));
   const dateTo = readDate(params.get('to'));
+  // "Search my exact words" (US-23). The flag holds the query it was chosen
+  // for, because the compact SearchPanel copies every param into the next
+  // search: a bare exact=1 would silently stick to whatever is typed next.
+  const exact = Boolean(q) && params.get('exact') === q;
   const photo =
     locationState?.photo instanceof File ? locationState.photo : null;
   const hasQuery = Boolean(q || photo);
@@ -76,7 +90,16 @@ export default function SearchResults() {
   useEffect(() => {
     if (!hasQuery) return undefined;
     const controller = new AbortController();
-    const key = requestKey(q, color, photo, office, dateFrom, dateTo, attempt);
+    const key = requestKey(
+      q,
+      exact,
+      color,
+      photo,
+      office,
+      dateFrom,
+      dateTo,
+      attempt,
+    );
 
     searchItems({
       text: q,
@@ -85,6 +108,7 @@ export default function SearchResults() {
       office: office || null,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
+      translate: !exact,
       signal: controller.signal,
     })
       .then((result) => {
@@ -96,7 +120,7 @@ export default function SearchResults() {
       });
 
     return () => controller.abort();
-  }, [hasQuery, q, color, photo, office, dateFrom, dateTo, attempt]);
+  }, [hasQuery, q, exact, color, photo, office, dateFrom, dateTo, attempt]);
 
   // The filter only needs the active offices' id and name. A failure leaves the
   // office select with "All offices"; the other filters and the search itself
@@ -137,9 +161,18 @@ export default function SearchResults() {
     applyFilters({ office: '', dateFrom: '', dateTo: '' });
   }
 
+  // A pushed history entry, so Back returns to the other wording.
+  function wordingLink(nextExact) {
+    const nextParams = new URLSearchParams(params);
+    if (nextExact) nextParams.set('exact', q);
+    else nextParams.delete('exact');
+    return { pathname: '/search', search: nextParams.toString() };
+  }
+
   const loading =
     hasQuery &&
-    outcome?.key !== requestKey(q, color, photo, office, dateFrom, dateTo, attempt);
+    outcome?.key !==
+      requestKey(q, exact, color, photo, office, dateFrom, dateTo, attempt);
   const error = !loading && outcome?.error;
   const best = !loading && !error && outcome?.best ? outcome.best : null;
   const possible =
@@ -166,7 +199,11 @@ export default function SearchResults() {
     headingRef.current?.focus();
   }, []);
 
+  // The translation replaces the query for matching; it is not searched
+  // alongside it. Hidden while loading so a stale one never labels new results.
   const translated =
+    !loading &&
+    !exact &&
     outcome?.translatedText &&
     outcome.translatedText.trim().toLowerCase() !== q.trim().toLowerCase()
       ? outcome.translatedText
@@ -201,7 +238,19 @@ export default function SearchResults() {
             )}
             {translated && (
               <p className="results__translated">
-                Also searching for “{translated}”.
+                Searched for “{translated}”, the English translation of your
+                words.{' '}
+                <Link to={wordingLink(true)} state={locationState}>
+                  Search “{q}” instead
+                </Link>
+              </p>
+            )}
+            {exact && (
+              <p className="results__translated">
+                Searched using your words exactly as typed.{' '}
+                <Link to={wordingLink(false)} state={locationState}>
+                  Search the English translation instead
+                </Link>
               </p>
             )}
           </div>
