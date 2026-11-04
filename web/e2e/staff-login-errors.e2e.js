@@ -13,10 +13,10 @@ test.describe('staff login credential errors', () => {
 
     await expect(email).toBeFocused();
     await expect(
-      emailField.getByText('Enter your email.', { exact: true }),
+      emailField.getByText('Enter the office email.', { exact: true }),
     ).toBeVisible();
     await expect(
-      passwordField.getByText('Enter your password.', { exact: true }),
+      passwordField.getByText('Enter the office password.', { exact: true }),
     ).toBeVisible();
   });
 });

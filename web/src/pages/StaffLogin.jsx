@@ -53,8 +53,8 @@ export default function StaffLogin() {
     if (submitting) return;
 
     const trimmedEmail = email.trim();
-    const nextEmailError = trimmedEmail ? '' : 'Enter your email.';
-    const nextPasswordError = password ? '' : 'Enter your password.';
+    const nextEmailError = trimmedEmail ? '' : 'Enter the office email.';
+    const nextPasswordError = password ? '' : 'Enter the office password.';
 
     setEmailError(nextEmailError);
     setPasswordError(nextPasswordError);
