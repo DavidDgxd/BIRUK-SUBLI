@@ -17,6 +17,7 @@ export default function StaffLogin() {
   const headingRef = useRef(null);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
+  const focusTargetRef = useRef(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,6 +26,7 @@ export default function StaffLogin() {
   const [passwordError, setPasswordError] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [focusAttempt, setFocusAttempt] = useState(0);
 
   const emailId = useId();
   const passwordId = useId();
@@ -48,6 +50,12 @@ export default function StaffLogin() {
     headingRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (!focusAttempt) return;
+    focusTargetRef.current?.focus();
+    focusTargetRef.current = null;
+  }, [focusAttempt]);
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (submitting) return;
@@ -61,8 +69,10 @@ export default function StaffLogin() {
 
     if (nextEmailError || nextPasswordError) {
       setFormError('');
-      if (nextEmailError) emailRef.current?.focus();
-      else passwordRef.current?.focus();
+      focusTargetRef.current = nextEmailError
+        ? emailRef.current
+        : passwordRef.current;
+      setFocusAttempt((attempt) => attempt + 1);
       return;
     }
 
@@ -78,7 +88,8 @@ export default function StaffLogin() {
         signInError?.message ??
           'We could not sign you in right now. Please try again.',
       );
-      passwordRef.current?.focus();
+      focusTargetRef.current = passwordRef.current;
+      setFocusAttempt((attempt) => attempt + 1);
     }
   }
 
@@ -130,7 +141,11 @@ export default function StaffLogin() {
                 required
                 value={email}
                 aria-invalid={emailError ? 'true' : undefined}
-                aria-describedby={emailError ? emailErrorId : undefined}
+                aria-describedby={
+                  [emailError ? emailErrorId : '', formError ? formErrorId : '']
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
                 onChange={(event) => {
                   setEmail(event.target.value);
                   if (emailError) setEmailError('');
