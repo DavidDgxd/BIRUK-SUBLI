@@ -5,6 +5,12 @@ const PNG_1PX = Buffer.from(
   'base64',
 );
 
+// Distinct from the text vector the fixture returns, so p_embedding can only be
+// their average if the reused report photo was embedded.
+const IMAGE_VECTOR = Array.from({ length: 512 }, (_, index) =>
+  index === 1 ? 1 : 0,
+);
+
 const REPORT = {
   id: '22222222-2222-2222-2222-222222222222',
   ref_code: 'FR-0201',
@@ -43,6 +49,13 @@ async function mockReport(page, onConvert = () => {}) {
   });
   await page.route(REPORT.image_url, (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1PX }),
+  );
+  await page.route('**/embed/image', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vector: IMAGE_VECTOR }),
+    }),
   );
 }
 
@@ -97,6 +110,15 @@ test.describe('staff intake reused-photo caption', () => {
       p_found_report_id: REPORT.id,
       p_ai_caption: suggestion,
     });
+
+    // Fixture text vector [1, 0, …] averaged with the reused photo [0, 1, …].
+    expect(submissions[0].p_embedding[0]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(submissions[0].p_embedding[1]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(
+      submissions[0].p_embedding
+        .slice(2)
+        .every((value) => Math.abs(value) < 1e-12),
+    ).toBe(true);
   });
 
   test('surfaces retry for a reused photo when the caption service fails', async ({
