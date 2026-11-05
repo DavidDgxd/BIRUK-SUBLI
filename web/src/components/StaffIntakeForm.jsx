@@ -542,7 +542,7 @@ export default function StaffIntakeForm({
             <dd>{receipt.staffEmail}</dd>
           </div>
         </dl>
-        {!receipt.usedPhoto && !receipt.reusedPhoto && (
+        {!receipt.usedPhoto && (
           <p className="state__text">
             The photo was saved, but we could not read it for matching — this
             item is searchable by its text details alone.

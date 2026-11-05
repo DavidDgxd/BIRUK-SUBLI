@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import {
+  embedImageFromUrlOrNull,
   embedImageOrNull,
   embedText,
   MAX_EMBED_TEXT_LENGTH,
@@ -82,6 +83,9 @@ export async function submitStaffCustody({
   // A pre-filled self-report already has its photo in the shared bucket. Reuse
   // that URL instead of downloading and re-uploading the same object. When the
   // officer picks a different file, that file wins and is stored normally.
+  //
+  // The reused photo is fetched and embedded too: a text-only vector scores
+  // much higher on every text query than the text+photo vectors other items use.
   const reusedPhoto = Boolean(photoUrl) && !photo;
   const [imageUrl, textResult, photoEmbedding] = await Promise.all([
     photo
@@ -90,7 +94,9 @@ export async function submitStaffCustody({
     embedText(matchingText, signal),
     photo
       ? embedImageOrNull(photo, signal, { label: 'staffIntake' })
-      : Promise.resolve(null),
+      : photoUrl
+        ? embedImageFromUrlOrNull(photoUrl, signal, { label: 'staffIntake' })
+        : Promise.resolve(null),
   ]);
 
   const embedding = combineEmbeddings(

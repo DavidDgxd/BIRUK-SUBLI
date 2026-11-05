@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { captionImage, captionImageFromUrlOrNull } from './aiService.js';
+import {
+  captionImage,
+  captionImageFromUrlOrNull,
+  embedImageFromUrlOrNull,
+} from './aiService.js';
 
 function response(body, { ok = true, status = 200 } = {}) {
   return {
@@ -19,6 +23,12 @@ function imageResponse(blob, { ok = true, status = 200 } = {}) {
     status,
     blob: vi.fn().mockResolvedValue(blob),
   };
+}
+
+function unitVector(index) {
+  return Array.from({ length: 512 }, (_, position) =>
+    position === index ? 1 : 0,
+  );
 }
 
 describe('captionImage', () => {
@@ -131,6 +141,63 @@ describe('captionImageFromUrlOrNull', () => {
 
     await expect(
       captionImageFromUrlOrNull('https://example.test/report.webp'),
+    ).resolves.toBeNull();
+  });
+});
+
+describe('embedImageFromUrlOrNull', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches a reused report photo and returns its embedding', async () => {
+    const blob = photo();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(imageResponse(blob))
+      .mockResolvedValueOnce(response({ vector: unitVector(1), dim: 512 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const url = 'https://example.test/found-reports/original.webp';
+    const result = await embedImageFromUrlOrNull(url);
+
+    expect(result).toEqual(unitVector(1));
+    expect(fetchMock.mock.calls[0][0]).toBe(url);
+
+    const [embedUrl, init] = fetchMock.mock.calls[1];
+    expect(embedUrl).toBe('http://localhost:8000/embed/image');
+    expect(init.method).toBe('POST');
+    const posted = init.body.get('file');
+    expect(posted.type).toBe(blob.type);
+    expect(posted.size).toBe(blob.size);
+  });
+
+  it('returns null when the reused photo cannot be fetched', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(imageResponse(photo(), { ok: false, status: 404 })),
+    );
+
+    await expect(
+      embedImageFromUrlOrNull('https://example.test/missing.webp'),
+    ).resolves.toBeNull();
+  });
+
+  it('returns null when the embedding endpoint fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(imageResponse(photo()))
+        .mockResolvedValueOnce(
+          response({ detail: 'model offline' }, { ok: false, status: 503 }),
+        ),
+    );
+
+    await expect(
+      embedImageFromUrlOrNull('https://example.test/report.webp'),
     ).resolves.toBeNull();
   });
 });

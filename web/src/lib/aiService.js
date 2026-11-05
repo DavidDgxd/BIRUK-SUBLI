@@ -283,18 +283,12 @@ export async function captionImageFromUrlOrNull(url, signal, options) {
 }
 
 /**
- * Best-effort photo embedding: resolves to the vector, or null when the photo
- * half cannot help.
- *
- * Any photo-side problem (unreachable service, bad response, timeout) drops the
- * caller back to matching on text alone rather than blocking the submission. A
- * genuine cancel — the caller's own signal — propagates instead.
- *
- * Shared by the lost, found and staff-intake flows so the timeout/abort handling
- * lives in one place; `label` only tags the development warning.
+ * Runs a best-effort embedding task with its own timeout. Resolves to whatever
+ * the task returns, or null on any failure. A genuine cancel — the caller's own
+ * signal — still propagates. `label` only tags the development warning.
  */
-export async function embedImageOrNull(
-  file,
+async function embeddingOrNull(
+  task,
   signal,
   { timeoutMs = 8000, label = 'aiService' } = {},
 ) {
@@ -313,8 +307,7 @@ export async function embedImageOrNull(
   }
 
   try {
-    const { embedding } = await embedImage(file, controller.signal);
-    return embedding;
+    return await task(controller.signal);
   } catch (error) {
     if (signal?.aborted) throw error;
     if (import.meta.env.DEV) {
@@ -328,4 +321,45 @@ export async function embedImageOrNull(
     clearTimeout(timer);
     signal?.removeEventListener('abort', forwardAbort);
   }
+}
+
+/**
+ * Best-effort photo embedding: resolves to the vector, or null when the photo
+ * half cannot help.
+ *
+ * Any photo-side problem (unreachable service, bad response, timeout) drops the
+ * caller back to matching on text alone rather than blocking the submission. A
+ * genuine cancel — the caller's own signal — propagates instead.
+ *
+ * Shared by the lost, found and staff-intake flows so the timeout/abort handling
+ * lives in one place; `label` only tags the development warning.
+ */
+export async function embedImageOrNull(file, signal, options) {
+  return embeddingOrNull(
+    async (embedSignal) => (await embedImage(file, embedSignal)).embedding,
+    signal,
+    options,
+  );
+}
+
+/**
+ * Best-effort photo embedding for a photo that already lives at a URL, such as
+ * the one reused from a pending self-report (US-10). /embed/image only accepts
+ * an upload, so the image is fetched first and posted as a blob. A missing
+ * object or blocked request resolves to null, so the item still matches on its
+ * text details like a newly selected photo whose model is offline.
+ */
+export async function embedImageFromUrlOrNull(url, signal, options) {
+  return embeddingOrNull(
+    async (embedSignal) => {
+      const response = await fetch(url, { signal: embedSignal });
+      if (!response.ok) {
+        throw new Error(`Photo request returned ${response.status}`);
+      }
+      const blob = await response.blob();
+      return (await embedImage(blob, embedSignal)).embedding;
+    },
+    signal,
+    options,
+  );
 }
