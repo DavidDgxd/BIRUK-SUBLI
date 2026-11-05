@@ -4,7 +4,7 @@ const { from } = vi.hoisted(() => ({ from: vi.fn() }));
 
 vi.mock('./supabase.js', () => ({ supabase: { from } }));
 
-import { listOffices, listPublicOffices, publicOffices } from './offices.js';
+import { listOffices, listPublicOffices } from './offices.js';
 
 function queryResult({ data = [], error = null } = {}) {
   const query = {
@@ -89,20 +89,5 @@ describe('listOffices', () => {
       name: 'OfficeError',
       code: 'db',
     });
-  });
-});
-
-describe('publicOffices', () => {
-  it('hides suspended offices from the public directory', () => {
-    expect(
-      publicOffices([
-        { id: 'A', status: 'active' },
-        { id: 'B', status: 'suspended' },
-        { id: 'C' },
-      ]),
-    ).toEqual([
-      { id: 'A', status: 'active' },
-      { id: 'C' },
-    ]);
   });
 });

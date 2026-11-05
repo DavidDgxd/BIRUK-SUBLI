@@ -26,11 +26,6 @@ export class OfficeError extends Error {
   }
 }
 
-/** Directory rows the public should see; suspended offices take no drop-offs. */
-export function publicOffices(rows) {
-  return (rows ?? []).filter((office) => office.status !== 'suspended');
-}
-
 /**
  * Loads the public drop-off directory, ordered by name.
  *

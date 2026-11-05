@@ -177,11 +177,7 @@ remain valid.
 
 ## Drop-off offices (`/offices`)
 
-US-9: the public directory lists each participating counter with its address and
-counter hours. It reads `offices` through `listOffices()` — the table has a
-public `SELECT` policy, so no login, RPC or Edge Function is needed. Suspended
-offices are hidden, and the same `OfficeDirectory` component appears on the
-found-report receipt. The site header links to the page.
+US-9: the public directory lists each participating counter with its address and counter hours. It reads offices through listPublicOffices(), which projects only id, name, address and counter_hours and filters status = 'active' in Postgres — the table has a public SELECT policy, so no login, RPC or Edge Function is needed. listOffices() stays for /admin/offices. The same OfficeDirectory component appears on the found-report receipt, and the site header links to the page.
 
 ## Staff intake and pending self-reports (`/staff/intake`)
 
