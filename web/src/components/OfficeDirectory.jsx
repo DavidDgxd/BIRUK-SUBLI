@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import Icon from './Icon.jsx';
-import { listOffices, publicOffices } from '../lib/offices.js';
+import { listPublicOffices } from '../lib/offices.js';
 
 /*
  * Public directory of physical drop-off counters (US-9).
@@ -24,9 +24,9 @@ export default function OfficeDirectory({
 
     setOffices(null);
     setLoadError('');
-    listOffices({ signal: controller.signal })
+    listPublicOffices({ signal: controller.signal })
       .then((rows) => {
-        if (active) setOffices(publicOffices(rows));
+        if (active) setOffices(rows);
       })
       .catch((error) => {
         if (!active || error.name === 'AbortError') return;

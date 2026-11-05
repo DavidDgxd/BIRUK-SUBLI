@@ -31,6 +31,25 @@ export function publicOffices(rows) {
   return (rows ?? []).filter((office) => office.status !== 'suspended');
 }
 
+/**
+ * Loads the public drop-off directory, ordered by name.
+ *
+ * Anonymous visitors only need the fields rendered by OfficeDirectory, so the
+ * projection stays narrow and suspended offices are filtered in the database.
+ */
+export async function listPublicOffices({ signal } = {}) {
+  let query = supabase
+    .from('offices')
+    .select('id, name, address, counter_hours')
+    .eq('status', 'active')
+    .order('name', { ascending: true });
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
+  if (error) throw new OfficeError('db', error.message);
+  return data ?? [];
+}
+
 /** Loads the participating-offices directory, ordered by name. */
 export async function listOffices({ signal } = {}) {
   let query = supabase
