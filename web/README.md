@@ -105,6 +105,11 @@ The color filter is prepended to the text before embedding. `MATCH_THRESHOLD` an
 `MATCH_COUNT` live in `searchItems.js`. The page has loading, empty, error (with retry)
 and no-query states.
 
+US-15: only items still in custody are eligible. `match_items` excludes
+`released`, `resolved`, `transferred` and `disposed` rows before ranking, and
+`searchItems.js` repeats that status guard on the returned page so a stale RPC
+or a status change mid-query cannot surface an item that is already gone.
+
 US-20 adds a filter bar on the results page. The holding-office and receipt-date
 range are applied by the `match_items` RPC (`filter_office`, `date_from`,
 `date_to`) before its match limit, so a narrow filter cannot be defeated by a

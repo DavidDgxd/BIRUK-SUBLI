@@ -21,6 +21,26 @@ export const POSSIBLE_ONLY_LIMIT = 5;
 const EPSILON = 1e-9;
 
 /**
+ * Inventory statuses that mean an item is no longer held. `resolved` is not an
+ * items status today (it belongs to lost reports), but it is listed here so the
+ * public guard stays correct if inventory adopts that name. `disposed` is the
+ * schema's resolved/destroyed terminal state.
+ */
+export const NON_SEARCHABLE_STATUSES = Object.freeze([
+  'released',
+  'resolved',
+  'transferred',
+  'disposed',
+]);
+
+/** True when a row is still eligible for a public listing. */
+export function isSearchableItemStatus(status) {
+  return (
+    typeof status === 'string' && !NON_SEARCHABLE_STATUSES.includes(status)
+  );
+}
+
+/**
  * Turns a raw cosine similarity into a readable percentage and colour tier.
  * Only best matches display it; possible matches hide it because 0.64 (the best
  * floor) would otherwise show as 81% — too confident for a maybe.
@@ -116,14 +136,14 @@ export async function searchItems({
 
   if (error) throw new SearchError('db', error.message);
 
-  // The RPC already applies the floor, office filter and excludes released
-  // rows; re-checking them here keeps the guarantee even if an older
-  // match_items is still deployed. A released item must never surface in a
-  // public listing, even if that function is stale or a row's status changed
-  // between the query and the read.
+  // The RPC already applies the floor, office filter and excludes released,
+  // resolved and other terminal rows; re-checking them here keeps the guarantee
+  // even if an older match_items is still deployed. A non-held item must never
+  // surface in a public listing, even if that function is stale or a row's
+  // status changed between the query and the read.
   const all = (data ?? []).filter(
     (item) =>
-      item.status === 'held' &&
+      isSearchableItemStatus(item.status) &&
       item.similarity >= MATCH_THRESHOLD &&
       (!office || item.holding_office_id === office),
   );

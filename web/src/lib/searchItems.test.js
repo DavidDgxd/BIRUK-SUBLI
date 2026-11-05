@@ -45,12 +45,15 @@ describe('searchItems confidence tiers', () => {
     embedText.mockResolvedValue({ embedding: [1, 0, 0] });
   });
 
-  it('splits best and possible matches and drops released rows', async () => {
+  it('splits best and possible matches and drops terminal rows', async () => {
     rpc.mockReturnValue(
       resolvedRpc({
         data: [
           row('best-top', 0.7),
           row('released', 0.95, { status: 'released' }),
+          row('resolved', 0.94, { status: 'resolved' }),
+          row('transferred', 0.93, { status: 'transferred' }),
+          row('disposed', 0.92, { status: 'disposed' }),
           row('best-next', 0.66),
           row('possible', 0.64),
           row('too-far', 0.62),
