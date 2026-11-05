@@ -19,30 +19,45 @@ vi.mock('./aiService.js', () => ({
   },
 }));
 
-import { MATCH_THRESHOLD, searchItems } from './searchItems.js';
+import {
+  BEST_DELTA,
+  BEST_FLOOR,
+  MATCH_THRESHOLD,
+  POSSIBLE_DELTA,
+  POSSIBLE_FLOOR,
+  POSSIBLE_LIMIT,
+  POSSIBLE_ONLY_LIMIT,
+  searchItems,
+} from './searchItems.js';
 
 function resolvedRpc({ data = [], error = null } = {}) {
   return { abortSignal: vi.fn().mockResolvedValue({ data, error }) };
 }
 
-describe('searchItems public listing', () => {
+function row(id, similarity, extra = {}) {
+  return { id, status: 'held', similarity, ...extra };
+}
+
+describe('searchItems confidence tiers', () => {
   beforeEach(() => {
     rpc.mockReset();
     embedText.mockReset();
     embedText.mockResolvedValue({ embedding: [1, 0, 0] });
   });
 
-  it('drops released, resolved and other terminal rows from public results', async () => {
+  it('splits best and possible matches and drops terminal rows', async () => {
     rpc.mockReturnValue(
       resolvedRpc({
         data: [
-          { id: 'held-primary', status: 'held', similarity: 0.7 },
-          { id: 'released', status: 'released', similarity: 0.95 },
-          { id: 'resolved', status: 'resolved', similarity: 0.94 },
-          { id: 'transferred', status: 'transferred', similarity: 0.93 },
-          { id: 'disposed', status: 'disposed', similarity: 0.92 },
-          { id: 'held-secondary', status: 'held', similarity: 0.56 },
-          { id: 'below-floor', status: 'held', similarity: 0.4 },
+          row('best-top', 0.7),
+          row('released', 0.95, { status: 'released' }),
+          row('resolved', 0.94, { status: 'resolved' }),
+          row('transferred', 0.93, { status: 'transferred' }),
+          row('disposed', 0.92, { status: 'disposed' }),
+          row('best-next', 0.66),
+          row('possible', 0.64),
+          row('too-far', 0.62),
+          row('below-floor', 0.4),
         ],
       }),
     );
@@ -52,12 +67,128 @@ describe('searchItems public listing', () => {
       signal: new AbortController().signal,
     });
 
-    expect(result.primary.map((item) => item.id)).toEqual(['held-primary']);
-    expect(result.secondary.map((item) => item.id)).toEqual(['held-secondary']);
-    expect(result.all.map((item) => item.id)).toEqual([
-      'held-primary',
-      'held-secondary',
+    expect(result.state).toBe('results');
+    expect(result.best.map((item) => item.id)).toEqual([
+      'best-top',
+      'best-next',
     ]);
+    expect(result.possible.map((item) => item.id)).toEqual(['possible']);
+  });
+
+  it('treats a top score below BEST_FLOOR as possible, not best', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [row('top', 0.639), row('next', 0.6), row('far', 0.55)],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('possible');
+    expect(result.best).toEqual([]);
+    expect(result.possible.map((item) => item.id)).toEqual(['top', 'next']);
+  });
+
+  it('accepts a top score exactly at BEST_FLOOR as best', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({ data: [row('top', 0.64), row('next', 0.6)] }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('results');
+    expect(result.best.map((item) => item.id)).toEqual(['top']);
+    expect(result.possible.map((item) => item.id)).toEqual(['next']);
+  });
+
+  it('caps possible at POSSIBLE_LIMIT when a best match exists', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('best', 0.7),
+          row('one', 0.64),
+          row('two', 0.638),
+          row('three', 0.636),
+          row('four', 0.634),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.possible).toHaveLength(POSSIBLE_LIMIT);
+    expect(result.possible.map((item) => item.id)).toEqual([
+      'one',
+      'two',
+      'three',
+    ]);
+  });
+
+  it('caps possible at POSSIBLE_ONLY_LIMIT when nothing is best', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('one', 0.639),
+          row('two', 0.635),
+          row('three', 0.63),
+          row('four', 0.625),
+          row('five', 0.62),
+          row('six', 0.615),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('possible');
+    expect(result.possible).toHaveLength(POSSIBLE_ONLY_LIMIT);
+    expect(result.possible.map((item) => item.id)).toEqual([
+      'one',
+      'two',
+      'three',
+      'four',
+      'five',
+    ]);
+  });
+
+  it('keeps an item on the float-rounded possible delta boundary', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [row('top', 0.664), row('edge', 0.594), row('below', 0.593)],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.possible.map((item) => item.id)).toEqual(['edge']);
+  });
+
+  it('returns the none state when every row is below the RPC floor', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({ data: [row('low', 0.54), row('lower', 0.5)] }),
+    );
+
+    const result = await searchItems({
+      text: 'umbrella',
+      signal: new AbortController().signal,
+    });
+
+    expect(result).toMatchObject({ best: [], possible: [], state: 'none' });
   });
 
   it('asks the RPC for held items at the shared match floor', async () => {
@@ -102,18 +233,8 @@ describe('searchItems public listing', () => {
     rpc.mockReturnValue(
       resolvedRpc({
         data: [
-          {
-            id: 'kept',
-            status: 'held',
-            similarity: 0.7,
-            holding_office_id: 'BCPIO',
-          },
-          {
-            id: 'elsewhere',
-            status: 'held',
-            similarity: 0.7,
-            holding_office_id: 'CITY_HALL_INFO',
-          },
+          row('kept', 0.7, { holding_office_id: 'BCPIO' }),
+          row('elsewhere', 0.7, { holding_office_id: 'CITY_HALL_INFO' }),
         ],
       }),
     );
@@ -124,7 +245,7 @@ describe('searchItems public listing', () => {
       signal: new AbortController().signal,
     });
 
-    expect(result.all.map((item) => item.id)).toEqual(['kept']);
+    expect(result.best.map((item) => item.id)).toEqual(['kept']);
   });
 
   it('surfaces an RPC failure as a SearchError', async () => {
@@ -135,5 +256,23 @@ describe('searchItems public listing', () => {
     await expect(
       searchItems({ text: 'wallet', signal: new AbortController().signal }),
     ).rejects.toMatchObject({ name: 'SearchError', code: 'db' });
+  });
+
+  it('exports the tuned tier constants', () => {
+    expect({
+      BEST_FLOOR,
+      BEST_DELTA,
+      POSSIBLE_FLOOR,
+      POSSIBLE_DELTA,
+      POSSIBLE_LIMIT,
+      POSSIBLE_ONLY_LIMIT,
+    }).toEqual({
+      BEST_FLOOR: 0.64,
+      BEST_DELTA: 0.05,
+      POSSIBLE_FLOOR: 0.55,
+      POSSIBLE_DELTA: 0.07,
+      POSSIBLE_LIMIT: 3,
+      POSSIBLE_ONLY_LIMIT: 5,
+    });
   });
 });

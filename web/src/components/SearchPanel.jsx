@@ -22,6 +22,7 @@ export default function SearchPanel({
   initialQuery = '',
   initialPhoto = null,
   compact = false,
+  focusToken = 0,
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -41,6 +42,14 @@ export default function SearchPanel({
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
+
+  // The results page can ask for the field after "Search again".
+  useEffect(() => {
+    if (focusToken > 0) {
+      queryInputRef.current?.focus();
+      queryInputRef.current?.select();
+    }
+  }, [focusToken]);
 
   // A new results-page photo starts a fresh editing session, so a removal made
   // against the previous photo no longer applies.
