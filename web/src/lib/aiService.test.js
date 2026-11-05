@@ -73,12 +73,14 @@ describe('captionImage', () => {
   it('surfaces the service detail when captioning fails', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        response(
-          { detail: 'Could not describe that photo: model offline' },
-          { ok: false, status: 503 },
+      vi
+        .fn()
+        .mockResolvedValue(
+          response(
+            { detail: 'Could not describe that photo: model offline' },
+            { ok: false, status: 503 },
+          ),
         ),
-      ),
     );
 
     await expect(captionImage(photo())).rejects.toMatchObject({
@@ -147,6 +149,7 @@ describe('captionImageFromUrlOrNull', () => {
 
 describe('embedImageFromUrlOrNull', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -199,5 +202,29 @@ describe('embedImageFromUrlOrNull', () => {
     await expect(
       embedImageFromUrlOrNull('https://example.test/report.webp'),
     ).resolves.toBeNull();
+  });
+
+  it('gives a slow download longer than the 8s file budget', async () => {
+    vi.useFakeTimers();
+    const blob = photo();
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        (_url, { signal }) =>
+          new Promise((resolve, reject) => {
+            const timer = setTimeout(() => resolve(imageResponse(blob)), 9000);
+            signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          }),
+      )
+      .mockResolvedValueOnce(response({ vector: unitVector(1), dim: 512 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const embedding = embedImageFromUrlOrNull('https://example.test/slow.webp');
+    await vi.advanceTimersByTimeAsync(9000);
+
+    await expect(embedding).resolves.toEqual(unitVector(1));
   });
 });
