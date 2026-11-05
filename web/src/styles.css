@@ -1809,6 +1809,52 @@ textarea {
   margin-block-start: var(--space-5);
 }
 
+/* Announcement draft (US-24) --------------------------------------------- */
+
+.announcement-draft {
+  margin-block-start: var(--space-5);
+}
+
+.announcement-draft__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.announcement-draft__photo {
+  flex: none;
+  inline-size: 6rem;
+  block-size: 6rem;
+  object-fit: cover;
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+
+.announcement-draft__text {
+  min-block-size: 12rem;
+}
+
+.announcement-draft__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--warning);
+  font-weight: var(--weight-strong);
+}
+
+.announcement-draft__notice .icon {
+  flex: none;
+  margin-block-start: 0.1em;
+}
+
+.announcement-draft__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .credential {
   display: grid;
   gap: var(--space-2);
@@ -2789,6 +2835,7 @@ main:has(.form) + .site-footer {
   .back-link,
   .form-actions,
   .receipt-actions,
+  .announcement-draft,
   .no-print {
     display: none;
   }

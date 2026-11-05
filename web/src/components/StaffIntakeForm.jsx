@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import AnnouncementDraft from './AnnouncementDraft.jsx';
 import { captionImage, captionImageFromUrlOrNull } from '../lib/aiService.js';
 import {
   captionForSubmission,
@@ -372,6 +373,10 @@ export default function StaffIntakeForm({
 
     const controller = new AbortController();
     controllerRef.current = controller;
+    const acceptedCaption = captionForSubmission(
+      captionSuggestion,
+      captionAccepted,
+    );
     try {
       const result = await submitStaffCustody({
         officeId: office.id,
@@ -386,7 +391,7 @@ export default function StaffIntakeForm({
         photo: photo.file,
         photoUrl: photo.existingUrl,
         foundReportId: prefill?.reportId ?? null,
-        aiCaption: captionForSubmission(captionSuggestion, captionAccepted),
+        aiCaption: acceptedCaption,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -398,6 +403,10 @@ export default function StaffIntakeForm({
         dateReceived,
         officeName: office.name,
         staffEmail,
+        aiCaption: acceptedCaption,
+        isCash,
+        photoFile: photo.file ?? null,
+        photoUrl: result.imageUrl,
       });
       setStatus('done');
       onConverted?.(prefill);
@@ -542,6 +551,7 @@ export default function StaffIntakeForm({
             <dd>{receipt.staffEmail}</dd>
           </div>
         </dl>
+        <AnnouncementDraft key={receipt.refCode} item={receipt} />
         {!receipt.usedPhoto && (
           <p className="state__text">
             The photo was saved, but we could not read it for matching — this

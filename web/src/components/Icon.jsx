@@ -35,6 +35,12 @@ const PATHS = {
       <path d="M7 16c0-1.5 1-2 2-2s2 .5 2 2M14 10h4M14 13h4" />
     </>
   ),
+  campaign: (
+    <>
+      <path d="M3 11v2a1 1 0 0 0 1 1h3l7 4V6l-7 4H4a1 1 0 0 0-1 1z" />
+      <path d="M18 9a4 4 0 0 1 0 6M14 7v10" />
+    </>
+  ),
   category: (
     <>
       <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
