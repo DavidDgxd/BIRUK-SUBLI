@@ -158,6 +158,13 @@ export default function StaffLogin() {
                   {emailError}
                 </p>
               )}
+              <div
+                className="visually-hidden"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {emailError}
+              </div>
             </div>
 
             <div className="field">
@@ -206,6 +213,13 @@ export default function StaffLogin() {
                   {passwordError}
                 </p>
               )}
+              <div
+                className="visually-hidden"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {passwordError}
+              </div>
             </div>
 
             <div aria-live="polite">
