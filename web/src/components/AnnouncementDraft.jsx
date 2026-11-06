@@ -6,47 +6,51 @@ import {
 } from '../lib/aiService.js';
 import { captionSource } from '../lib/captionSuggestion.js';
 import {
-  buildAnnouncementDraft,
+  buildAnnouncementDrafts,
+  copyAnnouncement,
   sanitizeAnnouncementText,
+  updateAnnouncementDraft,
 } from '../lib/announcementDraft.js';
 
 const CAPTION_WARNING =
   'We could not read the photo. The draft uses the item title only — add any public details you want to include.';
 
 const buildFor = (item, caption) => {
-  const generated = buildAnnouncementDraft({ ...item, aiCaption: caption });
-  return generated
-    ? { phase: 'ready', generated, body: generated }
-    : { phase: 'empty', generated: '', body: '' };
+  const generated = buildAnnouncementDrafts({ ...item, aiCaption: caption });
+  return generated.en || generated.tl
+    ? { phase: 'ready', en: generated.en, tl: generated.tl }
+    : { phase: 'empty', en: '', tl: '' };
 };
 
-/* Editable public announcement on the custody receipt (US-24). Private notes,
- * cash amounts and finder/claimant fields are never passed to the generator. */
+/* Editable public announcement on the custody receipt (US-24, US-25). Private
+ * notes, cash amounts and finder/claimant fields are never passed here. */
 export default function AnnouncementDraft({ item }) {
   const {
-    title, category, aiCaption, officeName,
+    title, category, aiCaption, officeName, counterHours,
     isCash, imageUrl, photoFile, photoUrl,
-  } = item;
+  } = item ?? {};
   const safeTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
-  const textareaId = useId();
+  const englishId = useId();
+  const filipinoId = useId();
   const hintId = useId();
   const headingId = useId();
-  const textareaRef = useRef(null);
+  const englishRef = useRef(null);
+  const filipinoRef = useRef(null);
   const [draft, setDraft] = useState(() =>
     aiCaption || !(photoFile || photoUrl)
-      ? buildFor(item, aiCaption)
-      : { phase: 'loading', generated: '', body: '' },
+      ? buildFor(item ?? {}, aiCaption)
+      : { phase: 'loading', en: '', tl: '' },
   );
   const [notice, setNotice] = useState('');
-  const [copyState, setCopyState] = useState('idle'); // idle | copied | error
+  const [copyState, setCopyState] = useState('idle'); // idle | en-copied | tl-copied | both-copied | error
 
   useEffect(() => {
     const source = captionSource({ file: photoFile, url: photoUrl });
     if (aiCaption || !source) return undefined;
 
     const controller = new AbortController();
-    const base = { title, category, officeName, isCash };
-    setDraft({ phase: 'loading', generated: '', body: '' });
+    const base = { title, category, officeName, counterHours, isCash };
+    setDraft({ phase: 'loading', en: '', tl: '' });
     setNotice('');
 
     const caption = source.file
@@ -67,19 +71,32 @@ export default function AnnouncementDraft({ item }) {
       });
 
     return () => controller.abort();
-  }, [aiCaption, category, isCash, officeName, photoFile, photoUrl, title]);
+  }, [aiCaption, category, counterHours, isCash, officeName, photoFile, photoUrl, title]);
 
-  async function handleCopy() {
-    if (!draft.body.trim()) return;
+  function editVersion(language, value) {
+    setDraft((current) => updateAnnouncementDraft(current, language, value));
+    setCopyState('idle');
+    setNotice('');
+  }
+  async function handleCopy(action) {
+    if (!draft.en.trim() && !draft.tl.trim()) return;
     try {
-      await navigator.clipboard.writeText(draft.body);
-      setCopyState('copied');
-      setNotice('');
+      const result = await copyAnnouncement(action, {
+        en: draft.en,
+        tl: draft.tl,
+        photoUrl: imageUrl,
+      });
+      setCopyState(`${action}-copied`);
+      const photoNote = result.photoIncluded
+        ? 'Both versions and the photo are on your clipboard.'
+        : 'Both versions are on your clipboard. The photo could not be attached.';
+      setNotice(action === 'both' ? photoNote : 'Copied to your clipboard.');
     } catch {
-      textareaRef.current?.focus();
-      textareaRef.current?.select();
+      const target = action === 'tl' ? filipinoRef : englishRef;
+      target.current?.focus();
+      target.current?.select();
       setCopyState('error');
-      setNotice('Copy failed — the draft is selected, press Ctrl/Cmd+C.');
+      setNotice('Copy failed — the text is selected, press Ctrl/Cmd+C.');
     }
   }
 
@@ -128,35 +145,39 @@ export default function AnnouncementDraft({ item }) {
 
       {draft.phase === 'ready' && (
         <>
-          <label className="field__label" htmlFor={textareaId}>
-            Announcement text
-          </label>
-          <textarea
-            id={textareaId}
-            ref={textareaRef}
-            className="field__control field__control--area announcement-draft__text"
-            rows={10}
-            value={draft.body}
-            aria-describedby={hintId}
-            onChange={(event) => {
-              setDraft((current) => ({ ...current, body: event.target.value }));
-              setCopyState('idle');
-              setNotice('');
-            }}
-          />
+          <div className="announcement-draft__versions">
+            {[
+              ['en', 'English announcement', englishRef, englishId],
+              ['tl', 'Filipino announcement', filipinoRef, filipinoId],
+            ].map(([language, label, ref, id]) => (
+              <div key={language}>
+                <label className="field__label" htmlFor={id}>
+                  {label}
+                </label>
+                <textarea
+                  id={id}
+                  ref={ref}
+                  className="field__control field__control--area announcement-draft__text"
+                  rows={10}
+                  lang={language}
+                  value={draft[language]}
+                  aria-describedby={hintId}
+                  onChange={(event) =>
+                    editVersion(language, event.target.value)
+                  }
+                />
+              </div>
+            ))}
+          </div>
           <p className="field__hint" id={hintId}>
-            Edit before posting. The text is copied to your clipboard; attach
-            the photo above separately.
+            Edit either version before posting. Copy one, or copy both together
+            with the item photo.
           </p>
 
           {notice && (
             <p
               className="announcement-draft__notice"
-              role={
-                notice === CAPTION_WARNING || copyState === 'error'
-                  ? 'status'
-                  : 'alert'
-              }
+              role={copyState === 'error' ? 'alert' : 'status'}
             >
               <Icon name={copyState === 'error' ? 'error' : 'info'} />
               {notice}
@@ -164,10 +185,24 @@ export default function AnnouncementDraft({ item }) {
           )}
 
           <div className="announcement-draft__actions">
-            <button type="button" className="btn btn--filled" onClick={handleCopy}>
-              <Icon name={copyState === 'copied' ? 'check' : 'content_copy'} />
-              {copyState === 'copied' ? 'Copied' : 'Copy announcement'}
-            </button>
+            {[
+              ['en', 'Copy English', 'English copied', draft.en],
+              ['tl', 'Copy Filipino', 'Filipino copied', draft.tl],
+              ['both', 'Copy both + photo', 'Copied both', draft.en || draft.tl],
+            ].map(([action, idle, copied, text]) => (
+              <button
+                key={action}
+                type="button"
+                className={action === 'both' ? 'btn btn--filled' : 'btn'}
+                onClick={() => handleCopy(action)}
+                disabled={!text.trim()}
+              >
+                <Icon
+                  name={copyState === `${action}-copied` ? 'check' : 'content_copy'}
+                />
+                {copyState === `${action}-copied` ? copied : idle}
+              </button>
+            ))}
           </div>
         </>
       )}

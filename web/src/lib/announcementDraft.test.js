@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildAnnouncementDraft,
+  buildAnnouncementDrafts,
+  copyAnnouncement,
   MAX_ANNOUNCEMENT_LENGTH,
   sanitizeAnnouncementText,
+  updateAnnouncementDraft,
 } from './announcementDraft.js';
 
 const ITEM = {
@@ -107,5 +110,29 @@ describe('buildAnnouncementDraft length budget', () => {
 
     expect(draft.length).toBeLessThanOrEqual(MAX_ANNOUNCEMENT_LENGTH);
     expect(draft).toContain('Bring a valid ID.');
+  });
+});
+
+const EN = 'Found item at BCPIO.', TL = 'May nakitang bagay sa BCPIO.';
+describe('US-25 bilingual drafts and copy', () => {
+  it('builds, edits and copies both languages privately', async () => {
+    const original = buildAnnouncementDrafts({
+      ...ITEM, counterHours: 'Mon-Fri, 8am-5pm', description: 'Serial 991287. PHP 5,000.', finderName: 'Juan',
+    });
+    expect(original.en).toContain('Counter hours: Mon-Fri, 8am-5pm');
+    expect(original.tl).toContain('Oras ng counter: Mon-Fri, 8am-5pm');
+    expect(`${original.en}${original.tl}`).not.toMatch(/991287|5,000|Juan/i);
+    expect(updateAnnouncementDraft(original, 'tl', 'TL').en).toBe(original.en);
+    const clipboard = () => ({ writeText: vi.fn(), write: vi.fn() });
+    const plain = clipboard();
+    await copyAnnouncement('en', { en: EN, tl: TL, clipboard: plain });
+    await copyAnnouncement('tl', { en: EN, tl: TL, clipboard: plain });
+    expect(plain.writeText.mock.calls).toEqual([[EN], [TL]]);
+    const photo = new Blob(['photo'], { type: 'image/webp' });
+    const rich = await copyAnnouncement('both', { en: EN, tl: TL, photoUrl: 'u', clipboard: plain, ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } }, fetchImpl: async () => ({ ok: true, blob: async () => photo }) });
+    expect(rich).toEqual({ mode: 'rich', photoIncluded: true });
+    const fallback = clipboard();
+    expect(await copyAnnouncement('both', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
+    expect(fallback.writeText.mock.calls[0][0]).toContain(TL);
   });
 });

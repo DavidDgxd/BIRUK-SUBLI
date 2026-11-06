@@ -58,26 +58,30 @@ test('drafts, edits and copies a public announcement without private notes', asy
     'Photo of Brown leather wallet',
   );
 
-  const textarea = page.getByLabel('Announcement text');
+  const textarea = page.getByLabel('English announcement');
   await expect(textarea).toHaveValue(
     /Found item at Baguio City Public Information Office: Brown leather wallet/,
+  );
+  await expect(page.getByLabel('Filipino announcement')).toHaveValue(
+    /May nakitang bagay sa Baguio City Public Information Office/,
   );
 
   const draft = await textarea.inputValue();
   expect(draft).toContain(CAPTION);
   expect(draft).not.toMatch(/BS-0123|991287|bus card|PHP 500/);
 
-  const readClipboard = () =>
-    page.evaluate(() =>
-      navigator.clipboard.readText().then((text) => text.replace(/\r\n/g, '\n')),
-    );
+  const readClipboard = () => page.evaluate(() =>
+    navigator.clipboard.readText().then((text) => text.replace(/\r\n/g, '\n')));
 
-  await page.getByRole('button', { name: 'Copy announcement' }).click();
-  await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
+  await page.getByRole('button', { name: 'Copy English' }).click();
+  await expect(page.getByRole('button', { name: 'English copied' })).toBeVisible();
   await expect.poll(readClipboard).toBe(draft);
 
   const edited = 'Brown wallet found near Malcolm Square. Ask at the counter.';
   await textarea.fill(edited);
-  await page.getByRole('button', { name: 'Copy announcement' }).click();
+  await page.getByRole('button', { name: 'Copy English' }).click();
   await expect.poll(readClipboard).toBe(edited);
+  await expect(page.getByLabel('Filipino announcement')).toHaveValue(
+    /May nakitang bagay sa/,
+  );
 });
