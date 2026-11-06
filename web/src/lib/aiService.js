@@ -259,6 +259,25 @@ export async function captionImageOrNull(file, signal, options) {
 }
 
 /**
+ * Downloads a photo that already has a public URL so it can be posted to an
+ * endpoint that only accepts an upload. A missing object or blocked request
+ * throws; the caller's best-effort timeout turns that into a null result.
+ */
+async function fetchPhotoBlob(url, signal) {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`Photo request returned ${response.status}`);
+  }
+  return response.blob();
+}
+
+/**
+ * A photo URL pays for a download on top of the model call, so the embedding
+ * path gets more room than the 8s a file already on the page gets.
+ */
+const URL_PHOTO_TIMEOUT_MS = 15000;
+
+/**
  * Captions a photo that already lives at a URL, such as the photo reused from a
  * pending self-report (US-10). /caption/image only accepts an upload, so the
  * image is fetched first and posted as a blob.
@@ -270,11 +289,7 @@ export async function captionImageOrNull(file, signal, options) {
 export async function captionImageFromUrlOrNull(url, signal, options) {
   return captionOrNull(
     async (captionSignal) => {
-      const response = await fetch(url, { signal: captionSignal });
-      if (!response.ok) {
-        throw new Error(`Photo request returned ${response.status}`);
-      }
-      const blob = await response.blob();
+      const blob = await fetchPhotoBlob(url, captionSignal);
       return (await captionImage(blob, captionSignal)).caption;
     },
     signal,
@@ -348,18 +363,17 @@ export async function embedImageOrNull(file, signal, options) {
  * an upload, so the image is fetched first and posted as a blob. A missing
  * object or blocked request resolves to null, so the item still matches on its
  * text details like a newly selected photo whose model is offline.
+ *
+ * This path also pays for the download, so it gets `URL_PHOTO_TIMEOUT_MS`
+ * unless the caller overrides it.
  */
 export async function embedImageFromUrlOrNull(url, signal, options) {
   return embeddingOrNull(
     async (embedSignal) => {
-      const response = await fetch(url, { signal: embedSignal });
-      if (!response.ok) {
-        throw new Error(`Photo request returned ${response.status}`);
-      }
-      const blob = await response.blob();
+      const blob = await fetchPhotoBlob(url, embedSignal);
       return (await embedImage(blob, embedSignal)).embedding;
     },
     signal,
-    options,
+    { timeoutMs: URL_PHOTO_TIMEOUT_MS, ...options },
   );
 }
