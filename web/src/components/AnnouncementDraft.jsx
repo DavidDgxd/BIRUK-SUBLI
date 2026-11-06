@@ -43,6 +43,27 @@ export default function AnnouncementDraft({ item }) {
   );
   const [notice, setNotice] = useState('');
   const [copyState, setCopyState] = useState('idle');
+  const [photoBlob, setPhotoBlob] = useState(null);
+  const copying = copyState.endsWith('-copying');
+
+  // Fetch the photo ahead of the click so clipboard.write() runs while the
+  // click's transient activation is still valid (Safari/iOS requirement).
+  useEffect(() => {
+    if (!imageUrl) {
+      setPhotoBlob(null);
+      return undefined;
+    }
+    let active = true;
+    const controller = new AbortController();
+    fetch(imageUrl, { signal: controller.signal })
+      .then((response) => (response.ok ? response.blob() : null))
+      .then((blob) => { if (active) setPhotoBlob(blob); })
+      .catch(() => { if (active) setPhotoBlob(null); });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [imageUrl]);
 
   useEffect(() => {
     const source = captionSource({ file: photoFile, url: photoUrl });
@@ -79,12 +100,24 @@ export default function AnnouncementDraft({ item }) {
     setNotice('');
   }
   async function handleCopy(action) {
-    if (!draft.en.trim() && !draft.tl.trim()) return;
+    if (copying || (!draft.en.trim() && !draft.tl.trim())) return;
+    setCopyState(`${action}-copying`);
     try {
-      const result = await copyAnnouncement(action, { en: draft.en, tl: draft.tl, photoUrl: imageUrl });
+      const result = await copyAnnouncement(action, {
+        en: draft.en, tl: draft.tl, photoBlob,
+      });
       setCopyState(`${action}-copied`);
-      const photoNote = result.photoIncluded ? 'Both versions and the photo are on your clipboard.' : 'Both versions are on your clipboard. The photo could not be attached.';
-      setNotice(action === 'both' ? photoNote : 'Copied to your clipboard.');
+      if (action === 'facebook') {
+        setNotice(result.photoIncluded
+          ? 'Text and photo are ready to paste into Facebook.'
+          : 'Text copied. The photo could not be attached — save it from the preview.');
+      } else if (action === 'both') {
+        setNotice(result.photoIncluded
+          ? 'Both versions and the photo are on your clipboard.'
+          : 'Both versions are on your clipboard. The photo could not be attached.');
+      } else {
+        setNotice('Copied to your clipboard.');
+      }
     } catch {
       const target = action === 'tl' ? filipinoRef : englishRef;
       target.current?.focus();
@@ -165,20 +198,24 @@ export default function AnnouncementDraft({ item }) {
             </p>
           )}
 
-          <div className="announcement-draft__actions">
+          <div className="announcement-draft__actions" aria-busy={copying}>
             {[
               ['en', 'Copy English', 'English copied', draft.en],
               ['tl', 'Copy Filipino', 'Filipino copied', draft.tl],
               ['both', 'Copy both + photo', 'Copied both', draft.en || draft.tl],
               ['facebook', 'Copy for Facebook', 'Copied for Facebook', draft.en || draft.tl],
-            ].map(([action, idle, copied, text]) => (
-              <button key={action} type="button"
-                className={action === 'both' ? 'btn btn--filled' : 'btn'}
-                onClick={() => handleCopy(action)} disabled={!text.trim()}>
-                <Icon name={copyState === `${action}-copied` ? 'check' : 'content_copy'} />
-                {copyState === `${action}-copied` ? copied : idle}
-              </button>
-            ))}
+            ].map(([action, idle, copied, text]) => {
+              const busy = copyState === `${action}-copying`;
+              const done = copyState === `${action}-copied`;
+              return (
+                <button key={action} type="button"
+                  className={action === 'both' ? 'btn btn--filled' : 'btn'}
+                  onClick={() => handleCopy(action)} disabled={copying || !text.trim()}>
+                  <Icon name={done ? 'check' : busy ? 'hourglass_top' : 'content_copy'} />
+                  {done ? copied : busy ? 'Copying…' : idle}
+                </button>
+              );
+            })}
           </div>
         </>
       )}

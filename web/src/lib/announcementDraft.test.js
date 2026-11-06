@@ -129,7 +129,7 @@ describe('US-25 bilingual drafts and copy', () => {
     await copyAnnouncement('tl', { en: EN, tl: TL, clipboard: plain });
     expect(plain.writeText.mock.calls).toEqual([[EN], [TL]]);
     const photo = new Blob(['photo'], { type: 'image/webp' });
-    const rich = await copyAnnouncement('both', { en: EN, tl: TL, photoUrl: 'u', clipboard: plain, ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } }, fetchImpl: async () => ({ ok: true, blob: async () => photo }) });
+    const rich = await copyAnnouncement('both', { en: EN, tl: TL, photoBlob: photo, clipboard: plain, ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } } });
     expect(rich).toEqual({ mode: 'rich', photoIncluded: true });
     const fallback = clipboard();
     expect(await copyAnnouncement('both', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
@@ -142,5 +142,43 @@ describe('US-25 bilingual drafts and copy', () => {
     expect(drafts.en).toContain(ITEM.aiCaption);
     expect(drafts.tl).toContain(captionTl);
     expect(drafts.tl).not.toContain(ITEM.aiCaption);
+  });
+});
+
+describe('US-26 Facebook copy', () => {
+  const clipboard = () => ({ writeText: vi.fn(), write: vi.fn() });
+  const ClipboardItemStub = class { constructor(parts) { this.parts = parts; } };
+
+  it('writes text and the pre-fetched photo in one ClipboardItem', async () => {
+    const photo = new Blob(['photo'], { type: 'image/webp' });
+    const plain = clipboard();
+    const result = await copyAnnouncement('facebook', {
+      en: EN, tl: TL, photoBlob: photo, clipboard: plain,
+      ClipboardItemCtor: ClipboardItemStub,
+    });
+    expect(result).toEqual({ mode: 'rich', photoIncluded: true });
+    expect(plain.write.mock.calls[0][0][0].parts['image/webp']).toBe(photo);
+  });
+
+  it('falls back to writeText when the rich write is blocked', async () => {
+    const plain = clipboard();
+    plain.write.mockRejectedValue(new Error('blocked'));
+    const result = await copyAnnouncement('facebook', {
+      en: EN, tl: TL, photoBlob: new Blob(['photo'], { type: 'image/png' }),
+      clipboard: plain, ClipboardItemCtor: ClipboardItemStub,
+    });
+    expect(result).toEqual({ mode: 'text', photoIncluded: false });
+    expect(plain.writeText).toHaveBeenCalledWith(expect.stringContaining(TL));
+  });
+
+  it('falls back to writeText when ClipboardItem is unavailable', async () => {
+    const plain = clipboard();
+    const result = await copyAnnouncement('facebook', { en: EN, tl: TL, clipboard: plain });
+    expect(result).toEqual({ mode: 'text', photoIncluded: false });
+    expect(plain.writeText.mock.calls[0][0]).toContain(TL);
+  });
+
+  it('throws when there is no text to copy', async () => {
+    await expect(copyAnnouncement('facebook', { en: '', tl: '', clipboard: clipboard() })).rejects.toThrow('There is nothing to copy yet.');
   });
 });

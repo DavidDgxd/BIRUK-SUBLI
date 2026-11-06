@@ -124,7 +124,7 @@ export const updateAnnouncementDraft = (draft, language, text) => ({
   en: '', tl: '', ...draft,
   [language === 'tl' || language === 'fil' ? 'tl' : 'en']: text,
 });
-const COPY_ACTIONS = ['en', 'tl', 'both'];
+const COPY_ACTIONS = ['en', 'tl', 'both', 'facebook'];
 export function combinedAnnouncementText({ en = '', tl = '' } = {}) {
   const english = String(en ?? '').trim();
   const filipino = String(tl ?? '').trim();
@@ -135,38 +135,28 @@ function textFor(action, { en = '', tl = '' }) {
   if (action === 'tl') return String(tl ?? '').trim();
   return combinedAnnouncementText({ en, tl });
 }
-async function photoPart(photoUrl, fetchImpl) {
-  if (!photoUrl || typeof fetchImpl !== 'function') return null;
-  try {
-    const response = await fetchImpl(photoUrl);
-    if (!response?.ok) return null;
-    const blob = await response.blob();
-    return blob ? { [blob.type || 'image/png']: blob } : null;
-  } catch {
-    return null;
-  }
-}
 export async function copyAnnouncement(
   action,
   {
     en = '',
     tl = '',
-    photoUrl = '',
+    photoBlob = null,
     clipboard = globalThis.navigator?.clipboard,
     ClipboardItemCtor = globalThis.ClipboardItem,
-    fetchImpl = globalThis.fetch,
   } = {},
 ) {
   if (!COPY_ACTIONS.includes(action)) throw new Error(`Unknown copy action: ${action}`);
   const text = textFor(action, { en, tl });
   if (!text) throw new Error('There is nothing to copy yet.');
   if (!clipboard?.writeText && !clipboard?.write) throw new Error('Clipboard access is unavailable.');
-  if (action === 'both' && typeof clipboard.write === 'function' && typeof ClipboardItemCtor === 'function') {
-    const media = await photoPart(photoUrl, fetchImpl);
-    const parts = { 'text/plain': new Blob([text], { type: 'text/plain' }), ...(media ?? {}) };
+  const rich = action === 'both' || action === 'facebook';
+  if (rich && photoBlob && typeof clipboard.write === 'function' && typeof ClipboardItemCtor === 'function') {
+    // The blob is fetched before the click, so write() runs inside the
+    // transient activation window required by Safari/iOS.
+    const parts = { 'text/plain': new Blob([text], { type: 'text/plain' }), [photoBlob.type || 'image/png']: photoBlob };
     try {
       await clipboard.write([new ClipboardItemCtor(parts)]);
-      return { mode: 'rich', photoIncluded: Boolean(media) };
+      return { mode: 'rich', photoIncluded: true };
     } catch { /* fall back to writeText below */ }
   }
   if (typeof clipboard.writeText !== 'function') throw new Error('Clipboard access is unavailable.');
