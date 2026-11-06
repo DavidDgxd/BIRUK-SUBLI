@@ -23,6 +23,10 @@ export default function SiteHeader({ isHome = false }) {
 
   const link = staffLinkFor(status, isAdmin);
   const staffLink = link?.to === pathname ? null : link;
+  const officesLink =
+    pathname === '/offices'
+      ? null
+      : { to: '/offices', icon: 'location_on', label: 'Offices' };
 
   return (
     <header className="site-header">
@@ -46,12 +50,20 @@ export default function SiteHeader({ isHome = false }) {
           </span>
         </span>
       </Link>
-      {staffLink && (
-        <Link className="site-header__staff" to={staffLink.to}>
-          <Icon name={staffLink.icon} size={18} strokeWidth={1.5} />
-          <span>{staffLink.label}</span>
-        </Link>
-      )}
+      <nav className="site-header__nav" aria-label="Site">
+        {officesLink && (
+          <Link className="site-header__link" to={officesLink.to}>
+            <Icon name={officesLink.icon} size={18} strokeWidth={1.5} />
+            <span>{officesLink.label}</span>
+          </Link>
+        )}
+        {staffLink && (
+          <Link className="site-header__link" to={staffLink.to}>
+            <Icon name={staffLink.icon} size={18} strokeWidth={1.5} />
+            <span>{staffLink.label}</span>
+          </Link>
+        )}
+      </nav>
     </header>
   );
 }
