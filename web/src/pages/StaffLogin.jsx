@@ -17,16 +17,22 @@ export default function StaffLogin() {
   const headingRef = useRef(null);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
+  const focusTargetRef = useRef(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [focusAttempt, setFocusAttempt] = useState(0);
 
   const emailId = useId();
   const passwordId = useId();
-  const errorId = useId();
+  const emailErrorId = useId();
+  const passwordErrorId = useId();
+  const formErrorId = useId();
 
   // Where the officer was headed before the gate sent them here. Only a path
   // within this app is honoured, never an absolute URL.
@@ -44,35 +50,46 @@ export default function StaffLogin() {
     headingRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (!focusAttempt) return;
+    focusTargetRef.current?.focus();
+    focusTargetRef.current = null;
+  }, [focusAttempt]);
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (submitting) return;
 
-    const siteEmail = email.trim();
-    if (!siteEmail) {
-      setError('Enter your email.');
-      emailRef.current?.focus();
-      return;
-    }
-    if (!password) {
-      setError('Enter your password.');
-      passwordRef.current?.focus();
+    const trimmedEmail = email.trim();
+    const nextEmailError = trimmedEmail ? '' : 'Enter the office email.';
+    const nextPasswordError = password ? '' : 'Enter the office password.';
+
+    setEmailError(nextEmailError);
+    setPasswordError(nextPasswordError);
+
+    if (nextEmailError || nextPasswordError) {
+      setFormError('');
+      focusTargetRef.current = nextEmailError
+        ? emailRef.current
+        : passwordRef.current;
+      setFocusAttempt((attempt) => attempt + 1);
       return;
     }
 
-    setError('');
+    setFormError('');
     setSubmitting(true);
     try {
-      await signIn(siteEmail, password);
+      await signIn(trimmedEmail, password);
       // The provider flips isAuthenticated, which renders the redirect below.
     } catch (signInError) {
       if (import.meta.env.DEV) console.error('[StaffLogin]', signInError);
       setSubmitting(false);
-      setError(
+      setFormError(
         signInError?.message ??
           'We could not sign you in right now. Please try again.',
       );
-      passwordRef.current?.focus();
+      focusTargetRef.current = passwordRef.current;
+      setFocusAttempt((attempt) => attempt + 1);
     }
   }
 
@@ -123,13 +140,30 @@ export default function StaffLogin() {
                 spellCheck="false"
                 required
                 value={email}
-                aria-invalid={error && !email.trim() ? 'true' : undefined}
-                aria-describedby={error ? errorId : undefined}
+                aria-invalid={emailError ? 'true' : undefined}
+                aria-describedby={
+                  [emailError ? emailErrorId : '', formError ? formErrorId : '']
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
                 onChange={(event) => {
                   setEmail(event.target.value);
-                  if (error) setError('');
+                  if (emailError) setEmailError('');
+                  if (formError) setFormError('');
                 }}
               />
+              <p
+                id={emailErrorId}
+                className={emailError ? 'form-error' : 'visually-hidden'}
+                aria-live="polite"
+              >
+                {emailError && (
+                  <>
+                    <Icon name="error" />
+                    {emailError}
+                  </>
+                )}
+              </p>
             </div>
 
             <div className="field">
@@ -145,11 +179,19 @@ export default function StaffLogin() {
                   autoComplete="current-password"
                   required
                   value={password}
-                  aria-invalid={error && !password ? 'true' : undefined}
-                  aria-describedby={error ? errorId : undefined}
+                  aria-invalid={passwordError ? 'true' : undefined}
+                  aria-describedby={
+                    [
+                      passwordError ? passwordErrorId : '',
+                      formError ? formErrorId : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                   onChange={(event) => {
                     setPassword(event.target.value);
-                    if (error) setError('');
+                    if (passwordError) setPasswordError('');
+                    if (formError) setFormError('');
                   }}
                 />
                 <button
@@ -164,16 +206,32 @@ export default function StaffLogin() {
                   <Icon name={showPassword ? 'visibility_off' : 'visibility'} />
                 </button>
               </div>
+              <p
+                id={passwordErrorId}
+                className={passwordError ? 'form-error' : 'visually-hidden'}
+                aria-live="polite"
+              >
+                {passwordError && (
+                  <>
+                    <Icon name="error" />
+                    {passwordError}
+                  </>
+                )}
+              </p>
             </div>
 
-            <div aria-live="polite">
-              {error && (
-                <p className="form-error" id={errorId}>
+            <p
+              id={formErrorId}
+              className={formError ? 'form-error' : 'visually-hidden'}
+              aria-live="polite"
+            >
+              {formError && (
+                <>
                   <Icon name="error" />
-                  {error}
-                </p>
+                  {formError}
+                </>
               )}
-            </div>
+            </p>
 
             <div className="form-actions">
               <button type="submit" className="btn btn--primary" disabled={submitting}>
