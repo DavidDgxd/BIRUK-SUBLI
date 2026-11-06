@@ -184,16 +184,14 @@ export default function StaffIntakeForm({
     setCaptionAccepted(false);
 
     const caption = source.file
-      ? captionImage(source.file, controller.signal).then(
-          (result) => result.caption,
-        )
+      ? captionImage(source.file, controller.signal)
       : captionImageFromUrlOrNull(source.url, controller.signal);
 
     caption
       .then((suggestion) => {
         if (controller.signal.aborted) return;
 
-        const text = truncateAtWordBoundary(suggestion, MAX_DESCRIPTION_LENGTH);
+        const text = truncateAtWordBoundary(suggestion?.caption, MAX_DESCRIPTION_LENGTH);
         if (!text) {
           // Both newly selected and reused (pending-report) photos surface the
           // same error state so the staffer can retry or type the description.
@@ -211,7 +209,7 @@ export default function StaffIntakeForm({
           descriptionValueRef.current = text;
           setDescription(text);
         }
-        setCaptionSuggestion({ status: 'ready', text });
+        setCaptionSuggestion({ status: 'ready', text, textTl: suggestion?.captionTl ?? null });
       })
       .catch((captionError) => {
         if (controller.signal.aborted || captionError.name === 'AbortError')
@@ -402,8 +400,10 @@ export default function StaffIntakeForm({
         storageLocation: trimmedStorage,
         dateReceived,
         officeName: office.name,
+        counterHours: office.counterHours ?? '',
         staffEmail,
         aiCaption: acceptedCaption,
+        aiCaptionTl: acceptedCaption ? captionSuggestion?.textTl ?? null : null,
         isCash,
         photoFile: photo.file ?? null,
         photoUrl: result.imageUrl,
