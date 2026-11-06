@@ -50,7 +50,18 @@ FILIPINO_TRANSLATIONS = [
     ("pulang payong", "red umbrella"),
     ("cellphone na may itim na case", "Black - case mobile phone"),
     ("black wallet na may ID", "black wallet with ID"),
+    # Second review on #79: missed by the first version of the list.
+    ("bote", "bottle"),
+    ("bentilador", "fan"),
+    ("telepono", "phone"),
+    ("kutsara", "spoon"),
+    ("plantsa", "iron"),
 ]
+
+# Documented trade-off: short words that are both Tagalog and English or a
+# name. These ARE sent to the model; the test pins the behaviour so a change
+# to it is deliberate.
+ACCEPTED_COLLISIONS = ["Bago City", "Si unit", "KO punch", "Plato"]
 
 
 class LanguageGateTests(unittest.TestCase):
@@ -75,6 +86,11 @@ class LanguageGateTests(unittest.TestCase):
                 ),
             ):
                 self.assertEqual(translate_to_english(query), output)
+
+    def test_accepted_collisions_are_treated_as_filipino(self):
+        for query in ACCEPTED_COLLISIONS:
+            with self.subTest(query=query):
+                self.assertTrue(looks_filipino(query))
 
     def test_linker_suffixes_are_recognised(self):
         self.assertTrue(looks_filipino("bagong sapatos"))

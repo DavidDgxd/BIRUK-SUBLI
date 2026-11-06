@@ -22,7 +22,13 @@ The list errs towards precision. A false positive rewrites an English query
 into the wrong words, while a miss only falls back to embedding the query as
 typed, which is how search behaved before this story. Words that are also
 English or a name ("may", "at", "pan", "polo", "lapis", "sombrero", "tabi",
-"kay", "abo") are left out.
+"kay", "abo") are left out. Known accepted collisions: "Bago City", "Si unit",
+"KO punch" and "Plato" are treated as Filipino and sent to the model.
+
+The list is a stopgap, not the long-term design: every missing word is a
+silent miss, so it needs curating as queries come in. The planned exit is the
+"api" provider below. A hosted translation API detects the language itself,
+so when it lands, looks_filipino() and the list can be deleted.
 
 Everything above translate_to_english() is pure logic, so the unit tests
 import this module without torch or transformers. Those are imported only
@@ -51,6 +57,8 @@ _FILIPINO_WORDS = frozenset(
     rosaryo susi pera barya lalagyan tubigan baunan aklat libro kuwaderno
     kwaderno bolpen panyo bimpo tuwalya kumot unan maleta bayong supot kahon
     laruan manika guwantes sinturon suklay katad balat tela bakal
+    bote bentilador telepono baso plato kutsara tinidor kutsilyo kaldero
+    kawali plantsa walis basahan uniporme
     kotse sasakyan bahay simbahan palengke paaralan eskwelahan
     """.split()  # noqa: SIM905
 )
