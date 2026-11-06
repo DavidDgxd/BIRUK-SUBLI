@@ -189,6 +189,7 @@ export default function AnnouncementDraft({ item }) {
               ['en', 'Copy English', 'English copied', draft.en],
               ['tl', 'Copy Filipino', 'Filipino copied', draft.tl],
               ['both', 'Copy both + photo', 'Copied both', draft.en || draft.tl],
+              ['facebook', 'Copy for Facebook', 'Copied for Facebook', draft.en || draft.tl],
             ].map(([action, idle, copied, text]) => (
               <button
                 key={action}

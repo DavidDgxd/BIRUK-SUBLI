@@ -139,7 +139,7 @@ export function updateAnnouncementDraft(draft, language, text) {
   const key = language === 'tl' || language === 'fil' ? 'tl' : 'en';
   return { en: '', tl: '', ...draft, [key]: text };
 }
-const COPY_ACTIONS = ['en', 'tl', 'both'];
+const COPY_ACTIONS = ['en', 'tl', 'both', 'facebook'];
 /** Both drafts in one plain-text clipboard payload. */
 export function combinedAnnouncementText({ en = '', tl = '' } = {}) {
   const english = String(en ?? '').trim();
@@ -184,7 +184,7 @@ export async function copyAnnouncement(
     throw new Error('Clipboard access is unavailable.');
   }
   if (
-    action === 'both' &&
+    (action === 'both' || action === 'facebook') &&
     typeof clipboard.write === 'function' &&
     typeof ClipboardItemCtor === 'function'
   ) {

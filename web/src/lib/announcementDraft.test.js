@@ -135,4 +135,32 @@ describe('US-25 bilingual drafts and copy', () => {
     expect(await copyAnnouncement('both', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
     expect(fallback.writeText.mock.calls[0][0]).toContain(TL);
   });
+
+  describe('US-26 facebook copy', () => {
+    const clipboard = () => ({ writeText: vi.fn(), write: vi.fn() });
+    const plain = clipboard();
+
+    it('copies both versions + photo via ClipboardItem when available', async () => {
+      const photo = new Blob(['photo'], { type: 'image/webp' });
+      const rich = await copyAnnouncement('facebook', {
+        en: EN,
+        tl: TL,
+        photoUrl: 'u',
+        clipboard: plain,
+        ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } },
+        fetchImpl: async () => ({ ok: true, blob: async () => photo }),
+      });
+      expect(rich).toEqual({ mode: 'rich', photoIncluded: true });
+    });
+
+    it('falls back to writeText when ClipboardItem unavailable', async () => {
+      const fallback = clipboard();
+      expect(await copyAnnouncement('facebook', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
+      expect(fallback.writeText.mock.calls[0][0]).toContain(TL);
+    });
+
+    it('throws when there is no text to copy', async () => {
+      await expect(copyAnnouncement('facebook', { en: '', tl: '', clipboard: plain })).rejects.toThrow('There is nothing to copy yet.');
+    });
+  });
 });
