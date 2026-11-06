@@ -5,7 +5,10 @@ import {
   captionImageFromUrlOrNull,
 } from '../lib/aiService.js';
 import { captionSource } from '../lib/captionSuggestion.js';
-import { buildAnnouncementDraft } from '../lib/announcementDraft.js';
+import {
+  buildAnnouncementDraft,
+  sanitizeAnnouncementText,
+} from '../lib/announcementDraft.js';
 
 const CAPTION_WARNING =
   'We could not read the photo. The draft uses the item title only — add any public details you want to include.';
@@ -24,6 +27,7 @@ export default function AnnouncementDraft({ item }) {
     title, category, aiCaption, officeName,
     isCash, imageUrl, photoFile, photoUrl,
   } = item;
+  const safeTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
   const textareaId = useId();
   const hintId = useId();
   const headingId = useId();
@@ -99,7 +103,7 @@ export default function AnnouncementDraft({ item }) {
           <img
             className="announcement-draft__photo"
             src={imageUrl}
-            alt={`Photo of ${title}`}
+            alt={`Photo of ${safeTitle || 'found item'}`}
             width="96"
             height="96"
             loading="lazy"
