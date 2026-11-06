@@ -152,19 +152,18 @@ export default function StaffLogin() {
                   if (formError) setFormError('');
                 }}
               />
-              {emailError && (
-                <p className="form-error" id={emailErrorId}>
-                  <Icon name="error" />
-                  {emailError}
-                </p>
-              )}
-              <div
-                className="visually-hidden"
+              <p
+                id={emailErrorId}
+                className={emailError ? 'form-error' : 'visually-hidden'}
                 aria-live="polite"
-                aria-atomic="true"
               >
-                {emailError}
-              </div>
+                {emailError && (
+                  <>
+                    <Icon name="error" />
+                    {emailError}
+                  </>
+                )}
+              </p>
             </div>
 
             <div className="field">
@@ -207,29 +206,32 @@ export default function StaffLogin() {
                   <Icon name={showPassword ? 'visibility_off' : 'visibility'} />
                 </button>
               </div>
-              {passwordError && (
-                <p className="form-error" id={passwordErrorId}>
-                  <Icon name="error" />
-                  {passwordError}
-                </p>
-              )}
-              <div
-                className="visually-hidden"
+              <p
+                id={passwordErrorId}
+                className={passwordError ? 'form-error' : 'visually-hidden'}
                 aria-live="polite"
-                aria-atomic="true"
               >
-                {passwordError}
-              </div>
+                {passwordError && (
+                  <>
+                    <Icon name="error" />
+                    {passwordError}
+                  </>
+                )}
+              </p>
             </div>
 
-            <div aria-live="polite">
+            <p
+              id={formErrorId}
+              className={formError ? 'form-error' : 'visually-hidden'}
+              aria-live="polite"
+            >
               {formError && (
-                <p className="form-error" id={formErrorId}>
+                <>
                   <Icon name="error" />
                   {formError}
-                </p>
+                </>
               )}
-            </div>
+            </p>
 
             <div className="form-actions">
               <button type="submit" className="btn btn--primary" disabled={submitting}>

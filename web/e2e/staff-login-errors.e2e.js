@@ -10,7 +10,7 @@ function fieldFor(page, label) {
 }
 
 function announcement(field) {
-  return field.locator('.visually-hidden[aria-live="polite"]');
+  return field.locator('[aria-live="polite"]');
 }
 
 test.describe('staff login credential errors', () => {
@@ -60,6 +60,12 @@ test.describe('staff login credential errors', () => {
     );
     await expect(announcement(emailField)).toHaveText(EMAIL_ERROR);
     await expect(announcement(passwordField)).toHaveText(PASSWORD_ERROR);
+    await expect(
+      emailField.getByText(EMAIL_ERROR, { exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      passwordField.getByText(PASSWORD_ERROR, { exact: true }),
+    ).toHaveCount(1);
 
     const emailErrorId = await emailField
       .locator('.form-error')
