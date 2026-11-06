@@ -204,7 +204,7 @@ The custody receipt carries a ready-to-post announcement, editable and copyable
 in place. `src/lib/announcementDraft.js` builds it from the public title,
 category, office and photo caption only — never the private `description`,
 `cash_amount`, storage location or finder/claimant fields. A sanitiser drops
-whole sentences containing money, serial/ID references, phone numbers, emails
+whole sentences containing money, serial and ID numbers, phone numbers, emails
 or links, and cash drafts never quote an amount. No new table or RPC is needed.
 
 ## Office provisioning (`/admin/offices`)

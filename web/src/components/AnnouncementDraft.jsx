@@ -152,7 +152,11 @@ export default function AnnouncementDraft({ item }) {
           {notice && (
             <p
               className="announcement-draft__notice"
-              role={copyState === 'error' ? 'status' : 'alert'}
+              role={
+                notice === CAPTION_WARNING || copyState === 'error'
+                  ? 'status'
+                  : 'alert'
+              }
             >
               <Icon name={copyState === 'error' ? 'error' : 'info'} />
               {notice}

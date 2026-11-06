@@ -26,10 +26,12 @@ function truncate(text, maxLength) {
   return `${text.slice(0, maxLength - 1).replace(/\s+\S*$/, '')}…`;
 }
 
+/* Public titles such as "Student ID", "Passport" or "Bank account" are safe on
+ * their own; only identifiers that carry digits are private. */
 const isPrivate = (sentence) =>
   MONEY_MARKER.test(sentence) ||
-  SENSITIVE_MARKER.test(sentence) ||
-  CONTACT_MARKER.test(sentence);
+  CONTACT_MARKER.test(sentence) ||
+  (SENSITIVE_MARKER.test(sentence) && /\d/.test(sentence));
 
 /** Drops private sentences and normalises the rest; exported for unit tests. */
 export function sanitizeAnnouncementText(
@@ -40,7 +42,9 @@ export function sanitizeAnnouncementText(
   if (!text) return '';
 
   const kept = text
-    .split(/(?<=[.!?])\s+|\n+/)
+    // Do not split after abbreviations such as "no." or "acct.": the
+    // identifier and its label must stay in one sentence to be dropped whole.
+    .split(/(?<=[.!?])(?<!\b(?:no|nos|acct)\.)\s+|\n+/i)
     .map(normalise)
     .filter((sentence) => sentence && !isPrivate(sentence));
 
@@ -67,20 +71,31 @@ export function buildAnnouncementDraft({
   const heading = isCash
     ? `Found cash at ${place}`
     : `Found item at ${place}${cleanTitle ? `: ${cleanTitle}` : ''}`;
-  const description =
-    cleanCaption ||
-    (isCash
-      ? 'Cash has been handed in. Please describe it at the counter.'
-      : 'See the photo for details.');
-
-  const lines = [
-    heading,
+  const fallback = isCash
+    ? 'Cash has been handed in. Please describe it at the counter.'
+    : 'See the photo for details.';
+  const tail = [
     '',
-    description,
     `Category: ${cleanCategory}`,
     '',
     `If this belongs to you, visit ${place} and describe the item at the counter. Bring a valid ID.`,
-  ];
+  ].join('\n');
 
-  return truncate(lines.join('\n').trim(), MAX_ANNOUNCEMENT_LENGTH);
+  if (!cleanCaption) {
+    return truncate(`${heading}\n\n${fallback}${tail}`, MAX_ANNOUNCEMENT_LENGTH);
+  }
+
+  const head = `${heading}\n\n`;
+  const full = `${head}${cleanCaption}${tail}`;
+  if (full.length <= MAX_ANNOUNCEMENT_LENGTH) return full;
+
+  // Trim the caption only, so the essential "visit the office… Bring a valid
+  // ID." footer always survives a long title, office name or caption.
+  const budget = MAX_ANNOUNCEMENT_LENGTH - head.length - tail.length;
+  const visibleCaption = budget > 0 ? truncate(cleanCaption, budget) : '';
+  const draft = `${head}${visibleCaption}${tail}`;
+
+  return draft.length <= MAX_ANNOUNCEMENT_LENGTH
+    ? draft
+    : truncate(draft, MAX_ANNOUNCEMENT_LENGTH);
 }

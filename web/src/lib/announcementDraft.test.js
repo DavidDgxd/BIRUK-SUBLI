@@ -68,4 +68,44 @@ describe('sanitizeAnnouncementText', () => {
       ),
     ).toBe('A black folding umbrella with a wooden handle and a small tear.');
   });
+
+  it.each([
+    'A Student ID card was found.',
+    'A UB ID card was handed in.',
+    'A passport was found.',
+    "A driver's license was handed in.",
+    'A bank account card was found.',
+  ])('keeps a public title without a number: %s', (text) => {
+    expect(sanitizeAnnouncementText(text)).toBe(text);
+  });
+
+  it.each([
+    'Serial no. A1234 is printed on the flap.',
+    'ID no. 2021-12345 is visible on the card.',
+    'Acct. 12345 belongs to the owner.',
+  ])('drops an identifier without leaving an orphan fragment: %s', (text) => {
+    const draft = buildAnnouncementDraft({
+      ...ITEM,
+      title: 'Found document',
+      aiCaption: text,
+    });
+
+    expect(sanitizeAnnouncementText(text)).toBe('');
+    expect(draft).not.toMatch(/\d/);
+  });
+});
+
+describe('buildAnnouncementDraft length budget', () => {
+  it('truncates the caption before the office footer', () => {
+    const draft = buildAnnouncementDraft({
+      ...ITEM,
+      title: 'Brown leather wallet with a long description'.repeat(4),
+      officeName: 'Baguio City Public Information Office '.repeat(4),
+      aiCaption:
+        'A brown leather wallet sitting on a wooden table. '.repeat(8),
+    });
+
+    expect(draft.length).toBeLessThanOrEqual(MAX_ANNOUNCEMENT_LENGTH);
+    expect(draft).toContain('Bring a valid ID.');
+  });
 });

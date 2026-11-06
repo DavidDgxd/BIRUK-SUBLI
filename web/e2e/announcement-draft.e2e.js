@@ -51,7 +51,12 @@ test('drafts, edits and copies a public announcement without private notes', asy
   await expect(
     page.getByRole('heading', { name: 'Announcement draft' }),
   ).toBeVisible();
-  await expect(page.locator('.announcement-draft__photo')).toBeVisible();
+  const previewPhoto = page.locator('.announcement-draft__photo');
+  await expect(previewPhoto).toBeVisible();
+  await expect(previewPhoto).toHaveAttribute(
+    'alt',
+    'Photo of Brown leather wallet',
+  );
 
   const textarea = page.getByLabel('Announcement text');
   await expect(textarea).toHaveValue(
