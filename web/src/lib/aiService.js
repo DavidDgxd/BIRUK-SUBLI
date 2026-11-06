@@ -150,8 +150,10 @@ async function postForEmbedding(path, init, signal) {
  * than at the service: an empty description still encodes to a meaningless
  * vector that scores close to every item, so the search would "succeed" while
  * showing arbitrary results.
+ *
+ * Pass { translate: false } to embed the words exactly as typed (US-23).
  */
-export async function embedText(text, signal) {
+export async function embedText(text, signal, { translate = true } = {}) {
   const clean = (text ?? '').trim();
 
   if (!clean) {
@@ -169,6 +171,7 @@ export async function embedText(text, signal) {
 
   const form = new FormData();
   form.append('text', clean);
+  if (!translate) form.append('translate', 'false');
   const body = await postForEmbedding('/embed/text', { body: form }, signal);
   return {
     embedding: body.vector,

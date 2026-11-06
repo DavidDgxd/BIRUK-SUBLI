@@ -72,6 +72,21 @@ class EmbedTextTranslationTests(unittest.TestCase):
         self.assertEqual(len(body["vector"]), 512)
         self.assertEqual(self.model.encoded, ["itim na pitaka"])
 
+    def test_translate_false_embeds_the_words_as_typed(self):
+        translate = self._translate_returns(return_value="black purse")
+
+        response = self.client.post(
+            "/embed/text", data={"text": "itim na pitaka", "translate": "false"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNone(body["translated_text"])
+        self.assertEqual(len(body["vector"]), 512)
+        self.assertEqual(body["dim"], 512)
+        translate.assert_not_called()
+        self.assertEqual(self.model.encoded, ["itim na pitaka"])
+
 
 if __name__ == "__main__":
     unittest.main()
