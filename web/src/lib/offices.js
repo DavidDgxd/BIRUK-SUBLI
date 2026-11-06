@@ -45,6 +45,27 @@ export async function listPublicOffices({ signal } = {}) {
   return data ?? [];
 }
 
+/**
+ * Loads the active offices for a public picker, ordered by name.
+ *
+ * The search filter and the item page only render the id and name, so the
+ * projection stays narrow and suspended offices are filtered in the database
+ * rather than in the client. `listOffices()` is for the admin screen, which
+ * needs the internal columns.
+ */
+export async function listOfficeOptions({ signal } = {}) {
+  let query = supabase
+    .from('offices')
+    .select('id, name')
+    .eq('status', 'active')
+    .order('name', { ascending: true });
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
+  if (error) throw new OfficeError('db', error.message);
+  return data ?? [];
+}
+
 /** Loads the participating-offices directory, ordered by name. */
 export async function listOffices({ signal } = {}) {
   let query = supabase

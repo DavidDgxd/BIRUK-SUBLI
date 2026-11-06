@@ -4,7 +4,11 @@ const { from } = vi.hoisted(() => ({ from: vi.fn() }));
 
 vi.mock('./supabase.js', () => ({ supabase: { from } }));
 
-import { listOffices, listPublicOffices } from './offices.js';
+import {
+  listOfficeOptions,
+  listOffices,
+  listPublicOffices,
+} from './offices.js';
 
 function queryResult({ data = [], error = null } = {}) {
   const query = {
@@ -57,13 +61,53 @@ describe('listPublicOffices', () => {
   });
 });
 
+describe('listOfficeOptions', () => {
+  beforeEach(() => {
+    from.mockReset();
+  });
+
+  it('selects only the picker fields and filters active offices in the database', async () => {
+    const office = {
+      id: 'BCPIO',
+      name: 'Baguio City Public Information Office',
+    };
+    const query = queryResult({ data: [office] });
+    from.mockReturnValue(query);
+    const signal = new AbortController().signal;
+
+    await expect(listOfficeOptions({ signal })).resolves.toEqual([office]);
+
+    expect(from).toHaveBeenCalledWith('offices');
+    expect(query.select).toHaveBeenCalledWith('id, name');
+    expect(query.eq).toHaveBeenCalledWith('status', 'active');
+    expect(query.order).toHaveBeenCalledWith('name', { ascending: true });
+    expect(query.abortSignal).toHaveBeenCalledWith(signal);
+  });
+
+  it('turns a read failure into an OfficeError', async () => {
+    from.mockReturnValue(
+      queryResult({ error: { message: 'permission denied' } }),
+    );
+
+    await expect(
+      listOfficeOptions({ signal: new AbortController().signal }),
+    ).rejects.toMatchObject({
+      name: 'OfficeError',
+      code: 'db',
+    });
+  });
+});
+
 describe('listOffices', () => {
   beforeEach(() => {
     from.mockReset();
   });
 
   it('reads the public office directory, ordered by name', async () => {
-    const office = { id: 'BCPIO', name: 'Baguio City Public Information Office' };
+    const office = {
+      id: 'BCPIO',
+      name: 'Baguio City Public Information Office',
+    };
     const query = queryResult({ data: [office] });
     from.mockReturnValue(query);
     const signal = new AbortController().signal;

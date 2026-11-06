@@ -11,7 +11,7 @@ import ResultCard from '../components/ResultCard.jsx';
 import SearchFilters from '../components/SearchFilters.jsx';
 import SearchPanel from '../components/SearchPanel.jsx';
 import Icon from '../components/Icon.jsx';
-import { listOffices } from '../lib/offices.js';
+import { listOfficeOptions } from '../lib/offices.js';
 import { searchItems } from '../lib/searchItems.js';
 
 const ERROR_COPY = {
@@ -98,14 +98,14 @@ export default function SearchResults() {
     return () => controller.abort();
   }, [hasQuery, q, color, photo, office, dateFrom, dateTo, attempt]);
 
-  // The filter only needs the public office directory. A failure leaves the
+  // The filter only needs the active offices' id and name. A failure leaves the
   // office select with "All offices"; the other filters and the search itself
   // still work.
   useEffect(() => {
     if (!hasQuery) return undefined;
     const controller = new AbortController();
 
-    listOffices({ signal: controller.signal })
+    listOfficeOptions({ signal: controller.signal })
       .then((rows) => {
         if (!controller.signal.aborted) setOfficeOptions(rows);
       })

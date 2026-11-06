@@ -7,7 +7,7 @@ import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { fetchPublicItem } from '../lib/itemDetails.js';
 import { releaseItemAtCounter } from '../lib/itemRelease.js';
 import { transferItemCustody } from '../lib/itemTransfer.js';
-import { listOffices } from '../lib/offices.js';
+import { listOfficeOptions } from '../lib/offices.js';
 import { calibrateMatchScore } from '../lib/searchItems.js';
 
 const ERROR_COPY = {
@@ -164,14 +164,11 @@ export default function ItemDetails() {
     setOfficeError('');
     setOfficeOptions(null);
 
-    listOffices({ signal: controller.signal })
+    listOfficeOptions({ signal: controller.signal })
       .then((rows) => {
         if (!active) return;
-        setOfficeOptions(
-          rows.filter(
-            (row) => row.status === 'active' && row.id !== holdingOfficeId,
-          ),
-        );
+        // Suspended offices are already excluded in the query.
+        setOfficeOptions(rows.filter((row) => row.id !== holdingOfficeId));
       })
       .catch((loadError) => {
         if (!active || loadError.name === 'AbortError') return;
