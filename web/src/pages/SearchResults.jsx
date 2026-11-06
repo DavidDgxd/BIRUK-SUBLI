@@ -195,9 +195,25 @@ export default function SearchResults() {
           ? 'No close match found.'
           : '';
 
+  // Also on a wording switch: the link that was clicked unmounts, and focus
+  // would otherwise fall to <body>.
   useEffect(() => {
     headingRef.current?.focus();
-  }, []);
+  }, [exact]);
+
+  // SearchPanel carries the old exact= into a new search. It is already inert
+  // (it no longer equals q), but drop it so a copied link stays clean and
+  // re-typing the original phrase does not silently re-enable exact mode.
+  const staleExact = params.has('exact') && !exact;
+  useEffect(() => {
+    if (!staleExact) return;
+    const nextParams = new URLSearchParams(params);
+    nextParams.delete('exact');
+    navigate(
+      { pathname: '/search', search: nextParams.toString() },
+      { replace: true, state: locationState },
+    );
+  }, [staleExact, params, navigate, locationState]);
 
   // The translation replaces the query for matching; it is not searched
   // alongside it. Hidden while loading so a stale one never labels new results.
@@ -247,7 +263,7 @@ export default function SearchResults() {
             )}
             {exact && (
               <p className="results__translated">
-                Searched using your words exactly as typed.{' '}
+                Searched using your own words, without translating them.{' '}
                 <Link to={wordingLink(false)} state={locationState}>
                   Search the English translation instead
                 </Link>

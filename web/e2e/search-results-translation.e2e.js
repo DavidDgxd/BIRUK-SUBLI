@@ -25,7 +25,7 @@ const WALLET = item('11111111-1111-1111-1111-111111111111', 'Black Wallet');
 const POUCH = item('22222222-2222-2222-2222-222222222222', 'Woven Pouch');
 
 const TRANSLATED_LINE = 'Searched for “black wallet”, the English translation';
-const EXACT_LINE = 'Searched using your words exactly as typed.';
+const EXACT_LINE = 'Searched using your own words, without translating them.';
 
 async function fakeServices(page) {
   const embedRequests = [];
@@ -76,6 +76,10 @@ test('shows the translated wording and switches to the exact words and back', as
 
   await expect(page).toHaveURL(/exact=itim\+na\+pitaka/);
   await expect(page.getByText(EXACT_LINE)).toBeVisible();
+  // The clicked link unmounts; focus moves to the heading, not <body>.
+  await expect(
+    page.getByRole('heading', { name: 'Search results', level: 1 }),
+  ).toBeFocused();
   await expect(page.getByText(TRANSLATED_LINE)).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Woven Pouch' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Black Wallet' })).toHaveCount(0);
@@ -117,7 +121,17 @@ test('a new search from the results page drops the exact-words mode', async ({
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
   await expect(page).toHaveURL(/q=black\+wallet/);
+  await expect(page).not.toHaveURL(/exact=/);
   await expect(page.getByRole('heading', { name: 'Black Wallet' })).toBeVisible();
+  await expect(page.getByText(EXACT_LINE)).toHaveCount(0);
+
+  // Searching the original phrase again must not revive exact mode.
+  await page
+    .getByRole('searchbox', { name: 'Search held items' })
+    .fill('itim na pitaka');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page).toHaveURL(/q=itim\+na\+pitaka/);
+  await expect(page.getByText(TRANSLATED_LINE)).toBeVisible();
   await expect(page.getByText(EXACT_LINE)).toHaveCount(0);
 });
 
