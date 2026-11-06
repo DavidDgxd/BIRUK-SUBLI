@@ -1,4 +1,16 @@
+import AxeBuilder from '@axe-core/playwright';
 import { test, expect, OFFICE, openRoute } from './fixtures.js';
+
+const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+
+/** Fails with the offending rule ids and selectors, not just a bare diff. */
+async function expectNoAxeViolations(page) {
+  const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+  const summary = results.violations.map(
+    (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+  );
+  expect(summary).toEqual([]);
+}
 
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -90,3 +102,51 @@ test('lists drop-off offices on the found-report receipt', async ({ page }) => {
   await expect(page.getByText(OFFICE.address)).toBeVisible();
   await expect(page.getByText(OFFICE.counter_hours)).toBeVisible();
 });
+
+/*
+ * The shared /offices route audit in a11y.e2e.js only ever sees the populated
+ * directory. These cover the two states a visitor can land in when the table is
+ * empty or the read fails, in both themes.
+ */
+for (const theme of ['light', 'dark']) {
+  test.describe(`offices states in the ${theme} theme`, () => {
+    test('empty directory passes the axe audit', async ({ page }) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.route('**/rest/v1/offices*', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: '[]',
+        }),
+      );
+
+      await openRoute(page, '/offices');
+      await expect(
+        page.getByRole('heading', { name: 'No offices listed yet' }),
+      ).toBeVisible();
+      await expectNoAxeViolations(page);
+    });
+
+    test('error state and its retry action pass the axe audit', async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.route('**/rest/v1/offices*', (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'database unavailable' }),
+        }),
+      );
+
+      await openRoute(page, '/offices');
+      await expect(
+        page.getByRole('heading', { name: 'Could not load offices' }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Try again' }),
+      ).toBeVisible();
+      await expectNoAxeViolations(page);
+    });
+  });
+}
