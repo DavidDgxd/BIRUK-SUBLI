@@ -9,6 +9,7 @@ import os
 import torch
 
 from caption_cleanup import clean_caption
+from translation import translate_to_english
 
 app = FastAPI(title="Biruk Subli CLIP Service")
 
@@ -156,6 +157,19 @@ def clean_query_text(raw: str) -> str:
     return text
 
 
+def translate_query(text: str):
+    """Returns the English translation of a Filipino query, or None.
+
+    A translation outage must never break search, so any provider failure is
+    logged and the original query is embedded instead.
+    """
+    try:
+        return translate_to_english(text)
+    except Exception as error:  # noqa: BLE001 - any outage falls back to the original
+        print(f"Translation unavailable, embedding the original query: {error!r}")
+        return None
+
+
 @app.get("/health")
 def health():
     return {
@@ -167,15 +181,21 @@ def health():
 
 
 @app.post("/embed/text")
-async def embed_text(text: str = Form(...)):
+def embed_text(text: str = Form(...)):
     """Encodes a typed search query into a 512-dim vector.
 
     Accepts free-form natural language — English or Filipino, a phrase or a
     sentence. The caller does not need to know the item categories or tags.
+    A Filipino query is translated to English first (US-22) so it lands in the
+    same CLIP space as an English one; translated_text is null otherwise.
+
+    A plain def, not async: FastAPI then runs it in its threadpool, so loading
+    the translation model and running CLIP do not block the event loop.
     """
     cleaned = clean_query_text(text)
+    translated = translate_query(cleaned)
     try:
-        vector = encode(cleaned)
+        vector = encode(translated or cleaned)
     except HTTPException:
         raise
     except Exception as error:
@@ -183,7 +203,7 @@ async def embed_text(text: str = Form(...)):
             status_code=503,
             detail=f"Could not embed that description: {error}",
         ) from error
-    return {"vector": vector, "dim": EMBEDDING_DIM}
+    return {"vector": vector, "dim": EMBEDDING_DIM, "translated_text": translated}
 
 
 @app.post("/embed/image")

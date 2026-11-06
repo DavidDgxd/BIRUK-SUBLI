@@ -1,6 +1,8 @@
 fastapi
 uvicorn[standard]
 sentence-transformers
+# MarianTokenizer (opus-mt translation, US-22) needs sentencepiece.
+sentencepiece
 transformers
 pillow
 python-multipart
