@@ -40,6 +40,7 @@ const DEV_OFFICE_NAME =
   import.meta.env.VITE_STAFF_OFFICE_NAME ||
   'Baguio City Public Information Office';
 const DEV_STAFF_EMAIL = 'staff@baguio.gov.ph';
+const DEV_COUNTER_HOURS = import.meta.env.VITE_STAFF_COUNTER_HOURS || 'Mon-Fri, 8:00 AM - 5:00 PM';
 
 const StaffAuthContext = createContext(null);
 
@@ -48,6 +49,7 @@ function mockSession() {
     staffEmail: DEV_STAFF_EMAIL,
     officeId: DEV_OFFICE_ID,
     officeName: DEV_OFFICE_NAME,
+    counterHours: DEV_COUNTER_HOURS,
     // Deliberately not an admin session. The mock holds no real Supabase
     // session, so it cannot satisfy the central-admin role check on the
     // provision and reset functions — every write would fail. Claiming the
@@ -130,7 +132,7 @@ export function StaffAuthProvider({ children }) {
       /** The central admin session (US-03), which has no office of its own. */
       isAdmin: session?.isAdmin === true,
       office: session?.officeId
-        ? { id: session.officeId, name: session.officeName }
+        ? { id: session.officeId, name: session.officeName, counterHours: session.counterHours }
         : null,
       /** Signs in with the office's shared credentials; throws StaffAuthError. */
       async signIn(email, password) {

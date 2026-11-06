@@ -135,4 +135,12 @@ describe('US-25 bilingual drafts and copy', () => {
     expect(await copyAnnouncement('both', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
     expect(fallback.writeText.mock.calls[0][0]).toContain(TL);
   });
+  it('uses the Filipino caption, never the raw English caption, for the tl draft', () => {
+    const captionTl = 'Isang kayumangging pitaka sa mesa.';
+    const drafts = buildAnnouncementDrafts({ ...ITEM, aiCaptionTl: captionTl });
+
+    expect(drafts.en).toContain(ITEM.aiCaption);
+    expect(drafts.tl).toContain(captionTl);
+    expect(drafts.tl).not.toContain(ITEM.aiCaption);
+  });
 });

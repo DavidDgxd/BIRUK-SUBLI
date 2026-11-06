@@ -123,7 +123,6 @@ def translate_to_filipino(text):
     return (_provider_translate(source, "en-tl") or "").strip() or None
 
 
-
 def _provider_translate(text, direction="tl-en"):
     """Dispatches to the configured backend. Each returns raw translated text."""
     if TRANSLATE_PROVIDER == "local":
@@ -164,7 +163,6 @@ _translate_lock_en_tl = Lock()
 
 
 def load_translation_model_en_tl():
-    """Loads the English-to-Filipino model once, on first use."""
     global _translate_tokenizer_en_tl, _translate_model_en_tl
     with _translate_lock_en_tl:
         if _translate_model_en_tl is None:

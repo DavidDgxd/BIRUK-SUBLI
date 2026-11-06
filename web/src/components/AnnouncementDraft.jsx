@@ -16,17 +16,17 @@ const CAPTION_WARNING =
   'We could not read the photo. The draft uses the item title only — add any public details you want to include.';
 
 const buildFor = (item, caption) => {
-  const generated = buildAnnouncementDrafts({ ...item, aiCaption: caption });
+  const generated = buildAnnouncementDrafts({ ...item, aiCaption: item.aiCaption || caption?.caption || '', aiCaptionTl: caption?.captionTl ?? item.aiCaptionTl ?? '' });
   return generated.en || generated.tl
     ? { phase: 'ready', en: generated.en, tl: generated.tl }
     : { phase: 'empty', en: '', tl: '' };
 };
 
-/* Editable public announcement on the custody receipt (US-24, US-25). Private
- * notes, cash amounts and finder/claimant fields are never passed here. */
+/* Editable public announcement on the custody receipt (US-24). Private notes,
+ * cash amounts and finder/claimant fields are never passed to the generator. */
 export default function AnnouncementDraft({ item }) {
   const {
-    title, category, aiCaption, officeName, counterHours,
+    title, category, aiCaption, aiCaptionTl, officeName, counterHours,
     isCash, imageUrl, photoFile, photoUrl,
   } = item ?? {};
   const safeTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
@@ -37,19 +37,19 @@ export default function AnnouncementDraft({ item }) {
   const englishRef = useRef(null);
   const filipinoRef = useRef(null);
   const [draft, setDraft] = useState(() =>
-    aiCaption || !(photoFile || photoUrl)
-      ? buildFor(item ?? {}, aiCaption)
+    (aiCaption && aiCaptionTl) || !(photoFile || photoUrl)
+      ? buildFor(item ?? {})
       : { phase: 'loading', en: '', tl: '' },
   );
   const [notice, setNotice] = useState('');
-  const [copyState, setCopyState] = useState('idle'); // idle | en-copied | tl-copied | both-copied | error
+  const [copyState, setCopyState] = useState('idle');
 
   useEffect(() => {
     const source = captionSource({ file: photoFile, url: photoUrl });
-    if (aiCaption || !source) return undefined;
+    if ((aiCaption && aiCaptionTl) || !source) return undefined;
 
     const controller = new AbortController();
-    const base = { title, category, officeName, counterHours, isCash };
+    const base = { title, category, aiCaption, officeName, counterHours, isCash };
     setDraft({ phase: 'loading', en: '', tl: '' });
     setNotice('');
 
@@ -66,12 +66,12 @@ export default function AnnouncementDraft({ item }) {
       .catch((error) => {
         if (controller.signal.aborted || error.name === 'AbortError') return;
         if (import.meta.env.DEV) console.warn('[AnnouncementDraft]', error);
-        setDraft(buildFor(base, ''));
+        setDraft(buildFor(base));
         setNotice(CAPTION_WARNING);
       });
 
     return () => controller.abort();
-  }, [aiCaption, category, counterHours, isCash, officeName, photoFile, photoUrl, title]);
+  }, [aiCaption, aiCaptionTl, category, counterHours, isCash, officeName, photoFile, photoUrl, title]);
 
   function editVersion(language, value) {
     setDraft((current) => updateAnnouncementDraft(current, language, value));
@@ -81,15 +81,9 @@ export default function AnnouncementDraft({ item }) {
   async function handleCopy(action) {
     if (!draft.en.trim() && !draft.tl.trim()) return;
     try {
-      const result = await copyAnnouncement(action, {
-        en: draft.en,
-        tl: draft.tl,
-        photoUrl: imageUrl,
-      });
+      const result = await copyAnnouncement(action, { en: draft.en, tl: draft.tl, photoUrl: imageUrl });
       setCopyState(`${action}-copied`);
-      const photoNote = result.photoIncluded
-        ? 'Both versions and the photo are on your clipboard.'
-        : 'Both versions are on your clipboard. The photo could not be attached.';
+      const photoNote = result.photoIncluded ? 'Both versions and the photo are on your clipboard.' : 'Both versions are on your clipboard. The photo could not be attached.';
       setNotice(action === 'both' ? photoNote : 'Copied to your clipboard.');
     } catch {
       const target = action === 'tl' ? filipinoRef : englishRef;
@@ -151,21 +145,11 @@ export default function AnnouncementDraft({ item }) {
               ['tl', 'Filipino announcement', filipinoRef, filipinoId],
             ].map(([language, label, ref, id]) => (
               <div key={language}>
-                <label className="field__label" htmlFor={id}>
-                  {label}
-                </label>
-                <textarea
-                  id={id}
-                  ref={ref}
+                <label className="field__label" htmlFor={id}>{label}</label>
+                <textarea id={id} ref={ref} rows={10} lang={language}
                   className="field__control field__control--area announcement-draft__text"
-                  rows={10}
-                  lang={language}
-                  value={draft[language]}
-                  aria-describedby={hintId}
-                  onChange={(event) =>
-                    editVersion(language, event.target.value)
-                  }
-                />
+                  value={draft[language]} aria-describedby={hintId}
+                  onChange={(event) => editVersion(language, event.target.value)} />
               </div>
             ))}
           </div>
@@ -175,10 +159,7 @@ export default function AnnouncementDraft({ item }) {
           </p>
 
           {notice && (
-            <p
-              className="announcement-draft__notice"
-              role={copyState === 'error' ? 'alert' : 'status'}
-            >
+            <p className="announcement-draft__notice" role={copyState === 'error' ? 'alert' : 'status'}>
               <Icon name={copyState === 'error' ? 'error' : 'info'} />
               {notice}
             </p>
@@ -190,16 +171,10 @@ export default function AnnouncementDraft({ item }) {
               ['tl', 'Copy Filipino', 'Filipino copied', draft.tl],
               ['both', 'Copy both + photo', 'Copied both', draft.en || draft.tl],
             ].map(([action, idle, copied, text]) => (
-              <button
-                key={action}
-                type="button"
+              <button key={action} type="button"
                 className={action === 'both' ? 'btn btn--filled' : 'btn'}
-                onClick={() => handleCopy(action)}
-                disabled={!text.trim()}
-              >
-                <Icon
-                  name={copyState === `${action}-copied` ? 'check' : 'content_copy'}
-                />
+                onClick={() => handleCopy(action)} disabled={!text.trim()}>
+                <Icon name={copyState === `${action}-copied` ? 'check' : 'content_copy'} />
                 {copyState === `${action}-copied` ? copied : idle}
               </button>
             ))}
