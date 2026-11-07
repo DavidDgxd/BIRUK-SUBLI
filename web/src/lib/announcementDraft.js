@@ -9,10 +9,12 @@
  * value.
  */
 
+/* The Filipino caption is machine-translated, so the markers include the
+ * Tagalog words the translation produces as well as the English originals. */
 const MONEY_MARKER =
-  /(?:₱|\bphp\s*\d|\bphp\b|\bpesos?\b|\b(?:usd|dollars?)\b|\$\s*\d|\b\d[\d,]*(?:\.\d{1,2})?\s*(?:php|pesos?|dollars?)\b|\bcash\s+(?:amount|total)\b)/i;
+  /(?:₱|\bphp\s*\d|\bphp\b|\bpesos?\b|\b(?:usd|dollars?)\b|\$\s*\d|\b\d[\d,]*(?:\.\d{1,2})?\s*(?:php|pesos?|dollars?|piso|sentimo)\b|\bcash\s+(?:amount|total)\b)/i;
 const SENSITIVE_MARKER =
-  /(?:\bserial(?:\s*(?:no\.?|number))?\b|\bs\/n\b|\bimei\b|\bimsi\b|\bmac\s+address\b|\baccount(?:\s*(?:no\.?|number))?\b|\bacct\b|\bpassport(?:\s*(?:no\.?|number))?\b|\bid(?:\s*(?:no\.?|number))?\b|\blicen[cs]e(?:\s*(?:no\.?|number))?\b)/i;
+  /(?:\bserial(?:\s*(?:no\.?|number))?\b|\bs\/n\b|\bimei\b|\bimsi\b|\bmac\s+address\b|\baccount(?:\s*(?:no\.?|number))?\b|\bacct\b|\bpassport(?:\s*(?:no\.?|number))?\b|\bpasaporte\b|\bid(?:\s*(?:no\.?|number))?\b|\blicen[cs]e(?:\s*(?:no\.?|number))?\b|\blisensya\b|\bnumero\b|\bserye\b|\bresibo\b|\btseke\b|\bplaka\b|\bhalaga\b)/i;
 const CONTACT_MARKER =
   /(?:\bhttps?:\/\/\S+|\bwww\.\S+|\b\S+@\S+\.\S+|\b(?:\+?63[\s-]?|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b(?:[a-z0-9-]+\.)+(?:com|net|org|ph|io|gov)\b(?:\/\S*)?)/i;
 
