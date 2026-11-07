@@ -548,7 +548,7 @@ describe('searchItems confidence tiers', () => {
       POSSIBLE_DELTA: 0.07,
       POSSIBLE_LIMIT: 3,
       POSSIBLE_ONLY_LIMIT: 5,
-      TEXT_STRONG_FLOOR: 0.68,
+      TEXT_STRONG_FLOOR: 0.75,
       IMAGE_STRONG_FLOOR: 0.82,
       LEGACY_BEST_FLOOR: 0.64,
       LEGACY_STRONG_FLOOR: 0.82,

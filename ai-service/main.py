@@ -21,13 +21,14 @@ CLIP_EMBEDDING_DIM = 512
 EMBEDDING_DIM = CLIP_EMBEDDING_DIM  # legacy name, kept for older callers
 MODEL_NAME = os.environ.get("CLIP_MODEL", "clip-ViT-B-32")
 
-# Text queries and item text use a multilingual sentence model, not CLIP. CLIP's
-# text tower is English-centric and its text-to-text ranking is weak on short
-# item titles; BGE-M3 gives English text real margins (and the glossary supplies
-# the English words for a Filipino query). This tower is loaded lazily so the
-# service does not pay for it until a text query arrives.
-TEXT_MODEL_NAME = os.environ.get("TEXT_MODEL", "BAAI/bge-m3")
-TEXT_EMBEDDING_DIM = 1024
+# Text queries and item text use a small English retrieval model, not CLIP.
+# CLIP's text tower is English-centric and its text-to-text ranking is weak on
+# short item titles. The glossary supplies the English words for a Filipino
+# query, so this tower only needs English; BGE-small keeps the model around
+# 130 MB instead of the 2.2 GB a multilingual large model would need. It is
+# loaded lazily so the service does not pay for it until a text query arrives.
+TEXT_MODEL_NAME = os.environ.get("TEXT_MODEL", "BAAI/bge-small-en-v1.5")
+TEXT_EMBEDDING_DIM = 384
 
 # BLIP writes a short natural-language description of a photo. It is loaded on
 # the first caption request rather than at startup so the search service does
@@ -163,7 +164,7 @@ def encode_clip(payload):
 
 
 def encode_text(payload):
-    """Encodes text with the multilingual tower as a 1024-number list."""
+    """Encodes text with the small retrieval tower as a 384-number list."""
     vector = load_text_model().encode(payload).tolist()
     if len(vector) != TEXT_EMBEDDING_DIM:
         raise HTTPException(
@@ -250,7 +251,7 @@ def embed_text(text: str = Form(...), expand: bool = Form(True)):
 
 @app.post("/embed/query")
 def embed_query(text: str = Form(...), expand: bool = Form(True)):
-    """Encodes a typed search query into the multilingual 1024-dim text space.
+    """Encodes a typed search query into the small English 384-dim text space.
 
     A Filipino query appends English synonyms from the glossary before it is
     embedded, so it lands closer to the English item text. The original words

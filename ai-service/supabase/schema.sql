@@ -78,6 +78,112 @@ create trigger search_synonyms_touch
 before update on public.search_synonyms
 for each row execute function public.touch_search_synonyms();
 
+-- Narrow, role-checked surface for the admin console. The table stays
+-- service-role only; the UI gate is not a security boundary.
+create or replace function public.list_search_synonyms()
+returns table (
+    term text,
+    synonyms text[],
+    enabled boolean,
+    updated_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin' then
+        raise exception 'Only the central admin can manage search synonyms.'
+            using errcode = '42501';
+    end if;
+
+    return query
+        select s.term, s.synonyms, s.enabled, s.updated_at
+        from public.search_synonyms s
+        order by s.term;
+end;
+$$;
+
+revoke all on function public.list_search_synonyms() from public, anon;
+grant execute on function public.list_search_synonyms() to authenticated;
+
+create or replace function public.upsert_search_synonym(
+    p_term text,
+    p_synonyms text[],
+    p_enabled boolean default true
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_term text;
+    v_synonyms text[];
+begin
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin' then
+        raise exception 'Only the central admin can manage search synonyms.'
+            using errcode = '42501';
+    end if;
+
+    v_term := lower(btrim(coalesce(p_term, '')));
+    if v_term = '' or length(v_term) > 64 then
+        raise exception 'A search term must be 1–64 characters.'
+            using errcode = '22023';
+    end if;
+
+    select array_agg(distinct btrim(value))
+      into v_synonyms
+      from unnest(coalesce(p_synonyms, '{}'::text[])) as value
+     where btrim(value) <> ''
+       and length(btrim(value)) <= 64;
+
+    if v_synonyms is null then
+        raise exception 'Add at least one English synonym.'
+            using errcode = '22023';
+    end if;
+
+    insert into public.search_synonyms (term, synonyms, enabled)
+    values (v_term, v_synonyms, coalesce(p_enabled, true))
+    on conflict (term) do update
+        set synonyms = excluded.synonyms,
+            enabled = excluded.enabled;
+end;
+$$;
+
+revoke all on function public.upsert_search_synonym(text, text[], boolean)
+    from public, anon;
+grant execute on function public.upsert_search_synonym(text, text[], boolean)
+    to authenticated;
+
+create or replace function public.delete_search_synonym(p_term text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_term text;
+begin
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin' then
+        raise exception 'Only the central admin can manage search synonyms.'
+            using errcode = '42501';
+    end if;
+
+    v_term := lower(btrim(coalesce(p_term, '')));
+    if v_term = '' then
+        raise exception 'A search term is required.'
+            using errcode = '22023';
+    end if;
+
+    delete from public.search_synonyms where term = v_term;
+end;
+$$;
+
+revoke all on function public.delete_search_synonym(text) from public, anon;
+grant execute on function public.delete_search_synonym(text) to authenticated;
+
 
 -- ============================================================================
 -- 3. FOUND ITEMS INVENTORY & CUSTODY LOGBOOK
@@ -134,7 +240,7 @@ create table if not exists public.items (
     -- stored separately so they are never averaged into one diluted vector.
     -- text_embedding is BGE-M3 over title + category + caption only; the staff
     -- description is deliberately excluded here too.
-    text_embedding vector(1024),
+    text_embedding vector(384),
     image_embedding vector(512),
 
     -- Currency Retention Attributes (Civil Code Art. 720 Compliance):
@@ -498,7 +604,7 @@ drop function if exists public.match_items_two_tower(
 );
 
 create or replace function public.match_items_two_tower (
-    query_text_embedding vector(1024) default null,
+    query_text_embedding vector(384) default null,
     query_image_embedding vector(512) default null,
     match_threshold float default 0.30,
     match_count int default 15,
@@ -1240,7 +1346,7 @@ create or replace function public.submit_staff_custody(
     p_finder_contact   text default null,
     p_found_report_id  uuid default null,
     p_ai_caption       text default null,
-    p_text_embedding   vector(1024) default null,
+    p_text_embedding   vector(384) default null,
     p_image_embedding  vector(512) default null
 )
 returns text

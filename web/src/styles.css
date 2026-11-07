@@ -2325,6 +2325,93 @@ textarea {
   margin-block-start: var(--space-4);
 }
 
+.synonym-editor {
+  margin-block: var(--space-5) var(--space-4);
+}
+
+.synonym-form {
+  max-inline-size: 36rem;
+  padding: var(--space-5);
+  padding-block-end: var(--space-5);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.synonym-form .form__legend {
+  margin-block-end: var(--space-4);
+}
+
+/* The report forms use a fixed mobile submit dock; an inline admin form does
+   not need it, and it adds a scrollbar-width of horizontal overflow. */
+.synonym-form .form-actions {
+  position: static;
+  inset: auto;
+  max-inline-size: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.synonym-filter {
+  max-inline-size: 22rem;
+}
+
+.synonym-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: fit-content;
+  cursor: pointer;
+}
+
+.synonym-toggle input {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  accent-color: var(--primary);
+}
+
+.synonym-table-wrap {
+  border-block-start: var(--border);
+  overflow-x: auto;
+}
+
+.synonym-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.synonym-table th,
+.synonym-table td {
+  padding: var(--space-3);
+  border-block-end: var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.synonym-table thead th {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.synonym-table tbody tr.is-disabled {
+  color: var(--ink-muted);
+}
+
+.synonym-table code {
+  font-size: 0.9375rem;
+}
+
+.synonym-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .office-admin__empty {
   padding-block: var(--space-5);
   border-block-start: var(--border);

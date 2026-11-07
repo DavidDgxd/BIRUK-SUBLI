@@ -1,6 +1,6 @@
 import { test, expect, openRoute } from './fixtures.js';
 
-const EMBEDDING = Array.from({ length: 1024 }, (_, index) => (index === 0 ? 1 : 0));
+const EMBEDDING = Array.from({ length: 384 }, (_, index) => (index === 0 ? 1 : 0));
 const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) => (index === 0 ? 1 : 0));
 
 const PNG_1PX = Buffer.from(

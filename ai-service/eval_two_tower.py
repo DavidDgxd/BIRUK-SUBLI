@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Read-only evaluation for the two-tower public search.
 
-Fetches held items through PostgREST, embeds each labelled query with BGE-M3
-(plus the glossary expansion), and calls match_items_two_tower exactly like the
-web client. Reports Recall@1, Recall@5, MRR and the false-confident count for
-the "none" queries. Never writes and never prints secrets.
+Fetches held items through PostgREST, embeds each labelled query with the small
+English retrieval tower (plus the glossary expansion), and calls
+match_items_two_tower exactly like the web client. Reports Recall@1, Recall@5,
+MRR and the false-confident count for the "none" queries. Never writes and
+never prints secrets.
 
 Run with the ai-service venv:
 
@@ -26,7 +27,7 @@ from glossary import expand_query  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / "ai-service" / ".env"
-TEXT_MODEL = os.environ.get("TEXT_MODEL", "BAAI/bge-m3")
+TEXT_MODEL = os.environ.get("TEXT_MODEL", "BAAI/bge-small-en-v1.5")
 TIMEOUT = 120
 
 # Hand labels over the held inventory. "" means the query should not produce a
@@ -63,7 +64,7 @@ LABELS = {
 BEST_FLOOR = 0.72
 POSSIBLE_FLOOR = 0.55
 LEXICAL_CONFIDENCE = 0.5
-TEXT_STRONG_FLOOR = 0.68
+TEXT_STRONG_FLOOR = 0.75
 
 
 def load_env() -> None:

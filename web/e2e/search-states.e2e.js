@@ -1,6 +1,6 @@
 import { test, expect, openRoute } from './fixtures.js';
 
-const EMBEDDING = Array.from({ length: 1024 }, (_, index) =>
+const EMBEDDING = Array.from({ length: 384 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 

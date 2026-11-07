@@ -7,6 +7,7 @@ import StaffIntake from './pages/StaffIntake.jsx';
 import StaffItems from './pages/StaffItems.jsx';
 import StaffLogin from './pages/StaffLogin.jsx';
 import AdminOffices from './pages/AdminOffices.jsx';
+import AdminSynonyms from './pages/AdminSynonyms.jsx';
 import ItemDetails from './pages/ItemDetails.jsx';
 import Offices from './pages/Offices.jsx';
 import RoutePlaceholder from './pages/RoutePlaceholder.jsx';
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/staff/intake" element={<StaffIntake />} />
       <Route path="/staff/items" element={<StaffItems />} />
       <Route path="/admin/offices" element={<AdminOffices />} />
+      <Route path="/admin/synonyms" element={<AdminSynonyms />} />
       <Route path="/staff/login" element={<StaffLogin />} />
       <Route
         path="*"

@@ -132,8 +132,8 @@ def main() -> None:
 
     public_text = f"{args.title}. {args.category}"
     text_vector = embed_item_text(ai_url, public_text)
-    if len(text_vector) != 1024:
-        fail(f"expected a 1024-number text vector, got {len(text_vector)}")
+    if len(text_vector) != 384:
+        fail(f"expected a 384-number text vector, got {len(text_vector)}")
 
     if args.image:
         if not args.image.exists():

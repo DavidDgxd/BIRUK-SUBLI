@@ -128,7 +128,10 @@ export default function AdminOffices() {
             <>
               <StaffBar icon="admin_panel_settings" label="Central admin" />
 
-              <section className="office-admin" aria-label="Participating offices">
+              <section
+                className="office-admin"
+                aria-label="Participating offices"
+              >
                 <div className="admin-toolbar">
                   <button
                     type="button"
@@ -138,6 +141,10 @@ export default function AdminOffices() {
                     <Icon name="add" />
                     Add an office
                   </button>
+                  <Link className="btn" to="/admin/synonyms">
+                    <Icon name="search" />
+                    Search synonyms
+                  </Link>
                 </div>
 
                 {loadError ? (
@@ -216,7 +223,11 @@ export default function AdminOffices() {
                           const account = accountStatus(office);
                           const held = heldCounts.get(office.id) ?? 0;
                           return (
-                            <div key={office.id} className="office-table__row" role="row">
+                            <div
+                              key={office.id}
+                              className="office-table__row"
+                              role="row"
+                            >
                               <div
                                 role="rowheader"
                                 className="office-table__cell office-table__office"
