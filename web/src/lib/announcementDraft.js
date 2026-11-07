@@ -9,10 +9,12 @@
  * value.
  */
 
+/* The Filipino caption is machine-translated, so the markers include the
+ * Tagalog words the translation produces as well as the English originals. */
 const MONEY_MARKER =
-  /(?:₱|\bphp\s*\d|\bphp\b|\bpesos?\b|\b(?:usd|dollars?)\b|\$\s*\d|\b\d[\d,]*(?:\.\d{1,2})?\s*(?:php|pesos?|dollars?)\b|\bcash\s+(?:amount|total)\b)/i;
+  /(?:₱|\bphp\s*\d|\bphp\b|\bpesos?\b|\b(?:usd|dollars?)\b|\$\s*\d|\b\d[\d,]*(?:\.\d{1,2})?\s*(?:php|pesos?|dollars?|piso|sentimo)\b|\bcash\s+(?:amount|total)\b)/i;
 const SENSITIVE_MARKER =
-  /(?:\bserial(?:\s*(?:no\.?|number))?\b|\bs\/n\b|\bimei\b|\bimsi\b|\bmac\s+address\b|\baccount(?:\s*(?:no\.?|number))?\b|\bacct\b|\bpassport(?:\s*(?:no\.?|number))?\b|\bid(?:\s*(?:no\.?|number))?\b|\blicen[cs]e(?:\s*(?:no\.?|number))?\b)/i;
+  /(?:\bserial(?:\s*(?:no\.?|number))?\b|\bs\/n\b|\bimei\b|\bimsi\b|\bmac\s+address\b|\baccount(?:\s*(?:no\.?|number))?\b|\bacct\b|\bpassport(?:\s*(?:no\.?|number))?\b|\bpasaporte\b|\bid(?:\s*(?:no\.?|number))?\b|\blicen[cs]e(?:\s*(?:no\.?|number))?\b|\blisensya\b|\bnumero\b|\bserye\b|\bresibo\b|\btseke\b|\bplaka\b|\bhalaga\b)/i;
 const CONTACT_MARKER =
   /(?:\bhttps?:\/\/\S+|\bwww\.\S+|\b\S+@\S+\.\S+|\b(?:\+?63[\s-]?|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b(?:[a-z0-9-]+\.)+(?:com|net|org|ph|io|gov)\b(?:\/\S*)?)/i;
 
@@ -125,6 +127,8 @@ export const updateAnnouncementDraft = (draft, language, text) => ({
   [language === 'tl' || language === 'fil' ? 'tl' : 'en']: text,
 });
 const COPY_ACTIONS = ['en', 'tl', 'both'];
+// item-photos is WebP-only (storage.js), so the promise can be typed now.
+const PHOTO_CLIPBOARD_TYPE = 'image/webp';
 export function combinedAnnouncementText({ en = '', tl = '' } = {}) {
   const english = String(en ?? '').trim();
   const filipino = String(tl ?? '').trim();
@@ -135,16 +139,14 @@ function textFor(action, { en = '', tl = '' }) {
   if (action === 'tl') return String(tl ?? '').trim();
   return combinedAnnouncementText({ en, tl });
 }
-async function photoPart(photoUrl, fetchImpl) {
+function photoPart(photoUrl, fetchImpl) {
   if (!photoUrl || typeof fetchImpl !== 'function') return null;
-  try {
-    const response = await fetchImpl(photoUrl);
-    if (!response?.ok) return null;
-    const blob = await response.blob();
-    return blob ? { [blob.type || 'image/png']: blob } : null;
-  } catch {
-    return null;
-  }
+  return fetchImpl(photoUrl).then((response) => {
+    if (!response?.ok) {
+      throw new Error(`Photo request returned ${response.status}`);
+    }
+    return response.blob();
+  });
 }
 export async function copyAnnouncement(
   action,
@@ -162,8 +164,11 @@ export async function copyAnnouncement(
   if (!text) throw new Error('There is nothing to copy yet.');
   if (!clipboard?.writeText && !clipboard?.write) throw new Error('Clipboard access is unavailable.');
   if (action === 'both' && typeof clipboard.write === 'function' && typeof ClipboardItemCtor === 'function') {
-    const media = await photoPart(photoUrl, fetchImpl);
-    const parts = { 'text/plain': new Blob([text], { type: 'text/plain' }), ...(media ?? {}) };
+    // Start the photo fetch now, but do not await it before write(): Safari
+    // only allows clipboard.write while the click's transient activation is
+    // still valid. The promise is resolved inside ClipboardItem instead.
+    const media = photoPart(photoUrl, fetchImpl);
+    const parts = { 'text/plain': new Blob([text], { type: 'text/plain' }), ...(media ? { [PHOTO_CLIPBOARD_TYPE]: media } : {}) };
     try {
       await clipboard.write([new ClipboardItemCtor(parts)]);
       return { mode: 'rich', photoIncluded: Boolean(media) };

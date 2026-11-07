@@ -72,6 +72,19 @@ describe('sanitizeAnnouncementText', () => {
     ).toBe('A black folding umbrella with a wooden handle and a small tear.');
   });
 
+  it('drops Filipino money and identifier sentences', () => {
+    expect(
+      sanitizeAnnouncementText(
+        'Isang kayumangging pitaka. May 500 piso sa loob. Numero ng serye 991287. Ang lisensya numero A1234 ay nakalagay.',
+      ),
+    ).toBe('Isang kayumangging pitaka.');
+  });
+
+  it('keeps safe Filipino description text intact', () => {
+    const text = 'Isang kayumangging pitaka sa mesa.';
+    expect(sanitizeAnnouncementText(text)).toBe(text);
+  });
+
   it.each([
     'A Student ID card was found.',
     'A UB ID card was handed in.',
@@ -142,5 +155,44 @@ describe('US-25 bilingual drafts and copy', () => {
     expect(drafts.en).toContain(ITEM.aiCaption);
     expect(drafts.tl).toContain(captionTl);
     expect(drafts.tl).not.toContain(ITEM.aiCaption);
+  });
+  it('keeps Filipino money and serial captions out of the tl draft', () => {
+    const drafts = buildAnnouncementDrafts({
+      ...ITEM,
+      aiCaptionTl: 'May 500 piso sa loob. Numero ng serye 991287.',
+    });
+
+    expect(drafts.tl).not.toMatch(/500 piso|991287/);
+    expect(drafts.tl).toContain('Tingnan ang larawan');
+  });
+  it('calls clipboard.write before the photo fetch settles', async () => {
+    let resolveFetch;
+    let parts;
+    const clipboard = { write: vi.fn().mockResolvedValue(), writeText: vi.fn() };
+    const pending = copyAnnouncement('both', {
+      en: EN, tl: TL, photoUrl: 'u', clipboard,
+      ClipboardItemCtor: class { constructor(value) { parts = value; } },
+      fetchImpl: () => new Promise((resolve) => { resolveFetch = resolve; }),
+    });
+
+    expect(clipboard.write).toHaveBeenCalledTimes(1);
+    expect(parts['image/webp']).toBeInstanceOf(Promise);
+    resolveFetch({ ok: true, blob: async () => new Blob(['photo'], { type: 'image/webp' }) });
+    await expect(pending).resolves.toEqual({ mode: 'rich', photoIncluded: true });
+    expect(clipboard.writeText).not.toHaveBeenCalled();
+  });
+  it('falls back to text when the rich clipboard write fails', async () => {
+    const clipboard = {
+      write: vi.fn(([item]) => Promise.all(Object.values(item.parts)).then(() => { throw new Error('unsupported'); })),
+      writeText: vi.fn().mockResolvedValue(),
+    };
+    const result = await copyAnnouncement('both', {
+      en: EN, tl: TL, photoUrl: 'u', clipboard,
+      ClipboardItemCtor: class { constructor(value) { this.parts = value; } },
+      fetchImpl: async () => ({ ok: false, status: 404 }),
+    });
+
+    expect(result).toEqual({ mode: 'text', photoIncluded: false });
+    expect(clipboard.writeText).toHaveBeenCalledWith(`ENGLISH\n${EN}\n\nFILIPINO\n${TL}`);
   });
 });
