@@ -22,7 +22,12 @@ Filipino sentences, but it is not on the critical path.
 Run the unit tests without torch/transformers: this module has no model.
 """
 
+import json
+import os
 import re
+import time
+import urllib.request
+from pathlib import Path
 
 # Grouped by kind so the list stays reviewable. Each value is a tuple of the
 # English words that should join the query; the Filipino token is not removed.
@@ -144,17 +149,102 @@ _GLOSSARY = {
 # "sing", "sang" and "nag" cannot match.
 _NON_WORD = re.compile(r"[^\w]+", re.UNICODE)
 
+# The table is optional and refreshed at most once a minute. The built-in
+# glossary is always the floor, so a DB outage or an empty table never removes
+# coverage that already works.
+SYNONYMS_CACHE_SECONDS = 60
+SYNONYMS_TIMEOUT_SECONDS = 3
+_db_synonyms = None
+_db_cached_at = 0.0
+_db_warned = False
+
+
+def _load_env_file() -> None:
+    path = Path(__file__).with_name(".env")
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _fetch_db_synonyms() -> dict:
+    """Reads enabled rows from public.search_synonyms, or returns {}."""
+    global _db_warned
+
+    if os.environ.get("SEARCH_SYNONYMS_DISABLED") == "1":
+        return {}
+
+    _load_env_file()
+    base = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not base or not key:
+        return {}
+
+    url = (
+        f"{base}/rest/v1/search_synonyms"
+        "?select=term,synonyms&enabled=eq.true"
+    )
+    request = urllib.request.Request(
+        url,
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+    )
+    try:
+        with urllib.request.urlopen(
+            request, timeout=SYNONYMS_TIMEOUT_SECONDS
+        ) as response:
+            rows = json.load(response)
+    except Exception as error:  # noqa: BLE001 - any outage uses the built-in list
+        if not _db_warned:
+            print(
+                "Synonym table unavailable, using the built-in glossary: "
+                f"{error!r}"
+            )
+            _db_warned = True
+        return {}
+
+    result = {}
+    for row in rows:
+        term = str(row.get("term") or "").strip().casefold()
+        synonyms = row.get("synonyms")
+        if not term or not isinstance(synonyms, list):
+            continue
+        cleaned = tuple(
+            str(synonym).strip()
+            for synonym in synonyms
+            if str(synonym).strip()
+        )
+        if cleaned:
+            result[term] = cleaned
+    return result
+
+
+def _effective_glossary() -> dict:
+    global _db_synonyms, _db_cached_at
+
+    now = time.monotonic()
+    if _db_synonyms is None or now - _db_cached_at > SYNONYMS_CACHE_SECONDS:
+        _db_synonyms = _fetch_db_synonyms()
+        _db_cached_at = now
+
+    merged = dict(_GLOSSARY)
+    merged.update(_db_synonyms)
+    return merged
+
 
 def _tokens(text):
     return [token for token in _NON_WORD.split((text or "").casefold()) if token]
 
 
-def _stems(token):
-    """Yields the token and any linker-stripped stem that is in the glossary."""
+def _stems(token, glossary):
+    """Yields the token and any linker-stripped stem in the glossary."""
     yield token
     if len(token) > 4 and token.endswith("ng"):
         stem = token[:-2]
-        if stem in _GLOSSARY:
+        if stem in glossary:
             yield stem
     if (
         len(token) > 3
@@ -162,7 +252,7 @@ def _stems(token):
         and token[-2] == "n"
     ):
         stem = token[:-1]
-        if stem in _GLOSSARY:
+        if stem in glossary:
             yield stem
 
 
@@ -179,11 +269,12 @@ def expand_query(text):
     if not tokens:
         return original, []
 
+    glossary = _effective_glossary()
     present = set(tokens)
     additions = []
     for token in tokens:
-        for stem in _stems(token):
-            synonyms = _GLOSSARY.get(stem) or ()
+        for stem in _stems(token, glossary):
+            synonyms = glossary.get(stem) or ()
             for synonym in synonyms:
                 if synonym in present or synonym in additions:
                     continue

@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { embedImage, embedQuery, SearchError } from './aiService.js';
+import { embedImage, embedQuery, embedText, SearchError } from './aiService.js';
 
 // Confidence tiers passed to match_items_two_tower, plus the best/possible
 // split. `score` is the RPC's blended vector + lexical score. A row only counts
@@ -11,15 +11,14 @@ export const MATCH_THRESHOLD = 0.3;
 export const MATCH_COUNT = 15;
 export const BEST_FLOOR = 0.72;
 export const BEST_DELTA = 0.05;
-// Vector-only rows (a photo-only query or a stale RPC) keep the old floor:
-// they carry no lexical bonus, so the blended floor would drop them.
-export const PHOTO_BEST_FLOOR = 0.64;
 export const POSSIBLE_FLOOR = 0.55;
 export const POSSIBLE_DELTA = 0.07;
 export const POSSIBLE_LIMIT = 3;
 export const POSSIBLE_ONLY_LIMIT = 5;
 export const TEXT_STRONG_FLOOR = 0.68;
 export const IMAGE_STRONG_FLOOR = 0.82;
+export const LEGACY_BEST_FLOOR = 0.64;
+export const LEGACY_STRONG_FLOOR = 0.82;
 export const LEXICAL_CONFIDENCE = 0.5;
 
 // Mirrors the lexical weight inside match_items_two_tower. Kept here so the two
@@ -92,26 +91,32 @@ function scoreOf(item) {
 /**
  * True when a row may be promoted to the confident tier.
  *
- * A stale RPC has no lexical_score at all, and a photo-only query has no tokens
- * to match, so both report null. Keep the old vector-only behaviour there. A
- * current row with text needs either a lexical hit (the query named something
- * in its title/category/caption) or a strong score in the modality that was
+ * A stale RPC has no lexical_score at all; keep the old vector-only behaviour
+ * there. A current row needs either a lexical hit (the query named something in
+ * its title/category/caption) or a strong score in the modality that was
  * actually queried.
  */
-function isConfident(item) {
+function bestFloorOf(item) {
+  // A photo-only query and a stale RPC both report no lexical score. They have
+  // no lexical bonus, so keep the old vector floor for them.
+  return Number.isFinite(item.lexical_score) ? BEST_FLOOR : LEGACY_BEST_FLOOR;
+}
+
+function isConfident(item, score) {
   if (!Number.isFinite(item.lexical_score)) return true;
   if (item.lexical_score >= LEXICAL_CONFIDENCE) return true;
+
+  const hasModality =
+    Number.isFinite(item.text_similarity) ||
+    Number.isFinite(item.image_similarity);
+  if (!hasModality) return score >= LEGACY_STRONG_FLOOR;
+
   return (
     (Number.isFinite(item.text_similarity) &&
       item.text_similarity >= TEXT_STRONG_FLOOR) ||
     (Number.isFinite(item.image_similarity) &&
       item.image_similarity >= IMAGE_STRONG_FLOOR)
   );
-}
-
-/** Blended rows use the retuned floor; vector-only rows keep the photo floor. */
-function bestFloorOf(item) {
-  return Number.isFinite(item.lexical_score) ? BEST_FLOOR : PHOTO_BEST_FLOOR;
 }
 
 /**
@@ -124,6 +129,146 @@ export function combineEmbeddings(vectors) {
   return normalize(
     units[0].map((_, i) => units.reduce((total, v) => total + v[i], 0)),
   );
+}
+
+/**
+ * Embeds the two query halves independently. A text-tower outage must not take
+ * photo search down with it, so the outcomes are settled separately and the
+ * caller decides whether to continue with one half or fall back.
+ */
+async function embedSearchInputs(queryText, photo, expand, signal) {
+  const [text, image] = await Promise.allSettled([
+    queryText
+      ? embedQuery(queryText, signal, { expand })
+      : Promise.resolve(null),
+    photo ? embedImage(photo, signal) : Promise.resolve(null),
+  ]);
+
+  if (signal?.aborted) {
+    const rejected = [text, image].find(
+      (outcome) => outcome.status === 'rejected',
+    );
+    throw rejected?.reason ?? new DOMException('Aborted', 'AbortError');
+  }
+
+  return {
+    text: text.status === 'fulfilled' ? text.value : null,
+    image: image.status === 'fulfilled' ? image.value : null,
+    textError: text.status === 'rejected' ? text.reason : null,
+    imageError: image.status === 'rejected' ? image.reason : null,
+  };
+}
+
+async function fetchTwoTower({
+  text,
+  image,
+  queryText,
+  expandedText,
+  office,
+  dateFrom,
+  dateTo,
+  signal,
+}) {
+  const { data, error } = await supabase
+    .rpc('match_items_two_tower', {
+      query_text_embedding: text?.embedding ?? null,
+      query_image_embedding: image?.embedding ?? null,
+      match_threshold: MATCH_THRESHOLD,
+      match_count: MATCH_COUNT,
+      filter_office: office || null,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+      query_text: text ? expandedText : queryText || null,
+    })
+    .abortSignal(signal);
+
+  if (error) throw new SearchError('db', error.message);
+  return data;
+}
+
+/**
+ * Last-resort path for an AI-service or RPC outage: the legacy CLIP text
+ * embedding and the legacy match_items_hybrid RPC. Both are still deployed and
+ * the item's combined vector is public-safe, so search degrades instead of
+ * failing entirely.
+ */
+async function fetchLegacy({
+  queryText,
+  expand,
+  image,
+  office,
+  dateFrom,
+  dateTo,
+  signal,
+  fallbackError,
+}) {
+  let legacy = null;
+  if (queryText) {
+    try {
+      legacy = await embedText(queryText, signal, { expand });
+    } catch (error) {
+      if (!image) throw fallbackError ?? error;
+    }
+  }
+
+  const embedding = combineEmbeddings(
+    [legacy?.embedding, image?.embedding].filter(Boolean),
+  );
+  if (!embedding) {
+    throw (
+      fallbackError ??
+      new SearchError('ai-failed', 'No search input could be embedded.')
+    );
+  }
+
+  const { data, error } = await supabase
+    .rpc('match_items_hybrid', {
+      query_embedding: embedding,
+      match_threshold: MATCH_THRESHOLD,
+      match_count: MATCH_COUNT,
+      filter_office: office || null,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+      query_text: legacy?.expandedText ?? queryText ?? null,
+    })
+    .abortSignal(signal);
+
+  if (!error) {
+    return {
+      data,
+      expandedText: legacy?.expandedText ?? queryText,
+      additions: legacy?.additions ?? [],
+    };
+  }
+
+  // Final fallback for a deployment where neither hybrid RPC exists yet. The
+  // original match_items function has been present since the first search
+  // release; the UI degrades to its vector-only tiers.
+  if (import.meta.env.DEV) {
+    console.warn(
+      '[searchItems] hybrid RPC missing, falling back to match_items:',
+      error.message,
+    );
+  }
+  const fallback = await supabase
+    .rpc('match_items', {
+      query_embedding: embedding,
+      match_threshold: MATCH_THRESHOLD,
+      match_count: MATCH_COUNT,
+      filter_office: office || null,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+    })
+    .abortSignal(signal);
+
+  if (fallback.error) {
+    throw new SearchError('db', fallback.error.message);
+  }
+  return {
+    data: fallback.data,
+    expandedText: legacy?.expandedText ?? queryText,
+    additions: legacy?.additions ?? [],
+  };
 }
 
 /**
@@ -160,27 +305,76 @@ export async function searchItems({
     .filter(Boolean)
     .join(' ');
 
-  const [textResult, imageResult] = await Promise.all([
-    queryText ? embedQuery(queryText, signal, { expand }) : null,
-    photo ? embedImage(photo, signal) : null,
-  ]);
+  const {
+    text: textResult,
+    image: imageResult,
+    textError,
+    imageError,
+  } = await embedSearchInputs(queryText, photo, expand, signal);
 
-  const expandedText = textResult?.expandedText ?? queryText;
+  let data;
+  let expandedText = textResult?.expandedText ?? queryText;
+  let additions = textResult?.additions ?? [];
 
-  const { data, error } = await supabase
-    .rpc('match_items_two_tower', {
-      query_text_embedding: textResult?.embedding ?? null,
-      query_image_embedding: imageResult?.embedding ?? null,
-      match_threshold: MATCH_THRESHOLD,
-      match_count: MATCH_COUNT,
-      filter_office: office || null,
-      date_from: dateFrom || null,
-      date_to: dateTo || null,
-      query_text: textResult ? expandedText : null,
-    })
-    .abortSignal(signal);
-
-  if (error) throw new SearchError('db', error.message);
+  if (textResult || imageResult) {
+    try {
+      data = await fetchTwoTower({
+        text: textResult,
+        image: imageResult,
+        queryText,
+        expandedText,
+        office,
+        dateFrom,
+        dateTo,
+        signal,
+      });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[searchItems] two-tower search failed, falling back to the legacy RPC:',
+          error.message,
+        );
+      }
+      const legacy = await fetchLegacy({
+        queryText,
+        expand,
+        image: imageResult,
+        office,
+        dateFrom,
+        dateTo,
+        signal,
+        fallbackError: error,
+      });
+      data = legacy.data;
+      expandedText = legacy.expandedText;
+      additions = legacy.additions;
+    }
+  } else {
+    const fallbackError = textError ?? imageError;
+    if (!fallbackError) {
+      throw new SearchError('ai-failed', 'No search input could be embedded.');
+    }
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[searchItems] new text tower unavailable, falling back to the legacy RPC:',
+        fallbackError.message,
+      );
+    }
+    const legacy = await fetchLegacy({
+      queryText,
+      expand,
+      image: null,
+      office,
+      dateFrom,
+      dateTo,
+      signal,
+      fallbackError,
+    });
+    data = legacy.data;
+    expandedText = legacy.expandedText;
+    additions = legacy.additions;
+  }
 
   // The RPC already applies the floor, office filter and excludes released,
   // resolved and other terminal rows; re-checking them here keeps the guarantee
@@ -202,7 +396,7 @@ export async function searchItems({
     const score = scoreOf(item);
     return (
       score >= bestFloorOf(item) &&
-      isConfident(item) &&
+      isConfident(item, score) &&
       score >= top - BEST_DELTA - EPSILON
     );
   });
@@ -225,6 +419,6 @@ export async function searchItems({
     state,
     queryText,
     expandedText,
-    additions: textResult?.additions ?? [],
+    additions,
   };
 }

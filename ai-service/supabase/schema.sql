@@ -44,6 +44,42 @@ drop function if exists public.handle_new_office_user();
 
 
 -- ============================================================================
+-- 2b. SEARCH SYNONYM VOCABULARY
+-- Admin-editable bilingual terms for public search. The AI service reads this
+-- table with a 60-second cache and falls back to the built-in glossary in
+-- ai-service/glossary.py when it is empty or unreachable. The seed rows live in
+-- supabase/migrations/20261107152116_search_synonyms.sql.
+-- ============================================================================
+create table if not exists public.search_synonyms (
+    term text primary key,
+    synonyms text[] not null check (cardinality(synonyms) > 0),
+    enabled boolean not null default true,
+    updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+alter table public.search_synonyms enable row level security;
+
+revoke all on table public.search_synonyms from anon, authenticated;
+grant all on table public.search_synonyms to service_role;
+
+create or replace function public.touch_search_synonyms()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+    new.updated_at := timezone('utc'::text, now());
+    return new;
+end;
+$$;
+
+drop trigger if exists search_synonyms_touch on public.search_synonyms;
+create trigger search_synonyms_touch
+before update on public.search_synonyms
+for each row execute function public.touch_search_synonyms();
+
+
+-- ============================================================================
 -- 3. FOUND ITEMS INVENTORY & CUSTODY LOGBOOK
 -- Central ledger of all physical property officially received at a city counter.
 -- Uses single-table inheritance for cash attributes and counter-release auditing.

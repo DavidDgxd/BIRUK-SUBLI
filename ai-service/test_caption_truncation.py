@@ -1,6 +1,9 @@
+import os
 import sys
 import types
 import unittest
+
+os.environ.setdefault("SEARCH_SYNONYMS_DISABLED", "1")
 
 # main.py loads the CLIP sentence-transformer while importing. Stub the heavy
 # model modules so this test only exercises the pure truncation helper.

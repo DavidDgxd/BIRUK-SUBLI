@@ -1,6 +1,11 @@
+import os
 import unittest
+from unittest import mock
 
-from glossary import expand_query
+os.environ.setdefault("SEARCH_SYNONYMS_DISABLED", "1")
+
+import glossary  # noqa: E402
+from glossary import expand_query  # noqa: E402
 
 
 class ExpandQueryTests(unittest.TestCase):
@@ -60,6 +65,35 @@ class ExpandQueryTests(unittest.TestCase):
         self.assertIn("wallet", additions)
         self.assertIn("black", additions)
         self.assertNotIn("ID", additions)
+
+
+class SynonymTableTests(unittest.TestCase):
+    def setUp(self):
+        self._reset_cache()
+        self.addCleanup(self._reset_cache)
+
+    @staticmethod
+    def _reset_cache():
+        glossary._db_synonyms = None
+        glossary._db_cached_at = 0.0
+
+    def test_a_database_row_overrides_the_builtin_entry(self):
+        with mock.patch.object(
+            glossary,
+            "_fetch_db_synonyms",
+            return_value={"pitaka": ("billfold",)},
+        ):
+            _, additions = expand_query("pitaka")
+
+        self.assertEqual(additions, ["billfold"])
+
+    def test_a_missing_or_empty_table_keeps_the_builtin_entry(self):
+        with mock.patch.object(
+            glossary, "_fetch_db_synonyms", return_value={}
+        ):
+            _, additions = expand_query("pitaka")
+
+        self.assertEqual(additions, ["wallet", "purse"])
 
 
 if __name__ == "__main__":
