@@ -1,9 +1,15 @@
-"""Filipino-to-English translation for typed search queries (US-22).
+"""Filipino/English translation for captions and the hosted-provider seam.
+
+Public search no longer calls translate_to_english(): it now uses additive
+glossary expansion (glossary.py), which cannot rewrite an English query and
+does not need a language gate. The tl-en path stays here because the planned
+hosted provider (issue #88) will share it, and its regression tests still pin
+the old gate. translate_to_filipino() feeds the staff announcement draft.
 
 This module is a seam on purpose: the translation provider is expected to
 change (the team may move captioning and translation onto one external API).
-Callers use only translate_to_english(). Swapping the backend means rewriting
-one provider function and setting TRANSLATE_PROVIDER, not editing callers.
+Swapping the backend means rewriting one provider function and setting
+TRANSLATE_PROVIDER, not editing callers.
 
 When does a query count as Filipino? The decision is made on the INPUT,
 before any model runs: a query is Filipino when it contains a word from

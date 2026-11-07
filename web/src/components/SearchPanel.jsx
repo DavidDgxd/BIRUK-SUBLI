@@ -12,7 +12,7 @@ const MAX_QUERY_LENGTH = 200;
  * On submit it navigates to /search with:
  *   - ?q=<text>        free text, English, Filipino or Ilokano
  *   - location.state.photo = File (optional, lost on page reload)
- * The results page owns translation, embedding and ranking.
+ * The results page owns synonym expansion, embedding and ranking.
  *
  * `compact` renders the query field, search button and photo control so the
  * results page can offer an editable search bar without the full helper copy.
@@ -130,9 +130,7 @@ export default function SearchPanel({
         <label className="visually-hidden" htmlFor={inputId}>
           Search held items
         </label>
-        <div
-          className={`search-inline__field${error ? ' is-invalid' : ''}`}
-        >
+        <div className={`search-inline__field${error ? ' is-invalid' : ''}`}>
           <Icon
             name="search"
             className="search-inline__loupe"

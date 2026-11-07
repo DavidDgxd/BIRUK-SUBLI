@@ -41,16 +41,7 @@ function ResultList({ items, possible = false }) {
   );
 }
 
-function requestKey(
-  q,
-  exact,
-  color,
-  photo,
-  office,
-  dateFrom,
-  dateTo,
-  attempt,
-) {
+function requestKey(q, exact, color, photo, office, dateFrom, dateTo, attempt) {
   return [
     q,
     exact,
@@ -82,7 +73,7 @@ export default function SearchResults() {
   const hasFilters = Boolean(office || dateFrom || dateTo);
 
   const [attempt, setAttempt] = useState(0);
-  const [outcome, setOutcome] = useState(null); // { key, best, possible, state, translatedText } or { key, error }
+  const [outcome, setOutcome] = useState(null); // { key, best, possible, state, expandedText, additions } or { key, error }
   const [officeOptions, setOfficeOptions] = useState(null);
   const [focusToken, setFocusToken] = useState(0);
   const headingRef = useRef(null);
@@ -108,7 +99,7 @@ export default function SearchResults() {
       office: office || null,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
-      translate: !exact,
+      expand: !exact,
       signal: controller.signal,
     })
       .then((result) => {
@@ -215,15 +206,11 @@ export default function SearchResults() {
     );
   }, [staleExact, params, navigate, locationState]);
 
-  // The translation replaces the query for matching; it is not searched
-  // alongside it. Hidden while loading so a stale one never labels new results.
-  const translated =
-    !loading &&
-    !exact &&
-    outcome?.translatedText &&
-    outcome.translatedText.trim().toLowerCase() !== q.trim().toLowerCase()
-      ? outcome.translatedText
-      : null;
+  // The expansion is additive: the typed words are still searched, with these
+  // English synonyms alongside them. Hidden while loading so stale additions
+  // never label new results.
+  const additions =
+    !loading && !exact && outcome?.additions?.length ? outcome.additions : null;
 
   return (
     <>
@@ -252,20 +239,20 @@ export default function SearchResults() {
                 {photo && 'Photo attached'}
               </p>
             )}
-            {translated && (
-              <p className="results__translated">
-                Searched for “{translated}”, the English translation of your
-                words.{' '}
+            {additions && (
+              <p className="results__expanded">
+                Also matching: {additions.map((word) => `“${word}”`).join(', ')}
+                .{' '}
                 <Link to={wordingLink(true)} state={locationState}>
-                  Search “{q}” instead
+                  Search my exact words
                 </Link>
               </p>
             )}
             {exact && (
-              <p className="results__translated">
-                Searched using your own words, without translating them.{' '}
+              <p className="results__expanded">
+                Searched using your own words, without adding synonyms.{' '}
                 <Link to={wordingLink(false)} state={locationState}>
-                  Search the English translation instead
+                  Add Filipino synonyms instead
                 </Link>
               </p>
             )}

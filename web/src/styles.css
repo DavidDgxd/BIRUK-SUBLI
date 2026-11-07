@@ -1193,7 +1193,7 @@ input[type='search']::-webkit-search-decoration {
   overflow-wrap: anywhere;
 }
 
-.results__translated {
+.results__expanded {
   margin-block-start: var(--space-2);
   color: var(--ink-muted);
 }

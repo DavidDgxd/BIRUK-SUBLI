@@ -8,8 +8,9 @@
  * A rejected call answers {"detail": "..."} with 422 (blank or over-long text)
  * or 503 (the model failed); postForJson surfaces that sentence to the user.
  *
- * /embed/text also returns "translated_text": the English translation of a
- * Filipino query (US-22), or null. The results page shows it to the user.
+ * /embed/text also returns "expanded_text" (the query plus any English
+ * synonyms) and "additions" (those synonyms). The results page shows the
+ * additions; the words the user typed are never rewritten.
  *
  * Set VITE_AI_SERVICE_URL in web/.env to override the service location.
  * Otherwise the service is assumed to run on the same host that served this
@@ -151,9 +152,12 @@ async function postForEmbedding(path, init, signal) {
  * vector that scores close to every item, so the search would "succeed" while
  * showing arbitrary results.
  *
- * Pass { translate: false } to embed the words exactly as typed (US-23).
+ * The service appends English synonyms for known Filipino words and returns
+ * the words it actually matched with, so the results page can show them. Pass
+ * { expand: false } to embed the words exactly as typed (the "search my exact
+ * words" link).
  */
-export async function embedText(text, signal, { translate = true } = {}) {
+export async function embedText(text, signal, { expand = true } = {}) {
   const clean = (text ?? '').trim();
 
   if (!clean) {
@@ -171,11 +175,12 @@ export async function embedText(text, signal, { translate = true } = {}) {
 
   const form = new FormData();
   form.append('text', clean);
-  if (!translate) form.append('translate', 'false');
+  if (!expand) form.append('expand', 'false');
   const body = await postForEmbedding('/embed/text', { body: form }, signal);
   return {
     embedding: body.vector,
-    translatedText: body.translated_text ?? null,
+    expandedText: body.expanded_text ?? null,
+    additions: Array.isArray(body.additions) ? body.additions : [],
   };
 }
 
@@ -205,7 +210,11 @@ export async function captionImage(file, signal) {
     );
   }
 
-  return { caption: body.caption.trim(), captionTl: body.caption_tl?.trim() || null, model: body.model ?? null };
+  return {
+    caption: body.caption.trim(),
+    captionTl: body.caption_tl?.trim() || null,
+    model: body.model ?? null,
+  };
 }
 
 /**
