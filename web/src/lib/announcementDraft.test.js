@@ -128,9 +128,9 @@ describe('US-25 bilingual drafts and copy', () => {
     await copyAnnouncement('en', { en: EN, tl: TL, clipboard: plain });
     await copyAnnouncement('tl', { en: EN, tl: TL, clipboard: plain });
     expect(plain.writeText.mock.calls).toEqual([[EN], [TL]]);
-    const photo = new Blob(['photo'], { type: 'image/webp' });
-    const rich = await copyAnnouncement('both', { en: EN, tl: TL, photoUrl: 'u', clipboard: plain, ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } }, fetchImpl: async () => ({ ok: true, blob: async () => photo }) });
-    expect(rich).toEqual({ mode: 'rich', photoIncluded: true });
+    const photo = new Blob(['photo'], { type: 'image/png' });
+    const photoCopy = await copyAnnouncement('photo', { photoBlob: photo, clipboard: plain, ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } } });
+    expect(photoCopy).toEqual({ mode: 'photo', photoIncluded: true });
     const fallback = clipboard();
     expect(await copyAnnouncement('both', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
     expect(fallback.writeText.mock.calls[0][0]).toContain(TL);
@@ -142,5 +142,40 @@ describe('US-25 bilingual drafts and copy', () => {
     expect(drafts.en).toContain(ITEM.aiCaption);
     expect(drafts.tl).toContain(captionTl);
     expect(drafts.tl).not.toContain(ITEM.aiCaption);
+  });
+});
+
+describe('US-26 copy text and photo', () => {
+  const clipboard = () => ({ writeText: vi.fn(), write: vi.fn() });
+  const ClipboardItemStub = class { constructor(parts) { this.parts = parts; } };
+
+  it('copies text without mixing in the photo', async () => {
+    const plain = clipboard();
+    const result = await copyAnnouncement('both', {
+      en: EN, tl: TL, photoBlob: new Blob(['photo'], { type: 'image/png' }),
+      clipboard: plain, ClipboardItemCtor: ClipboardItemStub,
+    });
+    expect(result).toEqual({ mode: 'text', photoIncluded: false });
+    expect(plain.write).not.toHaveBeenCalled();
+    expect(plain.writeText.mock.calls[0][0]).toContain(TL);
+  });
+
+  it('writes the pre-fetched photo as image/png on its own', async () => {
+    const photo = new Blob(['photo'], { type: 'image/png' });
+    const plain = clipboard();
+    const result = await copyAnnouncement('photo', {
+      photoBlob: photo, clipboard: plain, ClipboardItemCtor: ClipboardItemStub,
+    });
+    expect(result).toEqual({ mode: 'photo', photoIncluded: true });
+    expect(plain.writeText).not.toHaveBeenCalled();
+    expect(plain.write.mock.calls[0][0][0].parts['image/png']).toBe(photo);
+  });
+
+  it('refuses to copy a photo that is not ready', async () => {
+    await expect(copyAnnouncement('photo', { clipboard: clipboard() })).rejects.toThrow('The photo is not ready yet.');
+  });
+
+  it('throws when there is no text to copy', async () => {
+    await expect(copyAnnouncement('both', { en: '', tl: '', clipboard: clipboard() })).rejects.toThrow('There is nothing to copy yet.');
   });
 });

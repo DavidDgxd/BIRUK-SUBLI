@@ -15,6 +15,25 @@ import {
 const CAPTION_WARNING =
   'We could not read the photo. The draft uses the item title only — add any public details you want to include.';
 
+/* Facebook only accepts PNG from a paste, so the preview photo is re-encoded
+ * once up front instead of at click time. */
+async function toPngBlob(blob) {
+  if (!blob || blob.type === 'image/png') return blob;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.drawImage(bitmap, 0, 0);
+    bitmap.close?.();
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  } catch {
+    return null;
+  }
+}
+
 const buildFor = (item, caption) => {
   const generated = buildAnnouncementDrafts({ ...item, aiCaption: item.aiCaption || caption?.caption || '', aiCaptionTl: caption?.captionTl ?? item.aiCaptionTl ?? '' });
   return generated.en || generated.tl
@@ -43,6 +62,28 @@ export default function AnnouncementDraft({ item }) {
   );
   const [notice, setNotice] = useState('');
   const [copyState, setCopyState] = useState('idle');
+  const [photoBlob, setPhotoBlob] = useState(null);
+  const copying = copyState.endsWith('-copying');
+
+  // Fetch the photo ahead of the click so clipboard.write() runs while the
+  // click's transient activation is still valid (Safari/iOS requirement).
+  useEffect(() => {
+    if (!imageUrl) {
+      setPhotoBlob(null);
+      return undefined;
+    }
+    let active = true;
+    const controller = new AbortController();
+    fetch(imageUrl, { signal: controller.signal })
+      .then((response) => (response.ok ? response.blob() : null))
+      .then((blob) => (blob ? toPngBlob(blob) : null))
+      .then((blob) => { if (active) setPhotoBlob(blob); })
+      .catch(() => { if (active) setPhotoBlob(null); });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [imageUrl]);
 
   useEffect(() => {
     const source = captionSource({ file: photoFile, url: photoUrl });
@@ -79,13 +120,32 @@ export default function AnnouncementDraft({ item }) {
     setNotice('');
   }
   async function handleCopy(action) {
-    if (!draft.en.trim() && !draft.tl.trim()) return;
+    if (copying) return;
+    if (action === 'photo') {
+      if (!photoBlob) return;
+    } else {
+      const text = action === 'tl' ? draft.tl : action === 'en' ? draft.en : draft.en || draft.tl;
+      if (!text.trim()) return;
+    }
+    setCopyState(`${action}-copying`);
     try {
-      const result = await copyAnnouncement(action, { en: draft.en, tl: draft.tl, photoUrl: imageUrl });
+      await copyAnnouncement(action, {
+        en: draft.en, tl: draft.tl, photoBlob,
+      });
       setCopyState(`${action}-copied`);
-      const photoNote = result.photoIncluded ? 'Both versions and the photo are on your clipboard.' : 'Both versions are on your clipboard. The photo could not be attached.';
-      setNotice(action === 'both' ? photoNote : 'Copied to your clipboard.');
+      if (action === 'photo') {
+        setNotice('Photo copied. Paste it into Facebook.');
+      } else if (action === 'both') {
+        setNotice('Both versions are on your clipboard.');
+      } else {
+        setNotice('Copied to your clipboard.');
+      }
     } catch {
+      if (action === 'photo') {
+        setCopyState('error');
+        setNotice('Copy failed — save the photo from the preview instead.');
+        return;
+      }
       const target = action === 'tl' ? filipinoRef : englishRef;
       target.current?.focus();
       target.current?.select();
@@ -154,8 +214,8 @@ export default function AnnouncementDraft({ item }) {
             ))}
           </div>
           <p className="field__hint" id={hintId}>
-            Edit either version before posting. Copy one, or copy both together
-            with the item photo.
+            Edit either version before posting. Copy the text, then copy the
+            photo separately to paste both into Facebook.
           </p>
 
           {notice && (
@@ -165,19 +225,28 @@ export default function AnnouncementDraft({ item }) {
             </p>
           )}
 
-          <div className="announcement-draft__actions">
+          <div className="announcement-draft__actions" aria-busy={copying}>
             {[
-              ['en', 'Copy English', 'English copied', draft.en],
-              ['tl', 'Copy Filipino', 'Filipino copied', draft.tl],
-              ['both', 'Copy both + photo', 'Copied both', draft.en || draft.tl],
-            ].map(([action, idle, copied, text]) => (
-              <button key={action} type="button"
-                className={action === 'both' ? 'btn btn--filled' : 'btn'}
-                onClick={() => handleCopy(action)} disabled={!text.trim()}>
-                <Icon name={copyState === `${action}-copied` ? 'check' : 'content_copy'} />
-                {copyState === `${action}-copied` ? copied : idle}
-              </button>
-            ))}
+              ['en', 'Copy English', 'English copied'],
+              ['tl', 'Copy Filipino', 'Filipino copied'],
+              ['both', 'Copy both', 'Both copied'],
+              ['photo', 'Copy photo (PNG)', 'Photo copied'],
+            ].map(([action, idle, copied]) => {
+              const busy = copyState === `${action}-copying`;
+              const done = copyState === `${action}-copied`;
+              const blocked = action === 'photo'
+                ? !photoBlob
+                : !(draft.en || draft.tl).trim();
+              return (
+                <button key={action} type="button"
+                  className={action === 'both' ? 'btn btn--filled' : 'btn'}
+                  aria-disabled={copying || blocked}
+                  onClick={() => handleCopy(action)}>
+                  <Icon name={done ? 'check' : busy ? 'hourglass_top' : 'content_copy'} />
+                  {done ? copied : busy ? 'Copying…' : idle}
+                </button>
+              );
+            })}
           </div>
         </>
       )}

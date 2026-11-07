@@ -124,7 +124,7 @@ export const updateAnnouncementDraft = (draft, language, text) => ({
   en: '', tl: '', ...draft,
   [language === 'tl' || language === 'fil' ? 'tl' : 'en']: text,
 });
-const COPY_ACTIONS = ['en', 'tl', 'both'];
+const COPY_ACTIONS = ['en', 'tl', 'both', 'photo'];
 export function combinedAnnouncementText({ en = '', tl = '' } = {}) {
   const english = String(en ?? '').trim();
   const filipino = String(tl ?? '').trim();
@@ -135,40 +135,32 @@ function textFor(action, { en = '', tl = '' }) {
   if (action === 'tl') return String(tl ?? '').trim();
   return combinedAnnouncementText({ en, tl });
 }
-async function photoPart(photoUrl, fetchImpl) {
-  if (!photoUrl || typeof fetchImpl !== 'function') return null;
-  try {
-    const response = await fetchImpl(photoUrl);
-    if (!response?.ok) return null;
-    const blob = await response.blob();
-    return blob ? { [blob.type || 'image/png']: blob } : null;
-  } catch {
-    return null;
-  }
-}
 export async function copyAnnouncement(
   action,
   {
     en = '',
     tl = '',
-    photoUrl = '',
+    photoBlob = null,
     clipboard = globalThis.navigator?.clipboard,
     ClipboardItemCtor = globalThis.ClipboardItem,
-    fetchImpl = globalThis.fetch,
   } = {},
 ) {
   if (!COPY_ACTIONS.includes(action)) throw new Error(`Unknown copy action: ${action}`);
+  if (!clipboard?.writeText && !clipboard?.write) throw new Error('Clipboard access is unavailable.');
+  if (action === 'photo') {
+    // Paste targets like Facebook read one MIME format per paste, so the
+    // photo travels on its own and the text is copied separately.
+    if (!photoBlob) throw new Error('The photo is not ready yet.');
+    if (typeof clipboard.write !== 'function' || typeof ClipboardItemCtor !== 'function') {
+      throw new Error('Clipboard access is unavailable.');
+    }
+    // The PNG blob is prepared before the click, so write() runs inside the
+    // transient activation window required by Safari/iOS.
+    await clipboard.write([new ClipboardItemCtor({ 'image/png': photoBlob })]);
+    return { mode: 'photo', photoIncluded: true };
+  }
   const text = textFor(action, { en, tl });
   if (!text) throw new Error('There is nothing to copy yet.');
-  if (!clipboard?.writeText && !clipboard?.write) throw new Error('Clipboard access is unavailable.');
-  if (action === 'both' && typeof clipboard.write === 'function' && typeof ClipboardItemCtor === 'function') {
-    const media = await photoPart(photoUrl, fetchImpl);
-    const parts = { 'text/plain': new Blob([text], { type: 'text/plain' }), ...(media ?? {}) };
-    try {
-      await clipboard.write([new ClipboardItemCtor(parts)]);
-      return { mode: 'rich', photoIncluded: Boolean(media) };
-    } catch { /* fall back to writeText below */ }
-  }
   if (typeof clipboard.writeText !== 'function') throw new Error('Clipboard access is unavailable.');
   await clipboard.writeText(text);
   return { mode: 'text', photoIncluded: false };

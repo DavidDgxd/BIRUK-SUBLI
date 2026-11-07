@@ -85,3 +85,70 @@ test('drafts, edits and copies a public announcement without private notes', asy
     /May nakitang bagay sa/,
   );
 });
+
+test('copies the photo separately as a PNG for Facebook', async ({ page }) => {
+  await page.route('**/caption/image', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ caption: CAPTION }),
+    }),
+  );
+  await page.route('**/rest/v1/rpc/submit_staff_custody', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify('BS-0123'),
+    }),
+  );
+  await page.route('**/storage/v1/object/public/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: PNG_1PX,
+    }),
+  );
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.addInitScript(() => {
+    window.__copiedPhotoTypes = [];
+    const clipboard = navigator.clipboard;
+    if (!clipboard) return;
+    Object.defineProperty(clipboard, 'write', {
+      configurable: true,
+      value: async (items) => {
+        window.__copiedPhotoTypes.push(...items.flatMap((item) => item.types));
+      },
+    });
+  });
+
+  await openRoute(page, '/staff/intake');
+  await page.locator('form input[type=file]').setInputFiles({
+    name: 'wallet.png',
+    mimeType: 'image/png',
+    buffer: PNG_1PX,
+  });
+  await expect(
+    page.getByText('Suggested description from the photo'),
+  ).toBeVisible();
+  await page.getByLabel('Item title').fill('Brown leather wallet');
+  await page.getByLabel('Category').selectOption('Bags & Wallets');
+  await page.getByLabel('Storage location').fill('Locker 2, Bin B');
+  await page.getByRole('button', { name: 'Take into custody' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Announcement draft' }),
+  ).toBeVisible();
+
+  const photoButton = page.getByRole('button', { name: 'Copy photo (PNG)' });
+  await expect(photoButton).toHaveAttribute('aria-disabled', 'false');
+  await photoButton.focus();
+  await page.keyboard.press('Enter');
+
+  // Focus must stay on the clicked button while the write is in flight.
+  await expect(
+    page.locator('.announcement-draft__actions button:focus'),
+  ).toHaveText(/Photo copied/);
+
+  const types = await page.evaluate(() => window.__copiedPhotoTypes);
+  expect(types).toContain('image/png');
+  expect(types).not.toContain('image/webp');
+});
