@@ -2,6 +2,7 @@ import { supabase } from './supabase.js';
 import {
   embedImageFromUrlOrNull,
   embedImageOrNull,
+  embedItemText,
   embedText,
   MAX_EMBED_TEXT_LENGTH,
   SearchError,
@@ -20,19 +21,21 @@ import { uploadItemImage } from './storage.js';
  * custody receipt reference.
  *
  * `description` is the staff verification record (marks, serial numbers,
- * condition). It is embedded so it can influence matching, but it is never
- * returned by match_items and anon has no direct read on items — see the
- * "hide private verification details" section of schema.sql.
+ * condition). It is deliberately NOT embedded: the public text index is built
+ * from title, category and caption only, so a claimant cannot probe the marks
+ * through search. Anon also has no direct read on items — see the "hide private
+ * verification details" section of schema.sql.
  *
  * The RPC is used rather than a plain insert so the same call works once real
  * staff auth replaces the dev mock session, and so the server owns the
  * 'held' status and cash retention rules.
  *
- * Embedding: the intake text is embedded for the matching vector; the photo is
- * embedded as a best-effort extra. If the photo half fails, the item still
- * matches on text alone — the counter must never be blocked from taking custody.
- * If the text half fails the submission fails, because an unsearchable item is
- * worse than a retry.
+ * Embedding: public-safe text is embedded twice — once with CLIP for the legacy
+ * combined vector and once with the multilingual text tower for the two-tower
+ * index — and the photo is embedded with CLIP as a best-effort extra. If the
+ * photo half fails, the item still matches on text alone — the counter must
+ * never be blocked from taking custody. If the text half fails the submission
+ * fails, because an unsearchable item is worse than a retry.
  *
  * US-5: `aiCaption` is the raw suggestion produced from the photo. The staffer
  * may edit it before submitting, so it is stored separately from the confirmed
@@ -69,13 +72,11 @@ export async function submitStaffCustody({
   const cleanCaption = aiCaption?.trim() || null;
   const isCash = category === 'Cash';
 
-  // Storage location is deliberately left out: where a shelf is says nothing
-  // about what the item is, and it would only add noise to the vector.
-  //
-  // A full description runs to 1000 characters on its own, so the joined text
-  // can exceed what /embed/text accepts. The opening of the description holds
-  // the identifying detail; the row still stores every field in full.
-  const matchingText = [cleanTitle, category, cleanDescription]
+  // Storage location and the staff-only description are deliberately left out:
+  // where a shelf is says nothing about what the item is, and the description
+  // holds the counter check. The public index only sees fields a visitor can
+  // already infer from the photo and the listing.
+  const matchingText = [cleanTitle, category, cleanCaption]
     .filter(Boolean)
     .join(' ')
     .slice(0, MAX_EMBED_TEXT_LENGTH);
@@ -87,20 +88,22 @@ export async function submitStaffCustody({
   // The reused photo is fetched and embedded too: a text-only vector scores
   // much higher on every text query than the text+photo vectors other items use.
   const reusedPhoto = Boolean(photoUrl) && !photo;
-  const [imageUrl, textResult, photoEmbedding] = await Promise.all([
-    photo
-      ? uploadItemImage(photo, signal, 'staff-intake')
-      : Promise.resolve(photoUrl),
-    embedText(matchingText, signal),
-    photo
-      ? embedImageOrNull(photo, signal, { label: 'staffIntake' })
-      : photoUrl
-        ? embedImageFromUrlOrNull(photoUrl, signal, { label: 'staffIntake' })
-        : Promise.resolve(null),
-  ]);
+  const [imageUrl, legacyTextResult, itemTextResult, photoEmbedding] =
+    await Promise.all([
+      photo
+        ? uploadItemImage(photo, signal, 'staff-intake')
+        : Promise.resolve(photoUrl),
+      embedText(matchingText, signal),
+      embedItemText(matchingText, signal),
+      photo
+        ? embedImageOrNull(photo, signal, { label: 'staffIntake' })
+        : photoUrl
+          ? embedImageFromUrlOrNull(photoUrl, signal, { label: 'staffIntake' })
+          : Promise.resolve(null),
+    ]);
 
-  const embedding = combineEmbeddings(
-    [textResult.embedding, photoEmbedding].filter(Boolean),
+  const legacyEmbedding = combineEmbeddings(
+    [legacyTextResult.embedding, photoEmbedding].filter(Boolean),
   );
 
   let query = supabase.rpc('submit_staff_custody', {
@@ -110,7 +113,9 @@ export async function submitStaffCustody({
     p_category: category,
     p_storage_location: cleanStorage,
     p_image_url: imageUrl,
-    p_embedding: embedding,
+    p_embedding: legacyEmbedding,
+    p_text_embedding: itemTextResult.embedding,
+    p_image_embedding: photoEmbedding,
     p_date_received: dateReceived,
     p_cash_amount: isCash ? Number(cashAmount) || 0 : null,
     p_finder_name: isCash ? finderName?.trim() || null : null,

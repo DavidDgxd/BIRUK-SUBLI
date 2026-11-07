@@ -58,7 +58,11 @@ function resolveBaseUrl() {
 
 const BASE_URL = resolveBaseUrl().replace(/\/$/, '');
 
-export const EMBEDDING_DIM = 512;
+// CLIP covers photos and the legacy combined intake vector. BGE-M3 covers the
+// public text index. The dimensions are hard contracts with the RPC.
+export const IMAGE_EMBEDDING_DIM = 512;
+export const TEXT_EMBEDDING_DIM = 1024;
+export const EMBEDDING_DIM = IMAGE_EMBEDDING_DIM; // legacy name
 
 /**
  * Longest description sent to POST /embed/text. Mirrors MAX_TEXT_LENGTH in
@@ -131,16 +135,41 @@ async function postForJson(path, init, signal) {
   }
 }
 
-async function postForEmbedding(path, init, signal) {
+async function postForEmbedding(path, dim, init, signal) {
   const body = await postForJson(path, init, signal);
 
-  if (!Array.isArray(body.vector) || body.vector.length !== EMBEDDING_DIM) {
+  if (!Array.isArray(body.vector) || body.vector.length !== dim) {
     throw new SearchError(
       'ai-bad-response',
-      `Expected a ${EMBEDDING_DIM}-number "vector" from ${path}`,
+      `Expected a ${dim}-number "vector" from ${path}`,
     );
   }
   return body;
+}
+
+function cleanText(text) {
+  const clean = (text ?? '').trim();
+
+  if (!clean) {
+    throw new SearchError(
+      'ai-failed',
+      'Describe the item you are looking for in a few words.',
+    );
+  }
+  if (clean.length > MAX_EMBED_TEXT_LENGTH) {
+    throw new SearchError(
+      'ai-failed',
+      `Description is too long. Keep it under ${MAX_EMBED_TEXT_LENGTH} characters.`,
+    );
+  }
+  return clean;
+}
+
+function queryForm(text, expand) {
+  const form = new FormData();
+  form.append('text', text);
+  if (!expand) form.append('expand', 'false');
+  return form;
 }
 
 /**
@@ -158,25 +187,13 @@ async function postForEmbedding(path, init, signal) {
  * words" link).
  */
 export async function embedText(text, signal, { expand = true } = {}) {
-  const clean = (text ?? '').trim();
-
-  if (!clean) {
-    throw new SearchError(
-      'ai-failed',
-      'Describe the item you are looking for in a few words.',
-    );
-  }
-  if (clean.length > MAX_EMBED_TEXT_LENGTH) {
-    throw new SearchError(
-      'ai-failed',
-      `Description is too long. Keep it under ${MAX_EMBED_TEXT_LENGTH} characters.`,
-    );
-  }
-
-  const form = new FormData();
-  form.append('text', clean);
-  if (!expand) form.append('expand', 'false');
-  const body = await postForEmbedding('/embed/text', { body: form }, signal);
+  const clean = cleanText(text);
+  const body = await postForEmbedding(
+    '/embed/text',
+    IMAGE_EMBEDDING_DIM,
+    { body: queryForm(clean, expand) },
+    signal,
+  );
   return {
     embedding: body.vector,
     expandedText: body.expanded_text ?? null,
@@ -184,10 +201,52 @@ export async function embedText(text, signal, { expand = true } = {}) {
   };
 }
 
+/**
+ * Embeds a typed public search query into the multilingual 1024-dim text
+ * space. This is the text half of the two-tower search; the service appends
+ * English synonyms for known Filipino words and reports what it added.
+ */
+export async function embedQuery(text, signal, { expand = true } = {}) {
+  const clean = cleanText(text);
+  const body = await postForEmbedding(
+    '/embed/query',
+    TEXT_EMBEDDING_DIM,
+    { body: queryForm(clean, expand) },
+    signal,
+  );
+  return {
+    embedding: body.vector,
+    expandedText: body.expanded_text ?? null,
+    additions: Array.isArray(body.additions) ? body.additions : [],
+  };
+}
+
+/**
+ * Embeds public-safe item text for the text index. No expansion: the text is
+ * already the stored title/category/caption.
+ */
+export async function embedItemText(text, signal) {
+  const clean = cleanText(text);
+  const form = new FormData();
+  form.append('text', clean);
+  const body = await postForEmbedding(
+    '/embed/item-text',
+    TEXT_EMBEDDING_DIM,
+    { body: form },
+    signal,
+  );
+  return { embedding: body.vector };
+}
+
 export async function embedImage(file, signal) {
   const form = new FormData();
   form.append('file', file);
-  const body = await postForEmbedding('/embed/image', { body: form }, signal);
+  const body = await postForEmbedding(
+    '/embed/image',
+    IMAGE_EMBEDDING_DIM,
+    { body: form },
+    signal,
+  );
   return { embedding: body.vector };
 }
 

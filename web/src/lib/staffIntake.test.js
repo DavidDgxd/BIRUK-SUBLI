@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   rpc,
   embedText,
+  embedItemText,
   embedImageOrNull,
   embedImageFromUrlOrNull,
   uploadItemImage,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   rpc: vi.fn(),
   embedText: vi.fn(),
+  embedItemText: vi.fn(),
   embedImageOrNull: vi.fn(),
   embedImageFromUrlOrNull: vi.fn(),
   uploadItemImage: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('./storage.js', () => ({ uploadItemImage }));
 
 vi.mock('./aiService.js', () => ({
   embedText,
+  embedItemText,
   embedImageOrNull,
   embedImageFromUrlOrNull,
   MAX_EMBED_TEXT_LENGTH: 1000,
@@ -73,12 +76,14 @@ describe('submitStaffCustody self-report prefill', () => {
   beforeEach(() => {
     rpc.mockReset();
     embedText.mockReset();
+    embedItemText.mockReset();
     embedImageOrNull.mockReset();
     embedImageFromUrlOrNull.mockReset();
     uploadItemImage.mockReset();
     combineEmbeddings.mockReset();
 
     embedText.mockResolvedValue({ embedding: [1, 0, 0] });
+    embedItemText.mockResolvedValue({ embedding: [2, 0, 0] });
     embedImageOrNull.mockResolvedValue([0, 1, 0]);
     embedImageFromUrlOrNull.mockResolvedValue([0, 1, 0]);
     uploadItemImage.mockResolvedValue(
@@ -117,6 +122,8 @@ describe('submitStaffCustody self-report prefill', () => {
         p_image_url: photoUrl,
         p_found_report_id: '11111111-1111-1111-1111-111111111111',
         p_embedding: expectedEmbedding,
+        p_text_embedding: [2, 0, 0],
+        p_image_embedding: [0, 1, 0],
       }),
     );
     expect(result).toEqual({
@@ -147,7 +154,11 @@ describe('submitStaffCustody self-report prefill', () => {
     expect(combineEmbeddings).toHaveBeenCalledWith([[1, 0, 0]]);
     expect(rpc).toHaveBeenCalledWith(
       'submit_staff_custody',
-      expect.objectContaining({ p_embedding: [1, 0, 0] }),
+      expect.objectContaining({
+        p_embedding: [1, 0, 0],
+        p_text_embedding: [2, 0, 0],
+        p_image_embedding: null,
+      }),
     );
     expect(result.usedPhoto).toBe(false);
     expect(result.reusedPhoto).toBe(true);
@@ -234,6 +245,7 @@ describe('submitStaffCustody AI caption', () => {
     rpc.mockReset();
     uploadItemImage.mockReset();
     embedText.mockReset();
+    embedItemText.mockReset();
     embedImageOrNull.mockReset();
     embedImageFromUrlOrNull.mockReset();
     combineEmbeddings.mockReset();
@@ -241,6 +253,7 @@ describe('submitStaffCustody AI caption', () => {
     rpc.mockReturnValue(resolvedRpc({ data: 'BS-0001' }));
     uploadItemImage.mockResolvedValue('https://example.test/photo.webp');
     embedText.mockResolvedValue({ embedding: [1, 0] });
+    embedItemText.mockResolvedValue({ embedding: [2, 0] });
     embedImageOrNull.mockResolvedValue(null);
     combineEmbeddings.mockImplementation((vectors) => vectors[0]);
   });

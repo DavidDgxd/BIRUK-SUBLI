@@ -11,7 +11,10 @@ import { test as base, expect } from '@playwright/test';
 
 const PROJECT_REF = 'vwegcexuyznfsbgzurxa';
 const STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
-const EMBEDDING = Array.from({ length: 512 }, (_, index) =>
+const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) =>
+  index === 0 ? 1 : 0,
+);
+const TEXT_EMBEDDING = Array.from({ length: 1024 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 
@@ -108,7 +111,10 @@ async function mockBackends(page, role) {
   await page.route(/:8000\//, (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/embed/text' || path === '/embed/image') {
-      return json(route, { vector: EMBEDDING });
+      return json(route, { vector: IMAGE_EMBEDDING });
+    }
+    if (path === '/embed/query' || path === '/embed/item-text') {
+      return json(route, { vector: TEXT_EMBEDDING });
     }
     return json(route, { detail: 'Not available in tests' }, 503);
   });

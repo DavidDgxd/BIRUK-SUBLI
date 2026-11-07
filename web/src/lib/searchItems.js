@@ -1,18 +1,15 @@
 import { supabase } from './supabase.js';
-import { embedImage, embedText, SearchError } from './aiService.js';
+import { embedImage, embedQuery, SearchError } from './aiService.js';
 
-// Confidence tiers passed to match_items_hybrid, plus the best/possible split.
-//
-// `score` is the RPC's blended vector + lexical score. A row only counts as a
-// confident match when the query named something in its public text
-// (lexical_score >= LEXICAL_CONFIDENCE) or the blended score is strong on its
-// own. This is what stops a hub image from being "best" for an unrelated query
-// while keeping a genuine semantic match in the possible tier.
-export const MATCH_THRESHOLD = 0.55;
+// Confidence tiers passed to match_items_two_tower, plus the best/possible
+// split. `score` is the RPC's blended vector + lexical score. A row only counts
+// as confident when the query named something in its public text
+// (lexical_score >= LEXICAL_CONFIDENCE) or the relevant vector is strong on its
+// own. This stops a hub image from being "best" for an unrelated query while
+// keeping a genuine semantic match in the possible tier.
+export const MATCH_THRESHOLD = 0.3;
 export const MATCH_COUNT = 15;
-// Retuned on the labelled 36-query set over the public text at 0.68/0.05:
-// P=0.838 R=0.838 noneFP=12%, against 0.681/0.865/38% at the old 0.64.
-export const BEST_FLOOR = 0.68;
+export const BEST_FLOOR = 0.72;
 export const BEST_DELTA = 0.05;
 // Vector-only rows (a photo-only query or a stale RPC) keep the old floor:
 // they carry no lexical bonus, so the blended floor would drop them.
@@ -21,10 +18,11 @@ export const POSSIBLE_FLOOR = 0.55;
 export const POSSIBLE_DELTA = 0.07;
 export const POSSIBLE_LIMIT = 3;
 export const POSSIBLE_ONLY_LIMIT = 5;
-export const STRONG_FLOOR = 0.82;
+export const TEXT_STRONG_FLOOR = 0.68;
+export const IMAGE_STRONG_FLOOR = 0.82;
 export const LEXICAL_CONFIDENCE = 0.5;
 
-// Mirrors the lexical weight inside match_items_hybrid. Kept here so the two
+// Mirrors the lexical weight inside match_items_two_tower. Kept here so the two
 // halves of the contract are visible side by side; the client does not re-score
 // rows.
 export const LEXICAL_WEIGHT = 0.25;
@@ -84,9 +82,11 @@ function normalize(vector) {
   return vector.map((x) => x / norm);
 }
 
-/** The RPC's blended rank, falling back to similarity for a stale function. */
+/** The RPC's blended rank, falling back to a raw similarity for a stale RPC. */
 function scoreOf(item) {
-  return Number.isFinite(item.score) ? item.score : item.similarity;
+  if (Number.isFinite(item.score)) return item.score;
+  if (Number.isFinite(item.similarity)) return item.similarity;
+  return 0;
 }
 
 /**
@@ -95,12 +95,18 @@ function scoreOf(item) {
  * A stale RPC has no lexical_score at all, and a photo-only query has no tokens
  * to match, so both report null. Keep the old vector-only behaviour there. A
  * current row with text needs either a lexical hit (the query named something
- * in its title/category/caption) or a blended score strong enough to stand
- * alone.
+ * in its title/category/caption) or a strong score in the modality that was
+ * actually queried.
  */
-function isConfident(item, score) {
+function isConfident(item) {
   if (!Number.isFinite(item.lexical_score)) return true;
-  return item.lexical_score >= LEXICAL_CONFIDENCE || score >= STRONG_FLOOR;
+  if (item.lexical_score >= LEXICAL_CONFIDENCE) return true;
+  return (
+    (Number.isFinite(item.text_similarity) &&
+      item.text_similarity >= TEXT_STRONG_FLOOR) ||
+    (Number.isFinite(item.image_similarity) &&
+      item.image_similarity >= IMAGE_STRONG_FLOOR)
+  );
 }
 
 /** Blended rows use the retuned floor; vector-only rows keep the photo floor. */
@@ -122,11 +128,13 @@ export function combineEmbeddings(vectors) {
 
 /**
  * Embeds the text and/or photo with the AI service, then ranks held items with
- * the match_items_hybrid RPC. The color filter is added to the text so it is
- * embedded with the rest of the description. Office and receipt-date filters
- * are passed to the RPC so they narrow the candidate set before the match limit
- * applies; filtering the returned page instead would hide valid older or
- * other-office items whenever the unfiltered top matches filled the limit.
+ * the two-tower RPC. Text goes through the multilingual text tower and photos
+ * through CLIP; the RPC fuses them instead of averaging disjoint embeddings.
+ * The color filter is added to the text so it is embedded with the rest of the
+ * description. Office and receipt-date filters are passed to the RPC so they
+ * narrow the candidate set before the match limit applies; filtering the
+ * returned page instead would hide valid older or other-office items whenever
+ * the unfiltered top matches filled the limit.
  *
  * Resolves to { best, possible, state, queryText, expandedText, additions }.
  * `best` holds the confident matches; `possible` holds up to POSSIBLE_LIMIT
@@ -153,18 +161,16 @@ export async function searchItems({
     .join(' ');
 
   const [textResult, imageResult] = await Promise.all([
-    queryText ? embedText(queryText, signal, { expand }) : null,
+    queryText ? embedQuery(queryText, signal, { expand }) : null,
     photo ? embedImage(photo, signal) : null,
   ]);
 
-  const embedding = combineEmbeddings(
-    [textResult?.embedding, imageResult?.embedding].filter(Boolean),
-  );
   const expandedText = textResult?.expandedText ?? queryText;
 
   const { data, error } = await supabase
-    .rpc('match_items_hybrid', {
-      query_embedding: embedding,
+    .rpc('match_items_two_tower', {
+      query_text_embedding: textResult?.embedding ?? null,
+      query_image_embedding: imageResult?.embedding ?? null,
       match_threshold: MATCH_THRESHOLD,
       match_count: MATCH_COUNT,
       filter_office: office || null,
@@ -184,7 +190,7 @@ export async function searchItems({
   const all = (data ?? []).filter(
     (item) =>
       isSearchableItemStatus(item.status) &&
-      item.similarity >= MATCH_THRESHOLD &&
+      scoreOf(item) >= MATCH_THRESHOLD &&
       (!office || item.holding_office_id === office),
   );
 
@@ -196,7 +202,7 @@ export async function searchItems({
     const score = scoreOf(item);
     return (
       score >= bestFloorOf(item) &&
-      isConfident(item, score) &&
+      isConfident(item) &&
       score >= top - BEST_DELTA - EPSILON
     );
   });

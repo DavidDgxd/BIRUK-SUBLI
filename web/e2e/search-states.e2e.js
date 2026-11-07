@@ -1,6 +1,10 @@
 import { test, expect, openRoute } from './fixtures.js';
 
-const EMBEDDING = Array.from({ length: 512 }, (_, index) =>
+const EMBEDDING = Array.from({ length: 1024 }, (_, index) =>
+  index === 0 ? 1 : 0,
+);
+
+const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 
@@ -9,7 +13,7 @@ const PNG_1PX = Buffer.from(
   'base64',
 );
 
-function item(id, title, similarity, extra = {}) {
+function item(id, title, similarity, { score = similarity, lexical = 0 } = {}) {
   return {
     id,
     ref_code: id.toUpperCase(),
@@ -23,19 +27,22 @@ function item(id, title, similarity, extra = {}) {
     office_address: 'City Hall, Baguio City',
     created_at: '2026-09-10T00:00:00Z',
     similarity,
-    ...extra,
+    text_similarity: similarity,
+    image_similarity: null,
+    lexical_score: lexical,
+    score,
   };
 }
 
 async function mockScores(page, items) {
-  await page.route('**/embed/text', (route) =>
+  await page.route('**/embed/query', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ vector: EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
     const body = route.request().postDataJSON();
     const filtered = body.date_from === '2030-01-01' ? [] : items;
     return route.fulfill({
@@ -50,9 +57,17 @@ test('shows best matches with a collapsed possible drawer', async ({
   page,
 }) => {
   await mockScores(page, [
-    item('11111111-1111-1111-1111-111111111111', 'Black Umbrella', 0.7),
-    item('22222222-2222-2222-2222-222222222222', 'Navy Umbrella', 0.69),
-    item('33333333-3333-3333-3333-333333333333', 'Folding Umbrella', 0.64),
+    item('11111111-1111-1111-1111-111111111111', 'Black Umbrella', 0.7, {
+      score: 0.95,
+      lexical: 1,
+    }),
+    item('22222222-2222-2222-2222-222222222222', 'Navy Umbrella', 0.69, {
+      score: 0.94,
+      lexical: 1,
+    }),
+    item('33333333-3333-3333-3333-333333333333', 'Folding Umbrella', 0.64, {
+      score: 0.89,
+    }),
   ]);
 
   await openRoute(page, '/search?q=umbrella');
@@ -139,8 +154,8 @@ test('shows close-but-not-confident items in the possible state', async ({
 test('shows the no-close-match state for a query that only returns noise', async ({
   page,
 }) => {
-  // Below the 0.55 RPC floor: the client drops these even if a stale RPC
-  // returns them. "Umbrella" is a none query in the evaluation set.
+  // Below the client's 0.55 possible floor: the client drops these even if a
+  // stale RPC returns them. "Umbrella" is a none query in the evaluation set.
   await mockScores(page, [
     item('11111111-1111-1111-1111-111111111111', 'Sheet of Paper', 0.546),
     item('22222222-2222-2222-2222-222222222222', 'Jisulife Fan', 0.543),
@@ -180,20 +195,23 @@ test('shows a photo-only exact match as a best match', async ({ page }) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ vector: EMBEDDING }),
+      body: JSON.stringify({ vector: IMAGE_EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
     const body = route.request().postDataJSON();
     expect(body.query_text).toBeNull();
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([
-        item('11111111-1111-1111-1111-111111111111', 'Black Umbrella', 0.68, {
+        {
+          ...item('11111111-1111-1111-1111-111111111111', 'Black Umbrella', 0.66),
+          text_similarity: null,
+          image_similarity: 0.66,
           lexical_score: null,
-          score: 0.68,
-        }),
+          score: 0.66,
+        },
       ]),
     });
   });
