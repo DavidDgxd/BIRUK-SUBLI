@@ -9,6 +9,7 @@ from translation import (
     looks_filipino,
     normalise,
     translate_to_english,
+    translate_to_filipino,
 )
 
 # Regression table from the PR #79 review. Each English query was rewritten
@@ -130,6 +131,18 @@ class BlankInputTests(unittest.TestCase):
             self.assertIsNone(translate_to_english(""))
             self.assertIsNone(translate_to_english("   "))
         provider.assert_not_called()
+
+
+class FilipinoTranslationTests(unittest.TestCase):
+    def test_translates_english_and_skips_blank_input(self):
+        with mock.patch.object(
+            translation, "_provider_translate", return_value=" May nakitang pitaka. "
+        ) as provider:
+            self.assertIsNone(translate_to_filipino(""))
+            self.assertEqual(
+                translate_to_filipino("A wallet was found."), "May nakitang pitaka."
+            )
+        provider.assert_called_once_with("A wallet was found.", "en-tl")
 
 
 class ProviderTests(unittest.TestCase):

@@ -9,7 +9,7 @@ import os
 import torch
 
 from caption_cleanup import clean_caption
-from translation import translate_to_english
+from translation import translate_to_english, translate_to_filipino
 
 app = FastAPI(title="Biruk Subli CLIP Service")
 
@@ -170,6 +170,14 @@ def translate_query(text: str):
         return None
 
 
+def translate_caption(caption: str):
+    try:
+        return translate_to_filipino(caption)
+    except Exception as error:  # noqa: BLE001 - keep the English caption
+        print(f"Caption translation unavailable: {error!r}")
+        return None
+
+
 @app.get("/health")
 def health():
     return {
@@ -250,4 +258,4 @@ async def caption_image(file: UploadFile = File(...)):
             detail=f"Could not describe that photo: {error}",
         ) from error
 
-    return {"caption": caption, "model": CAPTION_MODEL}
+    return {"caption": caption, "caption_tl": translate_caption(caption), "model": CAPTION_MODEL}

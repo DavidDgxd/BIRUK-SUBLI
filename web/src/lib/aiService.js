@@ -205,7 +205,7 @@ export async function captionImage(file, signal) {
     );
   }
 
-  return { caption: body.caption.trim(), model: body.model ?? null };
+  return { caption: body.caption.trim(), captionTl: body.caption_tl?.trim() || null, model: body.model ?? null };
 }
 
 /**
@@ -250,12 +250,12 @@ async function captionOrNull(
 
 /**
  * Best-effort captioning for callers that must never block on the AI service.
- * Resolves to the caption text, or null when the photo cannot be described.
- * A genuine cancel — the caller's own signal — still propagates.
+ * Resolves to { caption, captionTl }, or null when the photo cannot be
+ * described. A genuine cancel — the caller's own signal — still propagates.
  */
 export async function captionImageOrNull(file, signal, options) {
   return captionOrNull(
-    async (captionSignal) => (await captionImage(file, captionSignal)).caption,
+    (captionSignal) => captionImage(file, captionSignal),
     signal,
     options,
   );
@@ -277,8 +277,7 @@ export async function captionImageFromUrlOrNull(url, signal, options) {
       if (!response.ok) {
         throw new Error(`Photo request returned ${response.status}`);
       }
-      const blob = await response.blob();
-      return (await captionImage(blob, captionSignal)).caption;
+      return captionImage(await response.blob(), captionSignal);
     },
     signal,
     options,

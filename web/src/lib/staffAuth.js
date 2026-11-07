@@ -26,7 +26,7 @@ export class StaffAuthError extends Error {
   }
 }
 
-const OFFICE_COLUMNS = 'id, name, status, auth_user_id';
+const OFFICE_COLUMNS = 'id, name, counter_hours, status, auth_user_id';
 
 /**
  * The role claim that marks the central admin. It lives in `app_metadata`
@@ -52,6 +52,7 @@ function sessionFor(office, user) {
     staffEmail: user?.email,
     officeId: office?.id ?? null,
     officeName: office?.name ?? null,
+    counterHours: office?.counter_hours ?? null,
     isAdmin: isCentralAdmin(user),
     isMock: false,
   };

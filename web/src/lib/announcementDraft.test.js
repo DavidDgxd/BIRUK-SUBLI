@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildAnnouncementDraft,
+  buildAnnouncementDrafts,
+  copyAnnouncement,
   MAX_ANNOUNCEMENT_LENGTH,
   sanitizeAnnouncementText,
+  updateAnnouncementDraft,
 } from './announcementDraft.js';
 
 const ITEM = {
@@ -69,6 +72,19 @@ describe('sanitizeAnnouncementText', () => {
     ).toBe('A black folding umbrella with a wooden handle and a small tear.');
   });
 
+  it('drops Filipino money and identifier sentences', () => {
+    expect(
+      sanitizeAnnouncementText(
+        'Isang kayumangging pitaka. May 500 piso sa loob. Numero ng serye 991287. Ang lisensya numero A1234 ay nakalagay.',
+      ),
+    ).toBe('Isang kayumangging pitaka.');
+  });
+
+  it('keeps safe Filipino description text intact', () => {
+    const text = 'Isang kayumangging pitaka sa mesa.';
+    expect(sanitizeAnnouncementText(text)).toBe(text);
+  });
+
   it.each([
     'A Student ID card was found.',
     'A UB ID card was handed in.',
@@ -107,5 +123,81 @@ describe('buildAnnouncementDraft length budget', () => {
 
     expect(draft.length).toBeLessThanOrEqual(MAX_ANNOUNCEMENT_LENGTH);
     expect(draft).toContain('Bring a valid ID.');
+  });
+});
+
+const EN = 'Found item at BCPIO.', TL = 'May nakitang bagay sa BCPIO.';
+describe('US-25 bilingual drafts and copy', () => {
+  it('builds, edits and copies both languages privately', async () => {
+    const original = buildAnnouncementDrafts({
+      ...ITEM, counterHours: 'Mon-Fri, 8am-5pm', description: 'Serial 991287. PHP 5,000.', finderName: 'Juan',
+    });
+    expect(original.en).toContain('Counter hours: Mon-Fri, 8am-5pm');
+    expect(original.tl).toContain('Oras ng counter: Mon-Fri, 8am-5pm');
+    expect(`${original.en}${original.tl}`).not.toMatch(/991287|5,000|Juan/i);
+    expect(updateAnnouncementDraft(original, 'tl', 'TL').en).toBe(original.en);
+    const clipboard = () => ({ writeText: vi.fn(), write: vi.fn() });
+    const plain = clipboard();
+    await copyAnnouncement('en', { en: EN, tl: TL, clipboard: plain });
+    await copyAnnouncement('tl', { en: EN, tl: TL, clipboard: plain });
+    expect(plain.writeText.mock.calls).toEqual([[EN], [TL]]);
+    const photo = new Blob(['photo'], { type: 'image/png' });
+    const photoCopy = await copyAnnouncement('photo', { photoBlob: photo, clipboard: plain, ClipboardItemCtor: class { constructor(parts) { this.parts = parts; } } });
+    expect(photoCopy).toEqual({ mode: 'photo', photoIncluded: true });
+    const fallback = clipboard();
+    expect(await copyAnnouncement('both', { en: EN, tl: TL, clipboard: fallback })).toEqual({ mode: 'text', photoIncluded: false });
+    expect(fallback.writeText.mock.calls[0][0]).toContain(TL);
+  });
+  it('uses the Filipino caption, never the raw English caption, for the tl draft', () => {
+    const captionTl = 'Isang kayumangging pitaka sa mesa.';
+    const drafts = buildAnnouncementDrafts({ ...ITEM, aiCaptionTl: captionTl });
+
+    expect(drafts.en).toContain(ITEM.aiCaption);
+    expect(drafts.tl).toContain(captionTl);
+    expect(drafts.tl).not.toContain(ITEM.aiCaption);
+  });
+  it('keeps Filipino money and serial captions out of the tl draft', () => {
+    const drafts = buildAnnouncementDrafts({
+      ...ITEM,
+      aiCaptionTl: 'May 500 piso sa loob. Numero ng serye 991287.',
+    });
+
+    expect(drafts.tl).not.toMatch(/500 piso|991287/);
+    expect(drafts.tl).toContain('Tingnan ang larawan');
+  });
+});
+
+describe('US-26 copy text and photo', () => {
+  const clipboard = () => ({ writeText: vi.fn(), write: vi.fn() });
+  const ClipboardItemStub = class { constructor(parts) { this.parts = parts; } };
+
+  it('copies text without mixing in the photo', async () => {
+    const plain = clipboard();
+    const result = await copyAnnouncement('both', {
+      en: EN, tl: TL, photoBlob: new Blob(['photo'], { type: 'image/png' }),
+      clipboard: plain, ClipboardItemCtor: ClipboardItemStub,
+    });
+    expect(result).toEqual({ mode: 'text', photoIncluded: false });
+    expect(plain.write).not.toHaveBeenCalled();
+    expect(plain.writeText.mock.calls[0][0]).toContain(TL);
+  });
+
+  it('writes the pre-fetched photo as image/png on its own', async () => {
+    const photo = new Blob(['photo'], { type: 'image/png' });
+    const plain = clipboard();
+    const result = await copyAnnouncement('photo', {
+      photoBlob: photo, clipboard: plain, ClipboardItemCtor: ClipboardItemStub,
+    });
+    expect(result).toEqual({ mode: 'photo', photoIncluded: true });
+    expect(plain.writeText).not.toHaveBeenCalled();
+    expect(plain.write.mock.calls[0][0][0].parts['image/png']).toBe(photo);
+  });
+
+  it('refuses to copy a photo that is not ready', async () => {
+    await expect(copyAnnouncement('photo', { clipboard: clipboard() })).rejects.toThrow('The photo is not ready yet.');
+  });
+
+  it('throws when there is no text to copy', async () => {
+    await expect(copyAnnouncement('both', { en: '', tl: '', clipboard: clipboard() })).rejects.toThrow('There is nothing to copy yet.');
   });
 });

@@ -39,17 +39,12 @@ describe('captionImage', () => {
   it('posts the photo and returns the trimmed caption', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
-        response({ caption: '  A brown leather wallet.  ', model: 'blip' }),
-      );
+      .mockResolvedValue(response({ caption: '  A brown leather wallet.  ', caption_tl: '  Isang kayumangging pitaka.  ', model: 'blip' }));
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await captionImage(photo());
 
-    expect(result).toEqual({
-      caption: 'A brown leather wallet.',
-      model: 'blip',
-    });
+    expect(result).toEqual({ caption: 'A brown leather wallet.', captionTl: 'Isang kayumangging pitaka.', model: 'blip' });
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('http://localhost:8000/caption/image');
@@ -99,13 +94,13 @@ describe('captionImageFromUrlOrNull', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(imageResponse(blob))
-      .mockResolvedValueOnce(response({ caption: 'A black umbrella.' }));
+      .mockResolvedValueOnce(response({ caption: 'A black umbrella.', caption_tl: 'Itim na payong.' }));
     vi.stubGlobal('fetch', fetchMock);
 
     const url = 'https://example.test/found-reports/original.webp';
     const result = await captionImageFromUrlOrNull(url);
 
-    expect(result).toBe('A black umbrella.');
+    expect(result).toEqual({ caption: 'A black umbrella.', captionTl: 'Itim na payong.', model: null });
     expect(fetchMock.mock.calls[0][0]).toBe(url);
     expect(fetchMock.mock.calls[1][0]).toBe(
       'http://localhost:8000/caption/image',

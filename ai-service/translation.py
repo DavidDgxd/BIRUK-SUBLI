@@ -41,6 +41,9 @@ from threading import Lock
 
 TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "local")
 TRANSLATE_MODEL = os.environ.get("TRANSLATE_MODEL", "Helsinki-NLP/opus-mt-tl-en")
+TRANSLATE_MODEL_EN_TL = os.environ.get(
+    "TRANSLATE_MODEL_EN_TL", "Helsinki-NLP/opus-mt-en-tl"
+)
 # Long enough for the 1000-character descriptions the report flows send.
 TRANSLATE_MAX_NEW_TOKENS = 256
 
@@ -112,10 +115,18 @@ def translate_to_english(text):
     return translated if is_material_translation(source, translated) else None
 
 
-def _provider_translate(text):
+def translate_to_filipino(text):
+    """Returns the Filipino translation of English text, or None when blank."""
+    source = (text or "").strip()
+    if not source:
+        return None
+    return (_provider_translate(source, "en-tl") or "").strip() or None
+
+
+def _provider_translate(text, direction="tl-en"):
     """Dispatches to the configured backend. Each returns raw translated text."""
     if TRANSLATE_PROVIDER == "local":
-        return _translate_local(text)
+        return _translate_local(text, direction)
     if TRANSLATE_PROVIDER == "api":
         # Future hosted provider (shared with captioning): implement here only.
         raise NotImplementedError("TRANSLATE_PROVIDER=api is not implemented yet.")
@@ -146,10 +157,26 @@ def load_translation_model():
     return _translate_tokenizer, _translate_model
 
 
-def _translate_local(text):
-    import torch
+_translate_tokenizer_en_tl = None
+_translate_model_en_tl = None
+_translate_lock_en_tl = Lock()
 
-    tokenizer, translate_model = load_translation_model()
+
+def load_translation_model_en_tl():
+    global _translate_tokenizer_en_tl, _translate_model_en_tl
+    with _translate_lock_en_tl:
+        if _translate_model_en_tl is None:
+            from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+            _translate_tokenizer_en_tl = AutoTokenizer.from_pretrained(TRANSLATE_MODEL_EN_TL)
+            _translate_model_en_tl = AutoModelForSeq2SeqLM.from_pretrained(TRANSLATE_MODEL_EN_TL)
+            _translate_model_en_tl.eval()
+    return _translate_tokenizer_en_tl, _translate_model_en_tl
+
+
+def _translate_local(text, direction="tl-en"):
+    import torch
+    loader = load_translation_model if direction == "tl-en" else load_translation_model_en_tl
+    tokenizer, translate_model = loader()
     inputs = tokenizer([text], return_tensors="pt", truncation=True)
     with torch.inference_mode():
         output = translate_model.generate(
