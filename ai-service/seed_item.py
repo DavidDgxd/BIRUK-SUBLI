@@ -21,9 +21,10 @@ Usage:
     python seed_item.py --title "Blue Hydro Flask" --description "Blue insulated bottle" \
         --image bottle.jpg --office CITY_HALL_INFO
 
-How the embedding is chosen:
-    --image given  -> the photo's CLIP image embedding (what real counter intake will use)
-    otherwise      -> the CLIP text embedding of "title. description"
+How the embeddings are chosen:
+    text_embedding  -> BGE-M3 over "title. category" (public-safe, two-tower index)
+    --image given   -> the photo's CLIP image embedding for image_embedding
+    otherwise       -> the CLIP text embedding for the legacy combined vector
 """
 import argparse
 import os
@@ -81,6 +82,12 @@ def embed_image(ai_url: str, path: Path) -> list:
     return r.json()["vector"]
 
 
+def embed_item_text(ai_url: str, text: str) -> list:
+    r = requests.post(f"{ai_url}/embed/item-text", data={"text": text}, timeout=TIMEOUT)
+    check(r, "item text embedding")
+    return r.json()["vector"]
+
+
 def main() -> None:
     load_env_file(Path(__file__).with_name(".env"))
 
@@ -123,12 +130,17 @@ def main() -> None:
     except requests.RequestException:
         fail(f"AI service not reachable at {ai_url}. Start it with: uvicorn main:app --port 8000")
 
+    public_text = f"{args.title}. {args.category}"
+    text_vector = embed_item_text(ai_url, public_text)
+    if len(text_vector) != 1024:
+        fail(f"expected a 1024-number text vector, got {len(text_vector)}")
+
     if args.image:
         if not args.image.exists():
             fail(f"image not found: {args.image}")
         vector, source = embed_image(ai_url, args.image), "photo"
     else:
-        vector, source = embed_text(ai_url, f"{args.title}. {args.description}"), "text"
+        vector, source = embed_text(ai_url, public_text), "text"
     if len(vector) != 512:
         fail(f"expected a 512-number vector, got {len(vector)}")
 
@@ -140,7 +152,10 @@ def main() -> None:
         "logging_office_id": args.office,
         "image_url": args.image_url,
         "embedding": vector,
+        "text_embedding": text_vector,
     }
+    if args.image:
+        row["image_embedding"] = vector
     r = requests.post(f"{supabase_url}/rest/v1/items", headers={**headers, "Prefer": "return=representation"},
                       json=row, timeout=TIMEOUT)
     if r.status_code == 409 or "foreign key" in r.text.lower():
@@ -159,6 +174,22 @@ def main() -> None:
         print(f"match_items check passed (similarity {similarity:.3f})")
     else:
         print("warning: match_items did not return the new item. Check the function and its status filter.")
+
+    r = requests.post(
+        f"{supabase_url}/rest/v1/rpc/match_items_two_tower",
+        headers=headers,
+        json={
+            "query_text_embedding": text_vector,
+            "query_text": public_text,
+            "match_count": 3,
+        },
+        timeout=TIMEOUT,
+    )
+    check(r, "match_items_two_tower check")
+    if item["id"] in [m["id"] for m in r.json()]:
+        print("two-tower check passed")
+    else:
+        print("warning: match_items_two_tower did not return the new item.")
 
     print(f"\nTry searching the app for: {args.title.lower()}")
 
