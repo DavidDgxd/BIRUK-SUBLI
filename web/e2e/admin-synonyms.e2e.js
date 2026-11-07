@@ -15,13 +15,19 @@ function seedRows() {
       term: 'pitaka',
       synonyms: ['wallet', 'purse'],
       enabled: true,
+      notes: 'Counter list',
+      updated_by: 'admin@baguio.gov.ph',
       updated_at: '2026-11-07T00:00:00Z',
+      created_at: '2026-11-01T00:00:00Z',
     },
     {
       term: 'payong',
       synonyms: ['umbrella'],
       enabled: true,
+      notes: null,
+      updated_by: null,
       updated_at: '2026-11-06T00:00:00Z',
+      created_at: '2026-11-01T00:00:00Z',
     },
   ];
 }
@@ -39,12 +45,17 @@ async function mockVocabulary(page) {
     if (existing) {
       existing.synonyms = body.p_synonyms;
       existing.enabled = body.p_enabled;
+      existing.notes = body.p_notes;
+      existing.updated_by = 'admin@baguio.gov.ph';
     } else {
       rows.push({
         term: body.p_term,
         synonyms: body.p_synonyms,
         enabled: body.p_enabled,
+        notes: body.p_notes,
+        updated_by: 'admin@baguio.gov.ph',
         updated_at: '2026-11-07T00:00:00Z',
+        created_at: '2026-11-07T00:00:00Z',
       });
     }
     return json(route, null);
@@ -76,10 +87,12 @@ test('adds, edits, filters and deletes a search term', async ({ page }) => {
 
   await page.getByLabel('Filipino term').fill('singsing');
   await page.getByLabel('English synonyms').fill('ring, jewellery');
+  await page.getByLabel(/notes/i).fill('Jewellery counter list');
   await page.getByRole('button', { name: 'Add term' }).click();
 
   const newRow = page.getByRole('row').filter({ hasText: 'singsing' });
   await expect(newRow).toContainText('ring, jewellery');
+  await expect(newRow).toContainText('Jewellery counter list');
 
   await page.getByRole('button', { name: 'Edit pitaka' }).click();
   await page.getByLabel('English synonyms').fill('wallet, billfold');

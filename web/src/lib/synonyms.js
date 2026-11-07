@@ -22,15 +22,16 @@ export async function listSynonyms({ signal } = {}) {
   return data ?? [];
 }
 
-/** Adds a term or replaces its synonyms and enabled flag. */
+/** Adds a term or replaces its synonyms, enabled flag and notes. */
 export async function saveSynonym(
-  { term, synonyms, enabled = true },
+  { term, synonyms, enabled = true, notes = null },
   { signal } = {},
 ) {
   let query = supabase.rpc('upsert_search_synonym', {
     p_term: term,
     p_synonyms: synonyms,
     p_enabled: enabled,
+    p_notes: notes || null,
   });
   if (signal) query = query.abortSignal(signal);
 

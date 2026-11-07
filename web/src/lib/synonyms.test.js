@@ -50,6 +50,7 @@ describe('search synonym admin client', () => {
         term: 'payong',
         synonyms: ['umbrella'],
         enabled: false,
+        notes: 'weather item',
       },
       { signal: new AbortController().signal },
     );
@@ -58,6 +59,7 @@ describe('search synonym admin client', () => {
       p_term: 'payong',
       p_synonyms: ['umbrella'],
       p_enabled: false,
+      p_notes: 'weather item',
     });
   });
 

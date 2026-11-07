@@ -10,9 +10,10 @@ import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 const MAX_TERM = 64;
 const MAX_SYNONYM = 64;
+const MAX_NOTES = 240;
 
 function emptyForm() {
-  return { term: '', synonyms: '', enabled: true };
+  return { term: '', synonyms: '', enabled: true, notes: '' };
 }
 
 function formatUpdated(value) {
@@ -53,6 +54,7 @@ export default function AdminSynonyms() {
 
   const termId = useId();
   const synonymsId = useId();
+  const notesId = useId();
   const filterId = useId();
   const hintId = useId();
   const errorId = useId();
@@ -107,6 +109,7 @@ export default function AdminSynonyms() {
       term: row.term,
       synonyms: row.synonyms.join(', '),
       enabled: row.enabled,
+      notes: row.notes ?? '',
     });
     setFormError('');
     synonymsRef.current?.focus();
@@ -121,6 +124,7 @@ export default function AdminSynonyms() {
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean);
+    const notes = form.notes.trim();
 
     if (!term) {
       setFormError('Enter the Filipino word or phrase.');
@@ -142,11 +146,20 @@ export default function AdminSynonyms() {
       synonymsRef.current?.focus();
       return;
     }
+    if (notes.length > MAX_NOTES) {
+      setFormError(`Keep notes under ${MAX_NOTES} characters.`);
+      return;
+    }
 
     setFormError('');
     setSaving(true);
     try {
-      await saveSynonym({ term, synonyms, enabled: form.enabled });
+      await saveSynonym({
+        term,
+        synonyms,
+        enabled: form.enabled,
+        notes,
+      });
       setAnnouncement(`Saved “${term}”.`);
       resetForm();
       setReloadKey((key) => key + 1);
@@ -276,6 +289,30 @@ export default function AdminSynonyms() {
                     </p>
                   </div>
 
+                  <div className="field">
+                    <label
+                      className="field__label"
+                      htmlFor={`${notesId}-notes`}
+                    >
+                      Notes
+                      <span className="field__optional"> optional</span>
+                    </label>
+                    <input
+                      id={`${notesId}-notes`}
+                      className="field__control"
+                      value={form.notes}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          notes: event.target.value,
+                        }))
+                      }
+                      maxLength={MAX_NOTES}
+                      autoComplete="off"
+                      placeholder="Why this term exists, or where it came from"
+                    />
+                  </div>
+
                   <label
                     className="synonym-toggle"
                     htmlFor={`${termId}-enabled`}
@@ -391,7 +428,14 @@ export default function AdminSynonyms() {
                             <th scope="row">
                               <code>{row.term}</code>
                             </th>
-                            <td>{row.synonyms.join(', ')}</td>
+                            <td>
+                              {row.synonyms.join(', ')}
+                              {row.notes && (
+                                <span className="synonym-note">
+                                  {row.notes}
+                                </span>
+                              )}
+                            </td>
                             <td>
                               <span
                                 className={`office-status office-status--${
@@ -401,7 +445,12 @@ export default function AdminSynonyms() {
                                 {row.enabled ? 'Enabled' : 'Disabled'}
                               </span>
                             </td>
-                            <td>{formatUpdated(row.updated_at)}</td>
+                            <td>
+                              {formatUpdated(row.updated_at)}
+                              <span className="synonym-note">
+                                {row.updated_by || 'Seed'}
+                              </span>
+                            </td>
                             <td>
                               <div className="synonym-actions">
                                 <button
