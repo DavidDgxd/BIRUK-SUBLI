@@ -29,7 +29,7 @@ async function mockScores(page, items) {
       body: JSON.stringify({ vector: EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
     const body = route.request().postDataJSON();
     const filtered = body.date_from === '2030-01-01' ? [] : items;
     return route.fulfill({
