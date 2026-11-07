@@ -119,13 +119,16 @@ export default function AnnouncementDraft({ item }) {
     setCopyState('idle');
     setNotice('');
   }
+  // The button state and the click guard must agree on what each action copies.
+  const textForAction = (action) => (
+    action === 'both' ? draft.en || draft.tl : draft[action] ?? ''
+  );
   async function handleCopy(action) {
     if (copying) return;
     if (action === 'photo') {
       if (!photoBlob) return;
-    } else {
-      const text = action === 'tl' ? draft.tl : action === 'en' ? draft.en : draft.en || draft.tl;
-      if (!text.trim()) return;
+    } else if (!textForAction(action).trim()) {
+      return;
     }
     setCopyState(`${action}-copying`);
     try {
@@ -236,7 +239,7 @@ export default function AnnouncementDraft({ item }) {
               const done = copyState === `${action}-copied`;
               const blocked = action === 'photo'
                 ? !photoBlob
-                : !(draft.en || draft.tl).trim();
+                : !textForAction(action).trim();
               return (
                 <button key={action} type="button"
                   className={action === 'both' ? 'btn btn--filled' : 'btn'}

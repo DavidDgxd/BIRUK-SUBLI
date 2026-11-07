@@ -4,6 +4,12 @@ const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64',
 );
+/* Every upload is re-encoded to WebP by the bucket (web/src/lib/storage.js), so
+ * the photo the clipboard action receives is WebP in production. */
+const WEBP_PHOTO = Buffer.from(
+  'UklGRhYCAABXRUJQVlA4WAoAAAAgAAAAAQAAAQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggKAAAAJABAJ0BKgIAAgABQCYlmAJ0ugADmAD+8NcD/gN18W0y/1XiDM9ZAAA=',
+  'base64',
+);
 const CAPTION = 'A brown leather wallet sitting on a wooden table.';
 
 test.use({ signedInAs: 'office' });
@@ -104,19 +110,23 @@ test('copies the photo separately as a PNG for Facebook', async ({ page }) => {
   await page.route('**/storage/v1/object/public/**', (route) =>
     route.fulfill({
       status: 200,
-      contentType: 'image/png',
-      body: PNG_1PX,
+      contentType: 'image/webp',
+      body: WEBP_PHOTO,
     }),
   );
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.addInitScript(() => {
-    window.__copiedPhotoTypes = [];
+    window.__copiedPhoto = { types: [], blobType: null };
     const clipboard = navigator.clipboard;
     if (!clipboard) return;
     Object.defineProperty(clipboard, 'write', {
       configurable: true,
       value: async (items) => {
-        window.__copiedPhotoTypes.push(...items.flatMap((item) => item.types));
+        window.__copiedPhoto.types.push(...items.flatMap((item) => item.types));
+        // The declared MIME key is always image/png, so read the blob itself to
+        // prove the WebP source was actually re-encoded.
+        const blob = await items[0].getType('image/png');
+        window.__copiedPhoto.blobType = blob?.type ?? null;
       },
     });
   });
@@ -143,12 +153,12 @@ test('copies the photo separately as a PNG for Facebook', async ({ page }) => {
   await photoButton.focus();
   await page.keyboard.press('Enter');
 
-  // Focus must stay on the clicked button while the write is in flight.
+  // The clicked button keeps focus while the copy completes.
   await expect(
     page.locator('.announcement-draft__actions button:focus'),
   ).toHaveText(/Photo copied/);
 
-  const types = await page.evaluate(() => window.__copiedPhotoTypes);
-  expect(types).toContain('image/png');
-  expect(types).not.toContain('image/webp');
+  const copied = await page.evaluate(() => window.__copiedPhoto);
+  expect(copied.types).toContain('image/png');
+  expect(copied.blobType).toBe('image/png');
 });
