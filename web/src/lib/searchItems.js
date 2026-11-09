@@ -10,9 +10,8 @@ import { embedImage, embedText, SearchError } from './aiService.js';
 // while keeping a genuine semantic match in the possible tier.
 export const MATCH_THRESHOLD = 0.55;
 export const MATCH_COUNT = 15;
-// Retuned on the hybrid eval at 0.68/0.05: P=0.838 R=0.838 noneFP=12%,
-// against 0.681/0.865/38% at the old vector-only 0.64. See
-// ai-service/eval_search_tiers.py.
+// Retuned on the labelled 36-query set over the public text at 0.68/0.05:
+// P=0.838 R=0.838 noneFP=12%, against 0.681/0.865/38% at the old 0.64.
 export const BEST_FLOOR = 0.68;
 export const BEST_DELTA = 0.05;
 // Vector-only rows (a photo-only query or a stale RPC) keep the old floor:

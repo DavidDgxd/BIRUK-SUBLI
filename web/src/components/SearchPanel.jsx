@@ -130,7 +130,9 @@ export default function SearchPanel({
         <label className="visually-hidden" htmlFor={inputId}>
           Search held items
         </label>
-        <div className={`search-inline__field${error ? ' is-invalid' : ''}`}>
+        <div
+          className={`search-inline__field${error ? ' is-invalid' : ''}`}
+        >
           <Icon
             name="search"
             className="search-inline__loupe"

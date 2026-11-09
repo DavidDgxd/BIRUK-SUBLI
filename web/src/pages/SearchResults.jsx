@@ -41,7 +41,16 @@ function ResultList({ items, possible = false }) {
   );
 }
 
-function requestKey(q, exact, color, photo, office, dateFrom, dateTo, attempt) {
+function requestKey(
+  q,
+  exact,
+  color,
+  photo,
+  office,
+  dateFrom,
+  dateTo,
+  attempt,
+) {
   return [
     q,
     exact,

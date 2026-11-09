@@ -210,11 +210,7 @@ export async function captionImage(file, signal) {
     );
   }
 
-  return {
-    caption: body.caption.trim(),
-    captionTl: body.caption_tl?.trim() || null,
-    model: body.model ?? null,
-  };
+  return { caption: body.caption.trim(), captionTl: body.caption_tl?.trim() || null, model: body.model ?? null };
 }
 
 /**
