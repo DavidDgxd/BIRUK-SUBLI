@@ -96,9 +96,14 @@ def unit(vector) -> np.ndarray:
 
 
 def combine(text_vec, image_vec):
-    """Rebuilds the legacy combined vector from public-safe halves."""
+    """Rebuilds the legacy combined vector from public-safe halves.
+
+    A missing photo falls back to the text-only vector, matching staff intake.
+    Returning None here would leave the stale description-based ``embedding``
+    in place, which the public ``match_items`` RPC still reads.
+    """
     if image_vec is None:
-        return None
+        return unit(text_vec).tolist()
     return unit(unit(text_vec) + unit(image_vec)).tolist()
 
 
