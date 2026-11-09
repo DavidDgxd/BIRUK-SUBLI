@@ -35,7 +35,6 @@ import {
   POSSIBLE_FLOOR,
   POSSIBLE_LIMIT,
   POSSIBLE_ONLY_LIMIT,
-  PHOTO_BEST_FLOOR,
   TEXT_STRONG_FLOOR,
   searchItems,
 } from './searchItems.js';
@@ -528,8 +527,7 @@ describe('searchItems confidence tiers', () => {
   it('exports the tuned tier constants', () => {
     expect({
       BEST_FLOOR,
-      PHOTO_BEST_FLOOR,
-      BEST_DELTA,
+          BEST_DELTA,
       POSSIBLE_FLOOR,
       POSSIBLE_DELTA,
       POSSIBLE_LIMIT,
@@ -542,7 +540,6 @@ describe('searchItems confidence tiers', () => {
       LEXICAL_WEIGHT,
     }).toEqual({
       BEST_FLOOR: 0.72,
-      PHOTO_BEST_FLOOR: 0.64,
       BEST_DELTA: 0.05,
       POSSIBLE_FLOOR: 0.55,
       POSSIBLE_DELTA: 0.07,

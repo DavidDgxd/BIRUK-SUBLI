@@ -72,8 +72,14 @@ as $$
         items.created_at,
         sims.text_similarity,
         sims.image_similarity,
-        lexical.lexical_score,
-        vector_score.value + 0.25 * lexical.lexical_score as score
+        -- A photo-only query has no tokens, so there is nothing to match
+        -- lexically. Return null instead of 0 so the client falls back to its
+        -- vector floor rather than demanding a strong score with no lexical hit.
+        case
+            when cardinality(input.tokens) = 0 then null
+            else lexical.lexical_score
+        end as lexical_score,
+        vector_score.value + 0.25 * coalesce(lexical.lexical_score, 0) as score
     from public.items
     join public.offices on items.holding_office_id = offices.id
     cross join input
