@@ -134,14 +134,14 @@ _GLOSSARY = {
     "palengke": ("market",),
     "paaralan": ("school",),
     "eskwela": ("school",),
-    "eskwelaham": ("school",),
+    "eskwelahan": ("school",),
     "ospital": ("hospital",),
     "parke": ("park",),
 }
 
-# Linker forms: "pulang" is pula + ng, "bagong" is bago + ng. The stem must be
-# long enough that "sing", "sang" and "nag" cannot match.
-_LINKER_VOWELS = "aeiou"
+# Linker forms: "pulang" is pula + ng, "bagong" is bago + ng. The -g suffix
+# follows an n ("luntiang" is luntian + g). The stem must be long enough that
+# "sing", "sang" and "nag" cannot match.
 _NON_WORD = re.compile(r"[^\w]+", re.UNICODE)
 
 
@@ -159,7 +159,7 @@ def _stems(token):
     if (
         len(token) > 3
         and token.endswith("g")
-        and token[-2] in _LINKER_VOWELS
+        and token[-2] == "n"
     ):
         stem = token[:-1]
         if stem in _GLOSSARY:

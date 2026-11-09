@@ -5,13 +5,19 @@ import { embedImage, embedText, SearchError } from './aiService.js';
 //
 // `score` is the RPC's blended vector + lexical score. A row only counts as a
 // confident match when the query named something in its public text
-// (lexical_score > 0) or the vector score is strong on its own. This is what
-// stops a hub image from being "best" for an unrelated query while keeping a
-// genuine semantic match in the possible tier.
+// (lexical_score >= LEXICAL_CONFIDENCE) or the blended score is strong on its
+// own. This is what stops a hub image from being "best" for an unrelated query
+// while keeping a genuine semantic match in the possible tier.
 export const MATCH_THRESHOLD = 0.55;
 export const MATCH_COUNT = 15;
-export const BEST_FLOOR = 0.64;
+// Retuned on the hybrid eval at 0.68/0.05: P=0.838 R=0.838 noneFP=12%,
+// against 0.681/0.865/38% at the old vector-only 0.64. See
+// ai-service/eval_search_tiers.py.
+export const BEST_FLOOR = 0.68;
 export const BEST_DELTA = 0.05;
+// Vector-only rows (a photo-only query or a stale RPC) keep the old floor:
+// they carry no lexical bonus, so the blended floor would drop them.
+export const PHOTO_BEST_FLOOR = 0.64;
 export const POSSIBLE_FLOOR = 0.55;
 export const POSSIBLE_DELTA = 0.07;
 export const POSSIBLE_LIMIT = 3;
@@ -19,8 +25,9 @@ export const POSSIBLE_ONLY_LIMIT = 5;
 export const STRONG_FLOOR = 0.82;
 export const LEXICAL_CONFIDENCE = 0.5;
 
-// Mirrors the lexical weight inside match_items. Kept here so the two halves
-// of the contract are visible side by side; the client does not re-score rows.
+// Mirrors the lexical weight inside match_items_hybrid. Kept here so the two
+// halves of the contract are visible side by side; the client does not re-score
+// rows.
 export const LEXICAL_WEIGHT = 0.25;
 
 // Absorbs the binary rounding in a delta comparison, e.g. 0.664 - 0.07 is
@@ -86,13 +93,20 @@ function scoreOf(item) {
 /**
  * True when a row may be promoted to the confident tier.
  *
- * A stale RPC has no lexical_score at all; keep the old vector-only behaviour
- * there. A current row needs either a lexical hit (the query named something in
- * its title/category/caption) or a vector score strong enough to stand alone.
+ * A stale RPC has no lexical_score at all, and a photo-only query has no tokens
+ * to match, so both report null. Keep the old vector-only behaviour there. A
+ * current row with text needs either a lexical hit (the query named something
+ * in its title/category/caption) or a blended score strong enough to stand
+ * alone.
  */
 function isConfident(item, score) {
   if (!Number.isFinite(item.lexical_score)) return true;
   return item.lexical_score >= LEXICAL_CONFIDENCE || score >= STRONG_FLOOR;
+}
+
+/** Blended rows use the retuned floor; vector-only rows keep the photo floor. */
+function bestFloorOf(item) {
+  return Number.isFinite(item.lexical_score) ? BEST_FLOOR : PHOTO_BEST_FLOOR;
 }
 
 /**
@@ -182,7 +196,7 @@ export async function searchItems({
   const best = ordered.filter((item) => {
     const score = scoreOf(item);
     return (
-      score >= BEST_FLOOR &&
+      score >= bestFloorOf(item) &&
       isConfident(item, score) &&
       score >= top - BEST_DELTA - EPSILON
     );

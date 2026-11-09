@@ -252,7 +252,7 @@ export default function SearchResults() {
               <p className="results__expanded">
                 Searched using your own words, without adding synonyms.{' '}
                 <Link to={wordingLink(false)} state={locationState}>
-                  Add Filipino synonyms instead
+                  Add English synonyms instead
                 </Link>
               </p>
             )}

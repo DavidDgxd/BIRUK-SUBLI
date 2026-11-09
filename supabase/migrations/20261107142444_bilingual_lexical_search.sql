@@ -107,9 +107,15 @@ as $$
         offices.address as office_address,
         items.created_at,
         1 - (items.embedding <=> query_embedding) as similarity,
-        lexical.lexical_score,
+        -- A photo-only query has no tokens, so there is nothing to match
+        -- lexically. Return null instead of 0 so the client falls back to its
+        -- vector floor rather than demanding a strong score with no lexical hit.
+        case
+            when cardinality(input.tokens) = 0 then null
+            else lexical.lexical_score
+        end as lexical_score,
         (1 - (items.embedding <=> query_embedding))
-            + 0.25 * lexical.lexical_score as score
+            + 0.25 * coalesce(lexical.lexical_score, 0) as score
     from public.items
     join public.offices on items.holding_office_id = offices.id
     cross join input

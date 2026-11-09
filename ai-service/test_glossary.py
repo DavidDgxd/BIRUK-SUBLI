@@ -34,6 +34,11 @@ class ExpandQueryTests(unittest.TestCase):
         self.assertIn("red", additions)
         self.assertIn("umbrella", additions)
 
+    def test_the_g_suffix_follows_n(self):
+        _, additions = expand_query("luntiang bag")
+
+        self.assertIn("green", additions)
+
     def test_duplicate_synonyms_are_added_once(self):
         _, additions = expand_query("pitaka at wallet")
 

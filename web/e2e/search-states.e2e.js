@@ -4,7 +4,12 @@ const EMBEDDING = Array.from({ length: 512 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 
-function item(id, title, similarity) {
+const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+function item(id, title, similarity, extra = {}) {
   return {
     id,
     ref_code: id.toUpperCase(),
@@ -18,6 +23,7 @@ function item(id, title, similarity) {
     office_address: 'City Hall, Baguio City',
     created_at: '2026-09-10T00:00:00Z',
     similarity,
+    ...extra,
   };
 }
 
@@ -166,5 +172,49 @@ test('shows the no-close-match state for a query that only returns noise', async
   ).toEqual([0, 8]);
   await expect(
     page.getByRole('link', { name: 'Report it lost' }),
+  ).toBeVisible();
+});
+
+test('shows a photo-only exact match as a best match', async ({ page }) => {
+  await page.route('**/embed/image', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vector: EMBEDDING }),
+    }),
+  );
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.query_text).toBeNull();
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        item('11111111-1111-1111-1111-111111111111', 'Black Umbrella', 0.68, {
+          lexical_score: null,
+          score: 0.68,
+        }),
+      ]),
+    });
+  });
+
+  await openRoute(page, '/');
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Add photo' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: 'umbrella.png',
+    mimeType: 'image/png',
+    buffer: PNG_1PX,
+  });
+
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Best matches' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Black Umbrella' }),
   ).toBeVisible();
 });

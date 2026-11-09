@@ -115,7 +115,7 @@ test('shows the expanded synonyms and switches to the exact words and back', asy
   await expect(page.getByText(EXACT_LINE)).toBeVisible();
 
   await page
-    .getByRole('link', { name: 'Add Filipino synonyms instead' })
+    .getByRole('link', { name: 'Add English synonyms instead' })
     .click();
 
   await expect(page).not.toHaveURL(/exact=/);
