@@ -6,6 +6,8 @@
 -- Enables UUID primary keys and pgvector cosine distance operations
 create extension if not exists "uuid-ossp";
 create extension if not exists "vector";
+-- Trigram similarity backs the lexical half of public search (US-22 follow-up).
+create extension if not exists pg_trgm;
 
 
 -- ============================================================================
@@ -80,6 +82,18 @@ create table if not exists public.items (
     embedding vector(512),
     ai_caption text,
 
+    -- Public-safe lexical text for the hybrid search. Built only from fields a
+    -- visitor can already infer (title, category, photo caption). `description`
+    -- holds staff verification marks and is deliberately excluded: letting it
+    -- affect ranking would leak the counter check.
+    search_text text generated always as (
+        lower(
+            coalesce(title, '') || ' ' ||
+            coalesce(category, '') || ' ' ||
+            coalesce(ai_caption, '')
+        )
+    ) stored,
+
     -- Currency Retention Attributes (Civil Code Art. 720 Compliance):
     -- Cash is kept discreet; monetary figures are excluded from announcements.
     is_cash boolean default false not null,
@@ -104,6 +118,9 @@ create table if not exists public.items (
 -- Fast indexing for vector similarity and multi-office filtering
 create index if not exists items_embedding_hnsw_idx 
 on public.items using hnsw (embedding vector_cosine_ops);
+
+create index if not exists items_search_text_trgm_idx
+on public.items using gin (search_text gin_trgm_ops);
 
 create index if not exists items_status_idx on public.items (status);
 create index if not exists items_holding_office_idx on public.items (holding_office_id);
@@ -204,13 +221,8 @@ create table if not exists public.dismissed_matches (
 -- filters. Released and resolved items keep their embeddings but are never
 -- eligible for matching (US-15).
 --
--- Similarity here is calibrated against the photo-backed distribution:
--- unrelated queries ("bottle", "wallet") score 0.55-0.58, a semantic synonym
--- ("blower") lands near 0.60 and a direct match ("fan") near 0.675. The default
--- floor of 0.55 sits just above that noise band so the client can separate
--- confident results from low-confidence "other possible matches"; callers that
--- only want confident results pass a higher threshold (the web client passes
--- 0.55 and splits the two bands at 0.60).
+-- This original shape stays in place for clients that have not deployed the
+-- hybrid search yet. `match_items_hybrid` below is the text-query path.
 --
 -- SECURITY DEFINER + public-safe projection: this is the ONLY way an anonymous
 -- caller reaches `items`. description (the staff verification notes),
@@ -281,6 +293,148 @@ $$;
 revoke all on function public.match_items(vector, double precision, integer, text, date, date) from public;
 grant execute on function public.match_items(vector, double precision, integer, text, date, date)
     to anon, authenticated, service_role;
+
+
+-- ============================================================================
+-- 6a. RPC: CITIZEN HYBRID SEARCH (US-22 follow-up)
+-- Blends the cosine similarity above with a lexical match over `search_text`,
+-- which only contains public-safe fields (title, category, photo caption). The
+-- AI service appends English synonyms for Filipino queries, so the same call
+-- serves both languages without a translator on the critical path.
+--
+-- The name is distinct on purpose: PostgREST cannot choose between two
+-- overloads that share the same named arguments, so the original match_items
+-- stays untouched for older clients.
+-- ============================================================================
+-- Splits a query into content tokens. Function words are dropped so a token
+-- that does appear in a title is not diluted by "the", "with", "na" or "mga".
+drop function if exists public.search_tokens(text);
+
+create or replace function public.search_tokens (q text)
+returns text[]
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+    select coalesce(array_agg(distinct token), '{}'::text[])
+    from unnest(
+        regexp_split_to_array(lower(coalesce(q, '')), '[^[:alnum:]]+')
+    ) as token
+    where
+        length(token) >= 3
+        and token not in (
+            'the', 'and', 'for', 'with', 'my', 'our', 'your', 'from',
+            'this', 'that', 'was', 'has', 'have', 'ang', 'mga', 'na',
+            'ng', 'sa', 'si', 'ni', 'ko', 'mo', 'ka', 'ako', 'ikaw',
+            'siya', 'ito', 'iyan', 'yung', 'may', 'meron', 'wala',
+            'at', 'para', 'dahil'
+        );
+$$;
+
+revoke all on function public.search_tokens(text) from public;
+
+drop function if exists public.match_items_hybrid(
+    vector, double precision, integer, text, date, date, text
+);
+
+create or replace function public.match_items_hybrid (
+    query_embedding vector(512),
+    match_threshold float default 0.55,
+    match_count int default 15,
+    filter_office text default null,
+    date_from date default null,
+    date_to date default null,
+    query_text text default null
+)
+returns table (
+    id uuid,
+    ref_code text,
+    title text,
+    category text,
+    status text,
+    image_url text,
+    holding_office_id text,
+    holding_office_name text,
+    counter_hours text,
+    office_address text,
+    created_at timestamptz,
+    similarity float,
+    lexical_score float,
+    score float
+)
+language sql stable
+security definer
+set search_path = public, pg_temp
+as $$
+    with input as (
+        select public.search_tokens(query_text) as tokens
+    )
+    select
+        items.id,
+        items.ref_code,
+        items.title,
+        items.category,
+        items.status,
+        items.image_url,
+        items.holding_office_id,
+        offices.name as holding_office_name,
+        offices.counter_hours,
+        offices.address as office_address,
+        items.created_at,
+        1 - (items.embedding <=> query_embedding) as similarity,
+        -- A photo-only query has no tokens, so there is nothing to match
+        -- lexically. Return null instead of 0 so the client falls back to its
+        -- vector floor rather than demanding a strong score with no lexical hit.
+        case
+            when cardinality(input.tokens) = 0 then null
+            else lexical.lexical_score
+        end as lexical_score,
+        (1 - (items.embedding <=> query_embedding))
+            + 0.25 * coalesce(lexical.lexical_score, 0) as score
+    from public.items
+    join public.offices on items.holding_office_id = offices.id
+    cross join input
+    cross join lateral (
+        select greatest(
+            coalesce(
+                (
+                    select max(
+                        case
+                            when items.search_text ~ ('\m' || token || '\M')
+                            then 1.0
+                            else 0.0
+                        end
+                    )
+                    from unnest(input.tokens) as token
+                ),
+                0.0
+            ),
+            coalesce(
+                similarity(
+                    items.search_text,
+                    lower(coalesce(query_text, ''))
+                ),
+                0.0
+            )
+        )::float as lexical_score
+    ) as lexical
+    where
+        items.status not in ('released', 'resolved', 'transferred', 'disposed')
+        and items.embedding is not null
+        and (filter_office is null or items.holding_office_id = filter_office)
+        and (date_from is null or items.date_received >= date_from)
+        and (date_to is null or items.date_received <= date_to)
+        and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.55)
+    order by score desc
+    limit match_count;
+$$;
+
+revoke all on function public.match_items_hybrid(
+    vector, double precision, integer, text, date, date, text
+) from public;
+grant execute on function public.match_items_hybrid(
+    vector, double precision, integer, text, date, date, text
+) to anon, authenticated, service_role;
 
 
 -- ============================================================================

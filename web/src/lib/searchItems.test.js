@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpc, embedText } = vi.hoisted(() => ({
+const { rpc, embedText, embedImage } = vi.hoisted(() => ({
   rpc: vi.fn(),
   embedText: vi.fn(),
+  embedImage: vi.fn(),
 }));
 
 vi.mock('./supabase.js', () => ({ supabase: { rpc } }));
 
 vi.mock('./aiService.js', () => ({
   embedText,
-  embedImage: vi.fn(),
+  embedImage,
   SearchError: class SearchError extends Error {
     constructor(code, message) {
       super(message);
@@ -22,11 +23,15 @@ vi.mock('./aiService.js', () => ({
 import {
   BEST_DELTA,
   BEST_FLOOR,
+  LEXICAL_CONFIDENCE,
+  LEXICAL_WEIGHT,
   MATCH_THRESHOLD,
   POSSIBLE_DELTA,
   POSSIBLE_FLOOR,
   POSSIBLE_LIMIT,
   POSSIBLE_ONLY_LIMIT,
+  PHOTO_BEST_FLOOR,
+  STRONG_FLOOR,
   searchItems,
 } from './searchItems.js';
 
@@ -42,7 +47,9 @@ describe('searchItems confidence tiers', () => {
   beforeEach(() => {
     rpc.mockReset();
     embedText.mockReset();
+    embedImage.mockReset();
     embedText.mockResolvedValue({ embedding: [1, 0, 0] });
+    embedImage.mockResolvedValue({ embedding: [0, 1, 0] });
   });
 
   it('splits best and possible matches and drops terminal rows', async () => {
@@ -78,7 +85,11 @@ describe('searchItems confidence tiers', () => {
   it('treats a top score below BEST_FLOOR as possible, not best', async () => {
     rpc.mockReturnValue(
       resolvedRpc({
-        data: [row('top', 0.639), row('next', 0.6), row('far', 0.55)],
+        data: [
+          row('top', 0.679, { lexical_score: 1 }),
+          row('next', 0.63, { lexical_score: 1 }),
+          row('far', 0.55, { lexical_score: 1 }),
+        ],
       }),
     );
 
@@ -94,7 +105,12 @@ describe('searchItems confidence tiers', () => {
 
   it('accepts a top score exactly at BEST_FLOOR as best', async () => {
     rpc.mockReturnValue(
-      resolvedRpc({ data: [row('top', 0.64), row('next', 0.6)] }),
+      resolvedRpc({
+        data: [
+          row('top', 0.68, { lexical_score: 1 }),
+          row('next', 0.64, { lexical_score: 1 }),
+        ],
+      }),
     );
 
     const result = await searchItems({
@@ -200,11 +216,91 @@ describe('searchItems confidence tiers', () => {
     });
 
     expect(rpc).toHaveBeenCalledWith(
-      'match_items',
+      'match_items_hybrid',
       expect.objectContaining({
         match_threshold: MATCH_THRESHOLD,
         match_count: 15,
+        query_text: 'wallet',
       }),
+    );
+  });
+
+  it('ranks a lexical hit above a higher-vector hub', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('hub', 0.73, { score: 0.73, lexical_score: 0 }),
+          row('named', 0.64, { score: 0.79, lexical_score: 1 }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'ring',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.best.map((item) => item.id)).toEqual(['named']);
+    expect(result.possible.map((item) => item.id)).toEqual(['hub']);
+  });
+
+  it('keeps a weak vector-only row out of the confident tier', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [row('hub', 0.797, { score: 0.814, lexical_score: 0.07 })],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'earbuds',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('possible');
+    expect(result.best).toEqual([]);
+    expect(result.possible.map((item) => item.id)).toEqual(['hub']);
+  });
+
+  it('keeps a photo-only match confident when the RPC reports no lexical score', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [row('photo-match', 0.66, { score: 0.66, lexical_score: null })],
+      }),
+    );
+
+    const result = await searchItems({
+      photo: new Blob(['x']),
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('results');
+    expect(result.best.map((item) => item.id)).toEqual(['photo-match']);
+    expect(rpc).toHaveBeenCalledWith(
+      'match_items_hybrid',
+      expect.objectContaining({ query_text: null }),
+    );
+  });
+
+  it('sends the expanded words and the expansion flag to the service', async () => {
+    rpc.mockReturnValue(resolvedRpc());
+    embedText.mockResolvedValue({
+      embedding: [1, 0, 0],
+      expandedText: 'pitaka wallet purse',
+      additions: ['wallet', 'purse'],
+    });
+
+    await searchItems({
+      text: 'pitaka',
+      expand: false,
+      signal: new AbortController().signal,
+    });
+
+    expect(embedText).toHaveBeenCalledWith('pitaka', expect.anything(), {
+      expand: false,
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      'match_items_hybrid',
+      expect.objectContaining({ query_text: 'pitaka wallet purse' }),
     );
   });
 
@@ -220,7 +316,7 @@ describe('searchItems confidence tiers', () => {
     });
 
     expect(rpc).toHaveBeenCalledWith(
-      'match_items',
+      'match_items_hybrid',
       expect.objectContaining({
         filter_office: 'BCPIO',
         date_from: '2026-09-01',
@@ -261,18 +357,26 @@ describe('searchItems confidence tiers', () => {
   it('exports the tuned tier constants', () => {
     expect({
       BEST_FLOOR,
+      PHOTO_BEST_FLOOR,
       BEST_DELTA,
       POSSIBLE_FLOOR,
       POSSIBLE_DELTA,
       POSSIBLE_LIMIT,
       POSSIBLE_ONLY_LIMIT,
+      STRONG_FLOOR,
+      LEXICAL_CONFIDENCE,
+      LEXICAL_WEIGHT,
     }).toEqual({
-      BEST_FLOOR: 0.64,
+      BEST_FLOOR: 0.68,
+      PHOTO_BEST_FLOOR: 0.64,
       BEST_DELTA: 0.05,
       POSSIBLE_FLOOR: 0.55,
       POSSIBLE_DELTA: 0.07,
       POSSIBLE_LIMIT: 3,
       POSSIBLE_ONLY_LIMIT: 5,
+      STRONG_FLOOR: 0.82,
+      LEXICAL_CONFIDENCE: 0.5,
+      LEXICAL_WEIGHT: 0.25,
     });
   });
 });

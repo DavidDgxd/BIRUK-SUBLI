@@ -1,20 +1,33 @@
 import { supabase } from './supabase.js';
 import { embedImage, embedText, SearchError } from './aiService.js';
 
-// Confidence tiers passed to match_items, plus the best/possible split.
+// Confidence tiers passed to match_items_hybrid, plus the best/possible split.
 //
-// Tuned on the 20 held items with ai-service/eval_search_tiers.py (36 labeled
-// queries): 0.64/0.05 gives precision 0.967, recall 0.784 and no result for any
-// of the "none" queries; the possible tier (0.55/0.07) restores the baseline
-// recall. Re-run that eval whenever the inventory changes materially.
+// `score` is the RPC's blended vector + lexical score. A row only counts as a
+// confident match when the query named something in its public text
+// (lexical_score >= LEXICAL_CONFIDENCE) or the blended score is strong on its
+// own. This is what stops a hub image from being "best" for an unrelated query
+// while keeping a genuine semantic match in the possible tier.
 export const MATCH_THRESHOLD = 0.55;
 export const MATCH_COUNT = 15;
-export const BEST_FLOOR = 0.64;
+// Retuned on the labelled 36-query set over the public text at 0.68/0.05:
+// P=0.838 R=0.838 noneFP=12%, against 0.681/0.865/38% at the old 0.64.
+export const BEST_FLOOR = 0.68;
 export const BEST_DELTA = 0.05;
+// Vector-only rows (a photo-only query or a stale RPC) keep the old floor:
+// they carry no lexical bonus, so the blended floor would drop them.
+export const PHOTO_BEST_FLOOR = 0.64;
 export const POSSIBLE_FLOOR = 0.55;
 export const POSSIBLE_DELTA = 0.07;
 export const POSSIBLE_LIMIT = 3;
 export const POSSIBLE_ONLY_LIMIT = 5;
+export const STRONG_FLOOR = 0.82;
+export const LEXICAL_CONFIDENCE = 0.5;
+
+// Mirrors the lexical weight inside match_items_hybrid. Kept here so the two
+// halves of the contract are visible side by side; the client does not re-score
+// rows.
+export const LEXICAL_WEIGHT = 0.25;
 
 // Absorbs the binary rounding in a delta comparison, e.g. 0.664 - 0.07 is
 // 0.5940000000000001, which would otherwise drop an item sitting on 0.594.
@@ -71,6 +84,30 @@ function normalize(vector) {
   return vector.map((x) => x / norm);
 }
 
+/** The RPC's blended rank, falling back to similarity for a stale function. */
+function scoreOf(item) {
+  return Number.isFinite(item.score) ? item.score : item.similarity;
+}
+
+/**
+ * True when a row may be promoted to the confident tier.
+ *
+ * A stale RPC has no lexical_score at all, and a photo-only query has no tokens
+ * to match, so both report null. Keep the old vector-only behaviour there. A
+ * current row with text needs either a lexical hit (the query named something
+ * in its title/category/caption) or a blended score strong enough to stand
+ * alone.
+ */
+function isConfident(item, score) {
+  if (!Number.isFinite(item.lexical_score)) return true;
+  return item.lexical_score >= LEXICAL_CONFIDENCE || score >= STRONG_FLOOR;
+}
+
+/** Blended rows use the retuned floor; vector-only rows keep the photo floor. */
+function bestFloorOf(item) {
+  return Number.isFinite(item.lexical_score) ? BEST_FLOOR : PHOTO_BEST_FLOOR;
+}
+
 /**
  * Scales each vector to unit length and averages them, so a text query and a photo
  * count equally. A single vector is returned as is (cosine search ignores its length).
@@ -85,18 +122,18 @@ export function combineEmbeddings(vectors) {
 
 /**
  * Embeds the text and/or photo with the AI service, then ranks held items with
- * the match_items RPC. The color filter is added to the text so it is embedded
- * with the rest of the description. Office and receipt-date filters are passed
- * to the RPC so they narrow the candidate set before the match limit applies;
- * filtering the returned page instead would hide valid older/other-office items
- * whenever the unfiltered top matches filled the limit.
+ * the match_items_hybrid RPC. The color filter is added to the text so it is
+ * embedded with the rest of the description. Office and receipt-date filters
+ * are passed to the RPC so they narrow the candidate set before the match limit
+ * applies; filtering the returned page instead would hide valid older or
+ * other-office items whenever the unfiltered top matches filled the limit.
  *
- * Resolves to { best, possible, state, queryText, translatedText }. `best` holds
- * the confident matches; `possible` holds up to POSSIBLE_LIMIT weaker ones (or
- * POSSIBLE_ONLY_LIMIT when no best exists) for the "possible matches" section.
- * `state` is 'results' | 'possible' | 'none' so
- * the page can show the "no close match" copy without an empty list. Both lists
- * keep the RPC's descending score order.
+ * Resolves to { best, possible, state, queryText, expandedText, additions }.
+ * `best` holds the confident matches; `possible` holds up to POSSIBLE_LIMIT
+ * weaker ones (or POSSIBLE_ONLY_LIMIT when no best exists) for the "possible
+ * matches" section. `state` is 'results' | 'possible' | 'none' so the page can
+ * show the "no close match" copy without an empty list. Both lists keep the
+ * RPC's descending score order.
  */
 export async function searchItems({
   text,
@@ -105,7 +142,7 @@ export async function searchItems({
   office,
   dateFrom,
   dateTo,
-  translate,
+  expand,
   signal,
 }) {
   const trimmed = (text ?? '').trim();
@@ -116,22 +153,24 @@ export async function searchItems({
     .join(' ');
 
   const [textResult, imageResult] = await Promise.all([
-    queryText ? embedText(queryText, signal, { translate }) : null,
+    queryText ? embedText(queryText, signal, { expand }) : null,
     photo ? embedImage(photo, signal) : null,
   ]);
 
   const embedding = combineEmbeddings(
     [textResult?.embedding, imageResult?.embedding].filter(Boolean),
   );
+  const expandedText = textResult?.expandedText ?? queryText;
 
   const { data, error } = await supabase
-    .rpc('match_items', {
+    .rpc('match_items_hybrid', {
       query_embedding: embedding,
       match_threshold: MATCH_THRESHOLD,
       match_count: MATCH_COUNT,
       filter_office: office || null,
       date_from: dateFrom || null,
       date_to: dateTo || null,
+      query_text: textResult ? expandedText : null,
     })
     .abortSignal(signal);
 
@@ -139,7 +178,7 @@ export async function searchItems({
 
   // The RPC already applies the floor, office filter and excludes released,
   // resolved and other terminal rows; re-checking them here keeps the guarantee
-  // even if an older match_items is still deployed. A non-held item must never
+  // even if a stale function is still deployed. A non-held item must never
   // surface in a public listing, even if that function is stale or a row's
   // status changed between the query and the read.
   const all = (data ?? []).filter(
@@ -151,21 +190,26 @@ export async function searchItems({
 
   // The RPC already sorts, but sorting here keeps the cap deterministic if a
   // stale function or a test fixture returns rows in another order.
-  const ordered = [...all].sort((a, b) => b.similarity - a.similarity);
-  const top = ordered.length ? ordered[0].similarity : 0;
-  const best = ordered.filter(
-    (item) =>
-      item.similarity >= BEST_FLOOR &&
-      item.similarity >= top - BEST_DELTA - EPSILON,
-  );
+  const ordered = [...all].sort((a, b) => scoreOf(b) - scoreOf(a));
+  const top = ordered.length ? scoreOf(ordered[0]) : 0;
+  const best = ordered.filter((item) => {
+    const score = scoreOf(item);
+    return (
+      score >= bestFloorOf(item) &&
+      isConfident(item, score) &&
+      score >= top - BEST_DELTA - EPSILON
+    );
+  });
   const possibleLimit = best.length ? POSSIBLE_LIMIT : POSSIBLE_ONLY_LIMIT;
   const possible = ordered
-    .filter(
-      (item) =>
+    .filter((item) => {
+      const score = scoreOf(item);
+      return (
         !best.includes(item) &&
-        item.similarity >= POSSIBLE_FLOOR &&
-        item.similarity >= top - POSSIBLE_DELTA - EPSILON,
-    )
+        score >= POSSIBLE_FLOOR &&
+        score >= top - POSSIBLE_DELTA - EPSILON
+      );
+    })
     .slice(0, possibleLimit);
   const state = best.length ? 'results' : possible.length ? 'possible' : 'none';
 
@@ -174,6 +218,7 @@ export async function searchItems({
     possible,
     state,
     queryText,
-    translatedText: textResult?.translatedText ?? null,
+    expandedText,
+    additions: textResult?.additions ?? [],
   };
 }

@@ -51,7 +51,7 @@ test('filters results by holding office and receipt-date range', async ({
     }),
   );
 
-  await page.route('**/rest/v1/rpc/match_items', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
     const body = route.request().postDataJSON();
     rpcCalls.push(body);
 
@@ -122,7 +122,7 @@ test('rejects a date range whose start is after its end', async ({ page }) => {
       body: JSON.stringify({ vector: EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items', (route) =>
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -156,7 +156,7 @@ test('edits the search text from the results page and keeps filters', async ({
       body: JSON.stringify({ vector: EMBEDDING }),
     });
   });
-  await page.route('**/rest/v1/rpc/match_items', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
     rpcCalls.push(route.request().postDataJSON());
     return route.fulfill({
       status: 200,
@@ -220,7 +220,7 @@ test('keeps the photo when the query is edited from the results page', async ({
       body: JSON.stringify({ vector: EMBEDDING }),
     });
   });
-  await page.route('**/rest/v1/rpc/match_items', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
     rpcCalls.push(route.request().postDataJSON());
     return route.fulfill({
       status: 200,
@@ -283,7 +283,7 @@ test('adds a photo from the results page and keeps filters', async ({ page }) =>
       body: JSON.stringify({ vector: EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
     rpcCalls.push(route.request().postDataJSON());
     return route.fulfill({
       status: 200,
