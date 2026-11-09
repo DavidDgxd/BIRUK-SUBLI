@@ -93,5 +93,27 @@ class NormalCaptionTests(unittest.TestCase):
         self.assertLessEqual(len(cleaned), CAPTION_MAX_CHARS)
 
 
+class IdentifierTests(unittest.TestCase):
+    def test_card_numbers_are_removed(self):
+        cleaned = clean_caption("a card with number 4111 1111 1111 1111")
+
+        self.assertEqual(cleaned, "a card with number")
+        self.assertNotRegex(cleaned, r"\d")
+
+    def test_mixed_reference_codes_are_removed(self):
+        self.assertEqual(
+            clean_caption("a black id card ABC12345"),
+            "a black id card",
+        )
+
+    def test_short_model_numbers_are_kept(self):
+        caption = "the back of an iphone 11"
+
+        self.assertEqual(clean_caption(caption), caption)
+
+    def test_a_caption_that_is_only_a_number_is_rejected(self):
+        self.assertIsNone(clean_caption("4111 1111 1111 1111"))
+
+
 if __name__ == "__main__":
     unittest.main()

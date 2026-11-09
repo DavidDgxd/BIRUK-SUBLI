@@ -40,6 +40,22 @@ _TRAILING_STOPWORDS = {
 _CLAUSE_MARKS = ".!?,;:"
 _SENTENCE_MARKS = ".!?"
 
+# Captions feed public search, so identifiers read off a photographed card must
+# not survive: 4+ digit runs (card, ID, phone numbers) and 6+ character tokens
+# mixing letters and digits (reference and serial codes). Short model numbers
+# such as "iphone 11" are kept.
+_NUMBER_RUN = re.compile(r"\b\d{4,}\b")
+_MIXED_CODE = re.compile(
+    r"\b(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{6,}\b"
+)
+
+
+def _strip_identifiers(text):
+    """Remove card/ID numbers and long reference codes from a caption."""
+    text = _NUMBER_RUN.sub("", text)
+    text = _MIXED_CODE.sub("", text)
+    return " ".join(text.split())
+
 
 def _word_key(token):
     """Lowercase letters and digits only, for comparing repeated words."""
@@ -156,6 +172,10 @@ def clean_caption(raw, *, incomplete_tail=False, max_chars=CAPTION_MAX_CHARS):
         text = _drop_incomplete_tail(text).strip()
         if not text:
             return None
+
+    text = _strip_identifiers(text)
+    if not text:
+        return None
 
     tokens = [_collapse_word_repeats(token) for token in text.split()]
     text = " ".join(_collapse_repeated_phrases(tokens))
