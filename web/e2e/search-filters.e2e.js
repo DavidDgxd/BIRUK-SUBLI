@@ -1,7 +1,11 @@
 import { test, expect, openRoute } from './fixtures.js';
 
-const EMBEDDING = Array.from({ length: 1024 }, (_, index) => (index === 0 ? 1 : 0));
-const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) => (index === 0 ? 1 : 0));
+const EMBEDDING = Array.from({ length: 1024 }, (_, index) =>
+  index === 0 ? 1 : 0,
+);
+const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) =>
+  index === 0 ? 1 : 0,
+);
 
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -181,11 +185,13 @@ test('edits the search text from the results page and keeps filters', async ({
   await expect(page).toHaveURL(/office=BCPIO/);
   await expect(page).toHaveURL(/from=2026-09-01/);
   await expect(page).toHaveURL(/to=2026-09-30/);
-  await expect.poll(() => rpcCalls.at(-1)).toMatchObject({
-    filter_office: 'BCPIO',
-    date_from: '2026-09-01',
-    date_to: '2026-09-30',
-  });
+  await expect
+    .poll(() => rpcCalls.at(-1))
+    .toMatchObject({
+      filter_office: 'BCPIO',
+      date_from: '2026-09-01',
+      date_to: '2026-09-30',
+    });
   const rpcCallsBeforeEdit = rpcCalls.length;
 
   await page
@@ -273,7 +279,9 @@ test('keeps the photo when the query is edited from the results page', async ({
   expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'BCPIO' });
 });
 
-test('adds a photo from the results page and keeps filters', async ({ page }) => {
+test('adds a photo from the results page and keeps filters', async ({
+  page,
+}) => {
   const rpcCalls = [];
 
   await page.route('**/embed/query', (route) =>
@@ -321,4 +329,66 @@ test('adds a photo from the results page and keeps filters', async ({ page }) =>
   await expect(page).toHaveURL(/office=BCPIO/);
   await expect(page.getByText('Photo attached')).toBeVisible();
   expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'BCPIO' });
+});
+
+test('removes a photo carried over from the dashboard', async ({ page }) => {
+  const rpcCalls = [];
+  let imageEmbeds = 0;
+
+  await page.route('**/embed/query', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vector: EMBEDDING }),
+    }),
+  );
+  await page.route('**/embed/image', (route) => {
+    imageEmbeds += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ vector: IMAGE_EMBEDDING }),
+    });
+  });
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
+    rpcCalls.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ITEMS),
+    });
+  });
+
+  await openRoute(page, '/');
+  await page.getByLabel('Describe the item').fill('umbrella');
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Add photo' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: 'umbrella.png',
+    mimeType: 'image/png',
+    buffer: PNG_1PX,
+  });
+
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+  await expect(page.getByText('Photo attached')).toBeVisible();
+  const chip = page.getByText('umbrella.png');
+  await expect(chip).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Remove photo' }),
+  ).toBeVisible();
+  expect(imageEmbeds).toBe(1);
+  const embedsBeforeRemoval = imageEmbeds;
+
+  await page.getByRole('button', { name: 'Remove photo' }).click();
+  await expect(chip).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+  await expect(page.getByText('Photo attached')).toHaveCount(0);
+  await expect(page).toHaveURL(/q=umbrella/);
+  expect(imageEmbeds).toBe(embedsBeforeRemoval);
+  await expect.poll(() => rpcCalls.at(-1)?.query_image_embedding).toBeNull();
 });

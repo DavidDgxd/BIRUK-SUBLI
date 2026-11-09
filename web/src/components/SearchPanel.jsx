@@ -63,6 +63,20 @@ export default function SearchPanel({
     return () => URL.revokeObjectURL(photo.url);
   }, [photo]);
 
+  // A photo carried over from the dashboard lives in location.state, not in
+  // this component, so give it a preview URL until it is removed or replaced.
+  const [initialPhotoUrl, setInitialPhotoUrl] = useState('');
+  useEffect(() => {
+    if (!initialPhoto || photo || photoRemoved) {
+      setInitialPhotoUrl('');
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(initialPhoto);
+    setInitialPhotoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [initialPhoto, photo, photoRemoved]);
+
   function handleFileChange(event) {
     const file = event.target.files?.[0];
     event.target.value = ''; // allow re-selecting the same file later
@@ -84,6 +98,11 @@ export default function SearchPanel({
   function removePhoto() {
     setPhoto(null);
     setPhotoRemoved(true);
+  }
+
+  function removeShownPhoto() {
+    if (photo) removePhoto();
+    else setPhotoRemoved(true);
   }
 
   function handleSubmit(event) {
@@ -117,6 +136,13 @@ export default function SearchPanel({
 
   const describedBy = error ? `${hintId} ${errorId}` : hintId;
   const hasPhoto = Boolean(photo || (!photoRemoved && initialPhoto));
+  // The chip shows the photo picked here, or the one carried in from the
+  // dashboard until it is removed.
+  const shownPhoto =
+    photo ??
+    (!photoRemoved && initialPhoto && initialPhotoUrl
+      ? { file: initialPhoto, url: initialPhotoUrl }
+      : null);
 
   if (compact) {
     return (
@@ -130,9 +156,7 @@ export default function SearchPanel({
         <label className="visually-hidden" htmlFor={inputId}>
           Search held items
         </label>
-        <div
-          className={`search-inline__field${error ? ' is-invalid' : ''}`}
-        >
+        <div className={`search-inline__field${error ? ' is-invalid' : ''}`}>
           <Icon
             name="search"
             className="search-inline__loupe"
@@ -191,24 +215,24 @@ export default function SearchPanel({
           <Icon name="photo_camera" size={16} strokeWidth={1.5} />
           <span>{hasPhoto ? 'Change photo' : 'Add photo'}</span>
         </button>
-        {photo && (
+        {shownPhoto && (
           <div className="photo-chip search-inline__photo">
             <img
               className="photo-chip__img"
-              src={photo.url}
+              src={shownPhoto.url}
               alt="Preview of the photo you selected"
               width="48"
               height="48"
               decoding="async"
             />
             <p className="photo-chip__name">
-              {photo.file.name}
+              {shownPhoto.file.name}
               <small>Used to match similar items</small>
             </p>
             <button
               type="button"
               className="icon-btn"
-              onClick={removePhoto}
+              onClick={removeShownPhoto}
               aria-label="Remove photo"
             >
               <Icon name="close" />
@@ -324,24 +348,24 @@ export default function SearchPanel({
           )}
         </div>
 
-        {photo && (
+        {shownPhoto && (
           <div className="photo-chip">
             <img
               className="photo-chip__img"
-              src={photo.url}
+              src={shownPhoto.url}
               alt="Preview of the photo you selected"
               width="48"
               height="48"
               decoding="async"
             />
             <p className="photo-chip__name">
-              {photo.file.name}
+              {shownPhoto.file.name}
               <small>Used to match similar items</small>
             </p>
             <button
               type="button"
               className="icon-btn"
-              onClick={removePhoto}
+              onClick={removeShownPhoto}
               aria-label="Remove photo"
             >
               <Icon name="close" />
