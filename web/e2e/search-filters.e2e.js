@@ -1,6 +1,7 @@
 import { test, expect, openRoute } from './fixtures.js';
 
-const EMBEDDING = Array.from({ length: 512 }, (_, index) => (index === 0 ? 1 : 0));
+const EMBEDDING = Array.from({ length: 1024 }, (_, index) => (index === 0 ? 1 : 0));
+const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) => (index === 0 ? 1 : 0));
 
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -21,6 +22,9 @@ const ITEMS = [
     office_address: 'City Hall, Baguio City',
     created_at: '2026-09-10T00:00:00Z',
     similarity: 0.7,
+    text_similarity: 0.7,
+    lexical_score: 1,
+    score: 0.95,
   },
   {
     id: '22222222-2222-2222-2222-222222222222',
@@ -35,6 +39,9 @@ const ITEMS = [
     office_address: 'City Hall, Baguio City',
     created_at: '2026-08-10T00:00:00Z',
     similarity: 0.68,
+    text_similarity: 0.68,
+    lexical_score: 1,
+    score: 0.94,
   },
 ];
 
@@ -43,7 +50,7 @@ test('filters results by holding office and receipt-date range', async ({
 }) => {
   const rpcCalls = [];
 
-  await page.route('**/embed/text', (route) =>
+  await page.route('**/embed/query', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -51,7 +58,7 @@ test('filters results by holding office and receipt-date range', async ({
     }),
   );
 
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
     const body = route.request().postDataJSON();
     rpcCalls.push(body);
 
@@ -115,14 +122,14 @@ test('filters results by holding office and receipt-date range', async ({
 });
 
 test('rejects a date range whose start is after its end', async ({ page }) => {
-  await page.route('**/embed/text', (route) =>
+  await page.route('**/embed/query', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ vector: EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) =>
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -148,7 +155,7 @@ test('edits the search text from the results page and keeps filters', async ({
   const rpcCalls = [];
   const textQueries = [];
 
-  await page.route('**/embed/text', (route) => {
+  await page.route('**/embed/query', (route) => {
     textQueries.push(route.request().postData() ?? '');
     return route.fulfill({
       status: 200,
@@ -156,7 +163,7 @@ test('edits the search text from the results page and keeps filters', async ({
       body: JSON.stringify({ vector: EMBEDDING }),
     });
   });
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
     rpcCalls.push(route.request().postDataJSON());
     return route.fulfill({
       status: 200,
@@ -205,7 +212,7 @@ test('keeps the photo when the query is edited from the results page', async ({
   const rpcCalls = [];
   let imageEmbeds = 0;
 
-  await page.route('**/embed/text', (route) =>
+  await page.route('**/embed/query', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -217,10 +224,10 @@ test('keeps the photo when the query is edited from the results page', async ({
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ vector: EMBEDDING }),
+      body: JSON.stringify({ vector: IMAGE_EMBEDDING }),
     });
   });
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
     rpcCalls.push(route.request().postDataJSON());
     return route.fulfill({
       status: 200,
@@ -269,7 +276,7 @@ test('keeps the photo when the query is edited from the results page', async ({
 test('adds a photo from the results page and keeps filters', async ({ page }) => {
   const rpcCalls = [];
 
-  await page.route('**/embed/text', (route) =>
+  await page.route('**/embed/query', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -280,10 +287,10 @@ test('adds a photo from the results page and keeps filters', async ({ page }) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ vector: EMBEDDING }),
+      body: JSON.stringify({ vector: IMAGE_EMBEDDING }),
     }),
   );
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
     rpcCalls.push(route.request().postDataJSON());
     return route.fulfill({
       status: 200,

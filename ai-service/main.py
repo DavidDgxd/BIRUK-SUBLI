@@ -14,11 +14,20 @@ from translation import translate_to_filipino
 
 app = FastAPI(title="Biruk Subli CLIP Service")
 
-# CLIP ViT-B-32 encodes text and images into the same 512-dim space. The
-# dimension is a hard contract with web/src/lib/aiService.js (EMBEDDING_DIM) and
-# with items.embedding in the database, so it is asserted before every response.
-EMBEDDING_DIM = 512
+# CLIP ViT-B-32 encodes photos into a 512-dim space. The dimension is a hard
+# contract with web/src/lib/aiService.js (IMAGE_EMBEDDING_DIM) and with
+# items.image_embedding in the database.
+CLIP_EMBEDDING_DIM = 512
+EMBEDDING_DIM = CLIP_EMBEDDING_DIM  # legacy name, kept for older callers
 MODEL_NAME = os.environ.get("CLIP_MODEL", "clip-ViT-B-32")
+
+# Text queries and item text use a multilingual sentence model, not CLIP. CLIP's
+# text tower is English-centric and its text-to-text ranking is weak on short
+# item titles; BGE-M3 gives English text real margins (and the glossary supplies
+# the English words for a Filipino query). This tower is loaded lazily so the
+# service does not pay for it until a text query arrives.
+TEXT_MODEL_NAME = os.environ.get("TEXT_MODEL", "BAAI/bge-m3")
+TEXT_EMBEDDING_DIM = 1024
 
 # BLIP writes a short natural-language description of a photo. It is loaded on
 # the first caption request rather than at startup so the search service does
@@ -56,9 +65,25 @@ print(f"Loading CLIP {MODEL_NAME} model...")
 model = SentenceTransformer(MODEL_NAME, device="cpu")
 print("Model loaded successfully.")
 
+_text_model = None
+_text_lock = Lock()
+
 _caption_processor = None
 _caption_model = None
 _caption_lock = Lock()
+
+
+def load_text_model():
+    """Loads the multilingual text tower once, on the first text request."""
+    global _text_model
+
+    with _text_lock:
+        if _text_model is None:
+            print(f"Loading text model {TEXT_MODEL_NAME}...")
+            _text_model = SentenceTransformer(TEXT_MODEL_NAME, device="cpu")
+            print("Text model loaded successfully.")
+
+    return _text_model
 
 
 def load_caption_model():
@@ -123,15 +148,29 @@ def generate_caption(image):
     return caption
 
 
-def encode(payload):
-    """Encodes text or a PIL image and returns a plain 512-number list."""
+def encode_clip(payload):
+    """Encodes a PIL image (or legacy CLIP text) as a 512-number list."""
     vector = model.encode(payload).tolist()
-    if len(vector) != EMBEDDING_DIM:
+    if len(vector) != CLIP_EMBEDDING_DIM:
         raise HTTPException(
             status_code=500,
             detail=(
                 f"{MODEL_NAME} produced a {len(vector)}-dim vector, "
-                f"expected {EMBEDDING_DIM}."
+                f"expected {CLIP_EMBEDDING_DIM}."
+            ),
+        )
+    return vector
+
+
+def encode_text(payload):
+    """Encodes text with the multilingual tower as a 1024-number list."""
+    vector = load_text_model().encode(payload).tolist()
+    if len(vector) != TEXT_EMBEDDING_DIM:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"{TEXT_MODEL_NAME} produced a {len(vector)}-dim vector, "
+                f"expected {TEXT_EMBEDDING_DIM}."
             ),
         )
     return vector
@@ -170,32 +209,30 @@ def translate_caption(caption: str):
 def health():
     return {
         "status": "ok",
-        "model": MODEL_NAME,
-        "dim": EMBEDDING_DIM,
+        "image_model": MODEL_NAME,
+        "image_dim": CLIP_EMBEDDING_DIM,
+        "text_model": TEXT_MODEL_NAME,
+        "text_dim": TEXT_EMBEDDING_DIM,
         "caption_model": CAPTION_MODEL,
     }
 
 
+def _expanded_query(text: str, expand: bool):
+    cleaned = clean_query_text(text)
+    return expand_query(cleaned) if expand else (cleaned, [])
+
+
 @app.post("/embed/text")
 def embed_text(text: str = Form(...), expand: bool = Form(True)):
-    """Encodes a typed search query into a 512-dim vector.
+    """Legacy CLIP text embedding (512-dim) used by the combined intake vector.
 
-    Accepts free-form natural language — English or Filipino, a phrase or a
-    sentence. A Filipino query appends English synonyms from the glossary
-    before it is embedded, so it lands closer to the English item text. The
-    original words are always kept and English queries are never rewritten:
-    this is expansion, not translation (see glossary.py).
-
-    `expand=false` embeds the words exactly as typed, which backs the results
-    page's "search my exact words" link.
-
-    A plain def, not async: FastAPI then runs it in its threadpool, so CLIP
-    does not block the event loop.
+    Public search uses /embed/query instead. This endpoint stays so the
+    lost/found and staff-intake flows can keep their combined 512-dim vector
+    while the public text path moves to the two-tower index.
     """
-    cleaned = clean_query_text(text)
-    expanded, additions = expand_query(cleaned) if expand else (cleaned, [])
+    expanded, additions = _expanded_query(text, expand)
     try:
-        vector = encode(expanded)
+        vector = encode_clip(expanded)
     except HTTPException:
         raise
     except Exception as error:
@@ -205,19 +242,69 @@ def embed_text(text: str = Form(...), expand: bool = Form(True)):
         ) from error
     return {
         "vector": vector,
-        "dim": EMBEDDING_DIM,
+        "dim": CLIP_EMBEDDING_DIM,
         "expanded_text": expanded,
         "additions": additions,
     }
 
 
+@app.post("/embed/query")
+def embed_query(text: str = Form(...), expand: bool = Form(True)):
+    """Encodes a typed search query into the multilingual 1024-dim text space.
+
+    A Filipino query appends English synonyms from the glossary before it is
+    embedded, so it lands closer to the English item text. The original words
+    are always kept and English queries are never rewritten: this is expansion,
+    not translation (see glossary.py).
+
+    `expand=false` embeds the words exactly as typed, which backs the results
+    page's "search my exact words" link.
+    """
+    expanded, additions = _expanded_query(text, expand)
+    try:
+        vector = encode_text(expanded)
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not embed that description: {error}",
+        ) from error
+    return {
+        "vector": vector,
+        "dim": TEXT_EMBEDDING_DIM,
+        "expanded_text": expanded,
+        "additions": additions,
+    }
+
+
+@app.post("/embed/item-text")
+def embed_item_text(text: str = Form(...)):
+    """Encodes public-safe item text (title, category, caption) for indexing.
+
+    No glossary expansion here: item text is written by staff or produced by
+    the caption model, and is embedded exactly as stored.
+    """
+    cleaned = clean_query_text(text)
+    try:
+        vector = encode_text(cleaned)
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not embed that description: {error}",
+        ) from error
+    return {"vector": vector, "dim": TEXT_EMBEDDING_DIM}
+
+
 @app.post("/embed/image")
 async def embed_image(file: UploadFile = File(...)):
-    """Encodes an uploaded photo query or intake photo into a 512-dim vector"""
+    """Encodes an uploaded photo query or intake photo into a 512-dim vector."""
     contents = await file.read()
     try:
         image = Image.open(io.BytesIO(contents)).convert("RGB")
-        vector = encode(image)
+        vector = encode_clip(image)
     except HTTPException:
         raise
     except Exception as error:
@@ -225,7 +312,7 @@ async def embed_image(file: UploadFile = File(...)):
             status_code=422,
             detail=f"Could not read that photo: {error}",
         ) from error
-    return {"vector": vector, "dim": EMBEDDING_DIM}
+    return {"vector": vector, "dim": CLIP_EMBEDDING_DIM}
 
 
 @app.post("/caption/image")

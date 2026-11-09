@@ -3,7 +3,7 @@ import { test, expect, openRoute } from './fixtures.js';
 
 // One-hot vectors so the faked RPC can tell which wording was embedded.
 const vector = (hot) =>
-  Array.from({ length: 512 }, (_, i) => (i === hot ? 1 : 0));
+  Array.from({ length: 1024 }, (_, i) => (i === hot ? 1 : 0));
 const EXPANDED_VECTOR = vector(0);
 const EXACT_VECTOR = vector(1);
 
@@ -20,8 +20,10 @@ const item = (id, title) => ({
   office_address: 'City Hall, Baguio City',
   created_at: '2026-09-10T00:00:00Z',
   similarity: 0.7,
+  text_similarity: 0.7,
+  image_similarity: null,
   lexical_score: 1,
-  score: 0.7,
+  score: 0.9,
 });
 
 const WALLET = item('11111111-1111-1111-1111-111111111111', 'Black Wallet');
@@ -33,7 +35,7 @@ const EXACT_LINE = 'Searched using your own words, without adding synonyms.';
 async function fakeServices(page) {
   const embedRequests = [];
 
-  await page.route('**/embed/text', (route) => {
+  await page.route('**/embed/query', (route) => {
     const body = route.request().postData() ?? '';
     embedRequests.push(body);
     const exact = /name="expand"\r?\n\r?\nfalse/.test(body);
@@ -44,7 +46,7 @@ async function fakeServices(page) {
       contentType: 'application/json',
       body: JSON.stringify({
         vector: exact ? EXACT_VECTOR : EXPANDED_VECTOR,
-        dim: 512,
+        dim: 1024,
         expanded_text: filipino
           ? exact
             ? 'itim na pitaka'
@@ -55,8 +57,8 @@ async function fakeServices(page) {
     });
   });
 
-  await page.route('**/rest/v1/rpc/match_items_hybrid', (route) => {
-    const { query_embedding: embedding } = route.request().postDataJSON();
+  await page.route('**/rest/v1/rpc/match_items_two_tower', (route) => {
+    const { query_text_embedding: embedding } = route.request().postDataJSON();
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
