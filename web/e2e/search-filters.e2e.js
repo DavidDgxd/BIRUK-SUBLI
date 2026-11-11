@@ -1,11 +1,7 @@
 import { test, expect, openRoute } from './fixtures.js';
 
-const EMBEDDING = Array.from({ length: 1024 }, (_, index) =>
-  index === 0 ? 1 : 0,
-);
-const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) =>
-  index === 0 ? 1 : 0,
-);
+const EMBEDDING = Array.from({ length: 1024 }, (_, index) => (index === 0 ? 1 : 0));
+const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) => (index === 0 ? 1 : 0));
 
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -185,13 +181,11 @@ test('edits the search text from the results page and keeps filters', async ({
   await expect(page).toHaveURL(/office=BCPIO/);
   await expect(page).toHaveURL(/from=2026-09-01/);
   await expect(page).toHaveURL(/to=2026-09-30/);
-  await expect
-    .poll(() => rpcCalls.at(-1))
-    .toMatchObject({
-      filter_office: 'BCPIO',
-      date_from: '2026-09-01',
-      date_to: '2026-09-30',
-    });
+  await expect.poll(() => rpcCalls.at(-1)).toMatchObject({
+    filter_office: 'BCPIO',
+    date_from: '2026-09-01',
+    date_to: '2026-09-30',
+  });
   const rpcCallsBeforeEdit = rpcCalls.length;
 
   await page
@@ -279,9 +273,7 @@ test('keeps the photo when the query is edited from the results page', async ({
   expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'BCPIO' });
 });
 
-test('adds a photo from the results page and keeps filters', async ({
-  page,
-}) => {
+test('adds a photo from the results page and keeps filters', async ({ page }) => {
   const rpcCalls = [];
 
   await page.route('**/embed/query', (route) =>

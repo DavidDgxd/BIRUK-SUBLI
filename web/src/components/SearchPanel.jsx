@@ -27,6 +27,7 @@ export default function SearchPanel({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef(null);
+  const attachButtonRef = useRef(null);
   const queryInputRef = useRef(null);
   const [query, setQuery] = useState(initialQuery);
   const [photo, setPhoto] = useState(null); // newly selected { file, url }
@@ -98,11 +99,7 @@ export default function SearchPanel({
   function removePhoto() {
     setPhoto(null);
     setPhotoRemoved(true);
-  }
-
-  function removeShownPhoto() {
-    if (photo) removePhoto();
-    else setPhotoRemoved(true);
+    attachButtonRef.current?.focus();
   }
 
   function handleSubmit(event) {
@@ -156,7 +153,9 @@ export default function SearchPanel({
         <label className="visually-hidden" htmlFor={inputId}>
           Search held items
         </label>
-        <div className={`search-inline__field${error ? ' is-invalid' : ''}`}>
+        <div
+          className={`search-inline__field${error ? ' is-invalid' : ''}`}
+        >
           <Icon
             name="search"
             className="search-inline__loupe"
@@ -210,6 +209,7 @@ export default function SearchPanel({
         <button
           type="button"
           className="btn search-inline__attach"
+          ref={attachButtonRef}
           onClick={() => fileInputRef.current?.click()}
         >
           <Icon name="photo_camera" size={16} strokeWidth={1.5} />
@@ -232,7 +232,7 @@ export default function SearchPanel({
             <button
               type="button"
               className="icon-btn"
-              onClick={removeShownPhoto}
+              onClick={removePhoto}
               aria-label="Remove photo"
             >
               <Icon name="close" />
@@ -321,6 +321,7 @@ export default function SearchPanel({
             <button
               type="button"
               className="search-console__attach"
+              ref={attachButtonRef}
               onClick={() => fileInputRef.current?.click()}
             >
               <Icon
@@ -365,7 +366,7 @@ export default function SearchPanel({
             <button
               type="button"
               className="icon-btn"
-              onClick={removeShownPhoto}
+              onClick={removePhoto}
               aria-label="Remove photo"
             >
               <Icon name="close" />
