@@ -28,6 +28,7 @@ import {
   IMAGE_STRONG_FLOOR,
   LEGACY_BEST_FLOOR,
   LEGACY_STRONG_FLOOR,
+  VECTOR_ONLY_BEST_FLOOR,
   LEXICAL_CONFIDENCE,
   LEXICAL_WEIGHT,
   MATCH_THRESHOLD,
@@ -422,6 +423,29 @@ describe('searchItems confidence tiers', () => {
     expect(result.best.map((item) => item.id)).toEqual(['legacy-best']);
   });
 
+  it('keeps the #93 floor for rows from the legacy fallback', async () => {
+    embedQuery.mockRejectedValue(new Error('text tower offline'));
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('legacy-borderline', 0.7, {
+            lexical_score: 0.6,
+            text_similarity: null,
+            image_similarity: null,
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('results');
+    expect(result.best.map((item) => item.id)).toEqual(['legacy-borderline']);
+  });
+
   it('falls back to the legacy RPC when the two-tower RPC is missing', async () => {
     rpc
       .mockReturnValueOnce(
@@ -527,7 +551,7 @@ describe('searchItems confidence tiers', () => {
   it('exports the tuned tier constants', () => {
     expect({
       BEST_FLOOR,
-          BEST_DELTA,
+      BEST_DELTA,
       POSSIBLE_FLOOR,
       POSSIBLE_DELTA,
       POSSIBLE_LIMIT,
@@ -535,6 +559,7 @@ describe('searchItems confidence tiers', () => {
       TEXT_STRONG_FLOOR,
       IMAGE_STRONG_FLOOR,
       LEGACY_BEST_FLOOR,
+      VECTOR_ONLY_BEST_FLOOR,
       LEGACY_STRONG_FLOOR,
       LEXICAL_CONFIDENCE,
       LEXICAL_WEIGHT,
@@ -547,7 +572,8 @@ describe('searchItems confidence tiers', () => {
       POSSIBLE_ONLY_LIMIT: 5,
       TEXT_STRONG_FLOOR: 0.75,
       IMAGE_STRONG_FLOOR: 0.82,
-      LEGACY_BEST_FLOOR: 0.64,
+      LEGACY_BEST_FLOOR: 0.68,
+      VECTOR_ONLY_BEST_FLOOR: 0.64,
       LEGACY_STRONG_FLOOR: 0.82,
       LEXICAL_CONFIDENCE: 0.5,
       LEXICAL_WEIGHT: 0.25,

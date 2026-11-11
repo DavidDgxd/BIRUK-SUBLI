@@ -41,6 +41,7 @@ export default function AdminSynonyms() {
   const headingRef = useRef(null);
   const termRef = useRef(null);
   const synonymsRef = useRef(null);
+  const confirmRef = useRef(null);
   const [rows, setRows] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [formError, setFormError] = useState('');
@@ -49,6 +50,7 @@ export default function AdminSynonyms() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [filter, setFilter] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -62,6 +64,10 @@ export default function AdminSynonyms() {
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (confirmingDelete) confirmRef.current?.focus();
+  }, [confirmingDelete]);
 
   useEffect(() => {
     if (status !== 'authenticated' || !isAdmin) return undefined;
@@ -178,6 +184,7 @@ export default function AdminSynonyms() {
     try {
       await deleteSynonym(row.term);
       setAnnouncement(`Deleted “${row.term}”.`);
+      setConfirmingDelete(null);
       if (editing === row.term) resetForm();
       setReloadKey((key) => key + 1);
     } catch (error) {
@@ -453,27 +460,61 @@ export default function AdminSynonyms() {
                             </td>
                             <td>
                               <div className="synonym-actions">
-                                <button
-                                  type="button"
-                                  className="btn btn--quiet"
-                                  onClick={() => startEdit(row)}
-                                  aria-label={`Edit ${row.term}`}
-                                >
-                                  <Icon name="description" />
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn--quiet"
-                                  onClick={() => handleDelete(row)}
-                                  disabled={deleting === row.term}
-                                  aria-label={`Delete ${row.term}`}
-                                >
-                                  <Icon name="close" />
-                                  {deleting === row.term
-                                    ? 'Deleting…'
-                                    : 'Delete'}
-                                </button>
+                                {confirmingDelete === row.term ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn--quiet"
+                                      ref={confirmRef}
+                                      onClick={() => handleDelete(row)}
+                                      disabled={deleting === row.term}
+                                      aria-label={`Confirm delete ${row.term}`}
+                                    >
+                                      <Icon name="close" />
+                                      {deleting === row.term
+                                        ? 'Deleting…'
+                                        : 'Confirm delete'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn--quiet"
+                                      onClick={() => {
+                                        setConfirmingDelete(null);
+                                        setAnnouncement(`Kept “${row.term}”.`);
+                                      }}
+                                      disabled={deleting === row.term}
+                                      aria-label={`Cancel delete ${row.term}`}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn--quiet"
+                                      onClick={() => startEdit(row)}
+                                      aria-label={`Edit ${row.term}`}
+                                    >
+                                      <Icon name="description" />
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn--quiet"
+                                      onClick={() => {
+                                        setConfirmingDelete(row.term);
+                                        setAnnouncement(
+                                          `Confirm deleting “${row.term}”.`,
+                                        );
+                                      }}
+                                      aria-label={`Delete ${row.term}`}
+                                    >
+                                      <Icon name="close" />
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>

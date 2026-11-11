@@ -17,7 +17,11 @@ export const POSSIBLE_LIMIT = 3;
 export const POSSIBLE_ONLY_LIMIT = 5;
 export const TEXT_STRONG_FLOOR = 0.75;
 export const IMAGE_STRONG_FLOOR = 0.82;
-export const LEGACY_BEST_FLOOR = 0.64;
+// The legacy hybrid fallback keeps #93's floor; this PR only retunes the
+// two-tower tiers. Rows with no lexical score at all (photo-only or the oldest
+// match_items fallback) keep the vector-only floor.
+export const LEGACY_BEST_FLOOR = 0.68;
+export const VECTOR_ONLY_BEST_FLOOR = 0.64;
 export const LEGACY_STRONG_FLOOR = 0.82;
 export const LEXICAL_CONFIDENCE = 0.5;
 
@@ -96,10 +100,9 @@ function scoreOf(item) {
  * its title/category/caption) or a strong score in the modality that was
  * actually queried.
  */
-function bestFloorOf(item) {
-  // A photo-only query and a stale RPC both report no lexical score. They have
-  // no lexical bonus, so keep the old vector floor for them.
-  return Number.isFinite(item.lexical_score) ? BEST_FLOOR : LEGACY_BEST_FLOOR;
+function bestFloorOf(item, usedLegacy) {
+  if (!Number.isFinite(item.lexical_score)) return VECTOR_ONLY_BEST_FLOOR;
+  return usedLegacy ? LEGACY_BEST_FLOOR : BEST_FLOOR;
 }
 
 function isConfident(item, score) {
@@ -244,12 +247,10 @@ async function fetchLegacy({
   // Final fallback for a deployment where neither hybrid RPC exists yet. The
   // original match_items function has been present since the first search
   // release; the UI degrades to its vector-only tiers.
-  if (import.meta.env.DEV) {
-    console.warn(
-      '[searchItems] hybrid RPC missing, falling back to match_items:',
-      error.message,
-    );
-  }
+  console.warn(
+    '[searchItems] hybrid RPC missing, falling back to match_items:',
+    error.message,
+  );
   const fallback = await supabase
     .rpc('match_items', {
       query_embedding: embedding,
@@ -273,7 +274,7 @@ async function fetchLegacy({
 
 /**
  * Embeds the text and/or photo with the AI service, then ranks held items with
- * the two-tower RPC. Text goes through the multilingual text tower and photos
+ * the two-tower RPC. Text goes through the small English text tower and photos
  * through CLIP; the RPC fuses them instead of averaging disjoint embeddings.
  * The color filter is added to the text so it is embedded with the rest of the
  * description. Office and receipt-date filters are passed to the RPC so they
@@ -315,6 +316,7 @@ export async function searchItems({
   let data;
   let expandedText = textResult?.expandedText ?? queryText;
   let additions = textResult?.additions ?? [];
+  let usedLegacy = false;
 
   if (textResult || imageResult) {
     try {
@@ -330,12 +332,11 @@ export async function searchItems({
       });
     } catch (error) {
       if (signal?.aborted) throw error;
-      if (import.meta.env.DEV) {
-        console.warn(
-          '[searchItems] two-tower search failed, falling back to the legacy RPC:',
-          error.message,
-        );
-      }
+      usedLegacy = true;
+      console.warn(
+        '[searchItems] two-tower search failed, falling back to the legacy RPC:',
+        error.message,
+      );
       const legacy = await fetchLegacy({
         queryText,
         expand,
@@ -355,12 +356,11 @@ export async function searchItems({
     if (!fallbackError) {
       throw new SearchError('ai-failed', 'No search input could be embedded.');
     }
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[searchItems] new text tower unavailable, falling back to the legacy RPC:',
-        fallbackError.message,
-      );
-    }
+    usedLegacy = true;
+    console.warn(
+      '[searchItems] new text tower unavailable, falling back to the legacy RPC:',
+      fallbackError.message,
+    );
     const legacy = await fetchLegacy({
       queryText,
       expand,
@@ -395,7 +395,7 @@ export async function searchItems({
   const best = ordered.filter((item) => {
     const score = scoreOf(item);
     return (
-      score >= bestFloorOf(item) &&
+      score >= bestFloorOf(item, usedLegacy) &&
       isConfident(item, score) &&
       score >= top - BEST_DELTA - EPSILON
     );

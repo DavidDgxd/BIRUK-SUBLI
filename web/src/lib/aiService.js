@@ -58,8 +58,8 @@ function resolveBaseUrl() {
 
 const BASE_URL = resolveBaseUrl().replace(/\/$/, '');
 
-// CLIP covers photos and the legacy combined intake vector. BGE-M3 covers the
-// public text index. The dimensions are hard contracts with the RPC.
+// CLIP covers photos and the legacy combined intake vector. BGE-small covers
+// the public text index. The dimensions are hard contracts with the RPC.
 export const IMAGE_EMBEDDING_DIM = 512;
 export const TEXT_EMBEDDING_DIM = 384;
 export const EMBEDDING_DIM = IMAGE_EMBEDDING_DIM; // legacy name

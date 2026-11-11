@@ -76,6 +76,7 @@ class SynonymTableTests(unittest.TestCase):
     def _reset_cache():
         glossary._db_synonyms = None
         glossary._db_cached_at = 0.0
+        glossary._db_loaded = False
 
     def test_a_database_row_overrides_the_builtin_entry(self):
         with mock.patch.object(
@@ -87,9 +88,17 @@ class SynonymTableTests(unittest.TestCase):
 
         self.assertEqual(additions, ["billfold"])
 
-    def test_a_missing_or_empty_table_keeps_the_builtin_entry(self):
+    def test_a_readable_table_is_authoritative_even_when_empty(self):
         with mock.patch.object(
             glossary, "_fetch_db_synonyms", return_value={}
+        ):
+            _, additions = expand_query("pitaka")
+
+        self.assertEqual(additions, [])
+
+    def test_an_unreachable_table_keeps_the_builtin_entries(self):
+        with mock.patch.object(
+            glossary, "_fetch_db_synonyms", return_value=None
         ):
             _, additions = expand_query("pitaka")
 

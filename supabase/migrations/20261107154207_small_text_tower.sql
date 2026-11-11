@@ -6,9 +6,10 @@
 -- 130 MB instead of 2.2 GB.
 --
 -- Existing 1024-dim text vectors cannot be cast to 384, so they are cleared
--- and rebuilt by ai-service/backfill_two_tower_embeddings.py. Text search is
--- empty for the moment between this migration and that backfill; the legacy
--- match_items_hybrid path still serves search during the window.
+-- and rebuilt by ai-service/backfill_two_tower_embeddings.py. Text search
+-- returns no rows until that backfill runs: the client only falls back when the
+-- RPC errors, not when it returns an empty result. Run the backfill
+-- immediately after applying this migration.
 
 update public.items set text_embedding = null;
 

@@ -23,8 +23,10 @@ Run the unit tests without torch/transformers: this module has no model.
 """
 
 import json
+import logging
 import os
 import re
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -149,14 +151,18 @@ _GLOSSARY = {
 # "sing", "sang" and "nag" cannot match.
 _NON_WORD = re.compile(r"[^\w]+", re.UNICODE)
 
-# The table is optional and refreshed at most once a minute. The built-in
-# glossary is always the floor, so a DB outage or an empty table never removes
-# coverage that already works.
+# The table is optional, but it is authoritative whenever it can be read:
+# disabling or deleting a row must stop the term from expanding, so the
+# built-in glossary is only a fallback for an unreachable or unconfigured
+# database. The table is refreshed at most once a minute.
 SYNONYMS_CACHE_SECONDS = 60
 SYNONYMS_TIMEOUT_SECONDS = 3
+_logger = logging.getLogger(__name__)
 _db_synonyms = None
 _db_cached_at = 0.0
+_db_loaded = False
 _db_warned = False
+_SYNONYMS_LOCK = threading.Lock()
 
 
 def _load_env_file() -> None:
@@ -171,26 +177,47 @@ def _load_env_file() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def _fetch_db_synonyms() -> dict:
-    """Reads enabled rows from public.search_synonyms, or returns {}."""
+def _warn_once(message: str) -> None:
     global _db_warned
+    if _db_warned:
+        return
+    _logger.warning(message)
+    _db_warned = True
 
+
+def _fetch_db_synonyms():
+    """Reads the live vocabulary, or returns None when it is unavailable.
+
+    The table is authoritative when it answers: disabled and deleted rows must
+    suppress a term instead of falling back to the built-in list. None means
+    the caller should keep the built-ins until the next refresh.
+    """
     if os.environ.get("SEARCH_SYNONYMS_DISABLED") == "1":
-        return {}
+        return None
 
     _load_env_file()
     base = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not base or not key:
-        return {}
-
-    url = (
-        f"{base}/rest/v1/search_synonyms"
-        "?select=term,synonyms&enabled=eq.true"
+    # An anon key is enough: search_synonyms_vocabulary() is a read-only
+    # SECURITY DEFINER function, so the service never needs the service role.
+    key = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get(
+        "SUPABASE_SERVICE_ROLE_KEY"
     )
+    if not base or not key:
+        _warn_once(
+            "Search synonyms are not configured; set SUPABASE_URL and "
+            "SUPABASE_ANON_KEY. Using the built-in glossary."
+        )
+        return None
+
     request = urllib.request.Request(
-        url,
-        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        f"{base}/rest/v1/rpc/search_synonyms_vocabulary",
+        data=b"{}",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
     )
     try:
         with urllib.request.urlopen(
@@ -198,13 +225,11 @@ def _fetch_db_synonyms() -> dict:
         ) as response:
             rows = json.load(response)
     except Exception as error:  # noqa: BLE001 - any outage uses the built-in list
-        if not _db_warned:
-            print(
-                "Synonym table unavailable, using the built-in glossary: "
-                f"{error!r}"
-            )
-            _db_warned = True
-        return {}
+        _warn_once(
+            "Synonym table unavailable, using the built-in glossary: "
+            f"{error!r}"
+        )
+        return None
 
     result = {}
     for row in rows:
@@ -213,9 +238,11 @@ def _fetch_db_synonyms() -> dict:
         if not term or not isinstance(synonyms, list):
             continue
         cleaned = tuple(
-            str(synonym).strip()
-            for synonym in synonyms
-            if str(synonym).strip()
+            dict.fromkeys(
+                str(synonym).strip().casefold()
+                for synonym in synonyms
+                if str(synonym).strip()
+            )
         )
         if cleaned:
             result[term] = cleaned
@@ -223,16 +250,27 @@ def _fetch_db_synonyms() -> dict:
 
 
 def _effective_glossary() -> dict:
-    global _db_synonyms, _db_cached_at
+    global _db_synonyms, _db_cached_at, _db_loaded
 
     now = time.monotonic()
-    if _db_synonyms is None or now - _db_cached_at > SYNONYMS_CACHE_SECONDS:
-        _db_synonyms = _fetch_db_synonyms()
-        _db_cached_at = now
+    if not _db_loaded or now - _db_cached_at > SYNONYMS_CACHE_SECONDS:
+        with _SYNONYMS_LOCK:
+            now = time.monotonic()
+            if not _db_loaded or now - _db_cached_at > SYNONYMS_CACHE_SECONDS:
+                _db_synonyms = _fetch_db_synonyms()
+                _db_loaded = True
+                # Cache failures too, so an outage adds at most one timeout per
+                # minute instead of one per search.
+                _db_cached_at = now
 
-    merged = dict(_GLOSSARY)
-    merged.update(_db_synonyms)
-    return merged
+    if _db_synonyms is not None:
+        return dict(_db_synonyms)
+    return dict(_GLOSSARY)
+
+
+def warm_synonyms() -> None:
+    """Loads the vocabulary once at startup so search never waits for it."""
+    _effective_glossary()
 
 
 def _tokens(text):

@@ -110,6 +110,18 @@ test('adds, edits, filters and deletes a search term', async ({ page }) => {
   await page.getByLabel('Filter terms').fill('');
   await page.getByRole('button', { name: 'Delete singsing' }).click();
   await expect(
+    page.getByRole('button', { name: 'Confirm delete singsing' }),
+  ).toBeFocused();
+  await page.getByRole('button', { name: 'Cancel delete singsing' }).click();
+  await expect(
+    page.getByRole('row').filter({ hasText: 'singsing' }),
+  ).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Delete singsing' }).click();
+  await page
+    .getByRole('button', { name: 'Confirm delete singsing' })
+    .click();
+  await expect(
     page.getByRole('row').filter({ hasText: 'singsing' }),
   ).toHaveCount(0);
 });

@@ -22,7 +22,7 @@ Usage:
         --image bottle.jpg --office CITY_HALL_INFO
 
 How the embeddings are chosen:
-    text_embedding  -> BGE-M3 over "title. category" (public-safe, two-tower index)
+    text_embedding  -> BGE-small over "title. category" (public-safe, two-tower index)
     --image given   -> the photo's CLIP image embedding for image_embedding
     otherwise       -> the CLIP text embedding for the legacy combined vector
 """

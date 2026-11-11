@@ -57,7 +57,7 @@ insert into public.search_synonyms (term, synonyms) values
     ('dilaw', array['yellow']),
     ('dyaket', array['jacket']),
     ('eskwela', array['school']),
-    ('eskwelaham', array['school']),
+    ('eskwelahan', array['school']),
     ('ginto', array['gold', 'golden']),
     ('guwantes', array['gloves']),
     ('hikaw', array['earring', 'earrings']),

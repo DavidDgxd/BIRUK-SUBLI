@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sentence_transformers import SentenceTransformer
@@ -9,10 +11,20 @@ import os
 import torch
 
 from caption_cleanup import clean_caption
-from glossary import expand_query
+from glossary import expand_query, warm_synonyms
 from translation import translate_to_filipino
 
-app = FastAPI(title="Biruk Subli CLIP Service")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Load the editable synonym vocabulary before serving so the first search
+    # does not pay for the lookup. A failure keeps the built-in glossary and is
+    # retried after the cache window.
+    warm_synonyms()
+    yield
+
+
+app = FastAPI(title="Biruk Subli CLIP Service", lifespan=lifespan)
 
 # CLIP ViT-B-32 encodes photos into a 512-dim space. The dimension is a hard
 # contract with web/src/lib/aiService.js (IMAGE_EMBEDDING_DIM) and with
