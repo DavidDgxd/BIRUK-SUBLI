@@ -31,7 +31,7 @@ import { uploadItemImage } from './storage.js';
  * 'held' status and cash retention rules.
  *
  * Embedding: public-safe text is embedded twice — once with CLIP for the legacy
- * combined vector and once with the multilingual text tower for the two-tower
+ * combined vector and once with the small English text tower for the two-tower
  * index — and the photo is embedded with CLIP as a best-effort extra. If the
  * photo half fails, the item still matches on text alone — the counter must
  * never be blocked from taking custody. If the text half fails the submission

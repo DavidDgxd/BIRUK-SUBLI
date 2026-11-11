@@ -3,7 +3,7 @@ import { test, expect, openRoute } from './fixtures.js';
 
 // One-hot vectors so the faked RPC can tell which wording was embedded.
 const vector = (hot) =>
-  Array.from({ length: 1024 }, (_, i) => (i === hot ? 1 : 0));
+  Array.from({ length: 384 }, (_, i) => (i === hot ? 1 : 0));
 const EXPANDED_VECTOR = vector(0);
 const EXACT_VECTOR = vector(1);
 
@@ -46,7 +46,7 @@ async function fakeServices(page) {
       contentType: 'application/json',
       body: JSON.stringify({
         vector: exact ? EXACT_VECTOR : EXPANDED_VECTOR,
-        dim: 1024,
+        dim: 384,
         expanded_text: filipino
           ? exact
             ? 'itim na pitaka'

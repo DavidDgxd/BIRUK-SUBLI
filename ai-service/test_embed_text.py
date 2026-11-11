@@ -1,7 +1,10 @@
+import os
 import sys
 import types
 import unittest
 from unittest import mock
+
+os.environ.setdefault("SEARCH_SYNONYMS_DISABLED", "1")
 
 # main.py loads CLIP while importing. Stub the heavy model modules (as
 # test_caption_truncation.py does) so no model is loaded.

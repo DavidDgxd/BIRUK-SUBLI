@@ -14,7 +14,7 @@ const STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 const IMAGE_EMBEDDING = Array.from({ length: 512 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
-const TEXT_EMBEDDING = Array.from({ length: 1024 }, (_, index) =>
+const TEXT_EMBEDDING = Array.from({ length: 384 }, (_, index) =>
   index === 0 ? 1 : 0,
 );
 
@@ -162,6 +162,7 @@ export const ROUTES = [
   { path: '/staff/login', role: null },
   { path: '/staff/intake', role: 'office' },
   { path: '/admin/offices', role: 'admin' },
+  { path: '/admin/synonyms', role: 'admin' },
 ];
 
 /** Opens a route and waits until the app has rendered and settled. */

@@ -58,10 +58,10 @@ function resolveBaseUrl() {
 
 const BASE_URL = resolveBaseUrl().replace(/\/$/, '');
 
-// CLIP covers photos and the legacy combined intake vector. BGE-M3 covers the
-// public text index. The dimensions are hard contracts with the RPC.
+// CLIP covers photos and the legacy combined intake vector. BGE-small covers
+// the public text index. The dimensions are hard contracts with the RPC.
 export const IMAGE_EMBEDDING_DIM = 512;
-export const TEXT_EMBEDDING_DIM = 1024;
+export const TEXT_EMBEDDING_DIM = 384;
 export const EMBEDDING_DIM = IMAGE_EMBEDDING_DIM; // legacy name
 
 /**
@@ -202,7 +202,7 @@ export async function embedText(text, signal, { expand = true } = {}) {
 }
 
 /**
- * Embeds a typed public search query into the multilingual 1024-dim text
+ * Embeds a typed public search query into the small English 384-dim text
  * space. This is the text half of the two-tower search; the service appends
  * English synonyms for known Filipino words and reports what it added.
  */

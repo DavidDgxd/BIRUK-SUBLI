@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Rebuild the two-tower public embeddings for held items.
 
-Text is embedded with BGE-M3 from the public-safe fields only
-(title + category + photo caption). The photo is embedded with CLIP's image
-tower. The staff-only ``description`` is deliberately not used.
+Text is embedded with the small English retrieval tower from the public-safe
+fields only (title + category + photo caption). The photo is embedded with
+CLIP's image tower. The staff-only ``description`` is deliberately not used.
 
 Default mode is a dry run. Writing requires ``--apply``; the old vectors are
 printed first so a bad run is visible. Never prints credentials.
@@ -34,7 +34,7 @@ SELECT = (
     "ref_code,title,category,ai_caption,image_url,"
     "embedding,text_embedding,image_embedding"
 )
-TEXT_MODEL = os.environ.get("TEXT_MODEL", "BAAI/bge-m3")
+TEXT_MODEL = os.environ.get("TEXT_MODEL", "BAAI/bge-small-en-v1.5")
 IMAGE_MODEL = os.environ.get("CLIP_MODEL", "clip-ViT-B-32")
 TIMEOUT = 120
 

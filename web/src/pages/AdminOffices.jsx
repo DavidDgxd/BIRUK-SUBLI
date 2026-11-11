@@ -138,6 +138,10 @@ export default function AdminOffices() {
                     <Icon name="add" />
                     Add an office
                   </button>
+                  <Link className="btn" to="/admin/synonyms">
+                    <Icon name="search" />
+                    Search synonyms
+                  </Link>
                 </div>
 
                 {loadError ? (

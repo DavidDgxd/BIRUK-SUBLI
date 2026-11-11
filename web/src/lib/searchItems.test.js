@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpc, embedQuery, embedImage } = vi.hoisted(() => ({
+const { rpc, embedQuery, embedText, embedImage } = vi.hoisted(() => ({
   rpc: vi.fn(),
   embedQuery: vi.fn(),
+  embedText: vi.fn(),
   embedImage: vi.fn(),
 }));
 
@@ -10,6 +11,7 @@ vi.mock('./supabase.js', () => ({ supabase: { rpc } }));
 
 vi.mock('./aiService.js', () => ({
   embedQuery,
+  embedText,
   embedImage,
   SearchError: class SearchError extends Error {
     constructor(code, message) {
@@ -24,6 +26,9 @@ import {
   BEST_DELTA,
   BEST_FLOOR,
   IMAGE_STRONG_FLOOR,
+  LEGACY_BEST_FLOOR,
+  LEGACY_STRONG_FLOOR,
+  VECTOR_ONLY_BEST_FLOOR,
   LEXICAL_CONFIDENCE,
   LEXICAL_WEIGHT,
   MATCH_THRESHOLD,
@@ -31,7 +36,6 @@ import {
   POSSIBLE_FLOOR,
   POSSIBLE_LIMIT,
   POSSIBLE_ONLY_LIMIT,
-  PHOTO_BEST_FLOOR,
   TEXT_STRONG_FLOOR,
   searchItems,
 } from './searchItems.js';
@@ -55,8 +59,14 @@ describe('searchItems confidence tiers', () => {
   beforeEach(() => {
     rpc.mockReset();
     embedQuery.mockReset();
+    embedText.mockReset();
     embedImage.mockReset();
     embedQuery.mockResolvedValue({
+      embedding: [1, 0, 0],
+      expandedText: 'wallet',
+      additions: [],
+    });
+    embedText.mockResolvedValue({
       embedding: [1, 0, 0],
       expandedText: 'wallet',
       additions: [],
@@ -372,20 +382,175 @@ describe('searchItems confidence tiers', () => {
     expect(result.best.map((item) => item.id)).toEqual(['kept']);
   });
 
-  it('surfaces an RPC failure as a SearchError', async () => {
+  it('surfaces an RPC failure as a SearchError when the legacy path also fails', async () => {
     rpc.mockReturnValue(
       resolvedRpc({ error: { code: 'XX000', message: 'database offline' } }),
     );
+    embedText.mockRejectedValue(new Error('legacy text offline'));
 
     await expect(
       searchItems({ text: 'wallet', signal: new AbortController().signal }),
     ).rejects.toMatchObject({ name: 'SearchError', code: 'db' });
   });
 
+  it('falls back to the legacy RPC when the text tower is unavailable', async () => {
+    embedQuery.mockRejectedValue(new Error('text tower offline'));
+    embedText.mockResolvedValue({
+      embedding: [1, 0, 0],
+      expandedText: 'wallet',
+      additions: [],
+    });
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('legacy-best', 0.9, {
+            score: 0.9,
+            lexical_score: 1,
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'match_items_hybrid',
+      expect.objectContaining({ query_embedding: [1, 0, 0] }),
+    );
+    expect(result.best.map((item) => item.id)).toEqual(['legacy-best']);
+  });
+
+  it('keeps the #93 floor for rows from the legacy fallback', async () => {
+    embedQuery.mockRejectedValue(new Error('text tower offline'));
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('legacy-borderline', 0.7, {
+            lexical_score: 0.6,
+            text_similarity: null,
+            image_similarity: null,
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.state).toBe('results');
+    expect(result.best.map((item) => item.id)).toEqual(['legacy-borderline']);
+  });
+
+  it('falls back to the legacy RPC when the two-tower RPC is missing', async () => {
+    rpc
+      .mockReturnValueOnce(
+        resolvedRpc({
+          error: {
+            code: 'PGRST202',
+            message: 'Could not find the function match_items_two_tower',
+          },
+        }),
+      )
+      .mockReturnValueOnce(
+        resolvedRpc({
+          data: [
+            row('legacy-best', 0.9, {
+              score: 0.9,
+              lexical_score: 1,
+            }),
+          ],
+        }),
+      );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(rpc).toHaveBeenNthCalledWith(
+      2,
+      'match_items_hybrid',
+      expect.objectContaining({ query_embedding: [1, 0, 0] }),
+    );
+    expect(result.best.map((item) => item.id)).toEqual(['legacy-best']);
+  });
+
+  it('falls back to the original match_items RPC when both hybrids are missing', async () => {
+    rpc
+      .mockReturnValueOnce(
+        resolvedRpc({
+          error: {
+            code: 'PGRST202',
+            message: 'Could not find the function match_items_two_tower',
+          },
+        }),
+      )
+      .mockReturnValueOnce(
+        resolvedRpc({
+          error: {
+            code: 'PGRST202',
+            message: 'Could not find the function match_items_hybrid',
+          },
+        }),
+      )
+      .mockReturnValueOnce(
+        resolvedRpc({
+          data: [{ id: 'legacy', status: 'held', similarity: 0.7 }],
+        }),
+      );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(rpc).toHaveBeenNthCalledWith(
+      3,
+      'match_items',
+      expect.objectContaining({ query_embedding: [1, 0, 0] }),
+    );
+    expect(result.best.map((item) => item.id)).toEqual(['legacy']);
+  });
+
+  it('keeps photo search alive when the text tower fails', async () => {
+    embedQuery.mockRejectedValue(new Error('text tower offline'));
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('photo-match', 0.95, {
+            score: 0.95,
+            lexical_score: 0,
+            text_similarity: null,
+            image_similarity: 0.95,
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      photo: new Blob(['photo'], { type: 'image/png' }),
+      signal: new AbortController().signal,
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'match_items_two_tower',
+      expect.objectContaining({
+        query_text_embedding: null,
+        query_image_embedding: [0, 1, 0],
+      }),
+    );
+    expect(result.best.map((item) => item.id)).toEqual(['photo-match']);
+  });
+
   it('exports the tuned tier constants', () => {
     expect({
       BEST_FLOOR,
-      PHOTO_BEST_FLOOR,
       BEST_DELTA,
       POSSIBLE_FLOOR,
       POSSIBLE_DELTA,
@@ -393,18 +558,23 @@ describe('searchItems confidence tiers', () => {
       POSSIBLE_ONLY_LIMIT,
       TEXT_STRONG_FLOOR,
       IMAGE_STRONG_FLOOR,
+      LEGACY_BEST_FLOOR,
+      VECTOR_ONLY_BEST_FLOOR,
+      LEGACY_STRONG_FLOOR,
       LEXICAL_CONFIDENCE,
       LEXICAL_WEIGHT,
     }).toEqual({
       BEST_FLOOR: 0.72,
-      PHOTO_BEST_FLOOR: 0.64,
       BEST_DELTA: 0.05,
       POSSIBLE_FLOOR: 0.55,
       POSSIBLE_DELTA: 0.07,
       POSSIBLE_LIMIT: 3,
       POSSIBLE_ONLY_LIMIT: 5,
-      TEXT_STRONG_FLOOR: 0.68,
+      TEXT_STRONG_FLOOR: 0.75,
       IMAGE_STRONG_FLOOR: 0.82,
+      LEGACY_BEST_FLOOR: 0.68,
+      VECTOR_ONLY_BEST_FLOOR: 0.64,
+      LEGACY_STRONG_FLOOR: 0.82,
       LEXICAL_CONFIDENCE: 0.5,
       LEXICAL_WEIGHT: 0.25,
     });
