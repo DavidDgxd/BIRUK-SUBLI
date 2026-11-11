@@ -27,6 +27,7 @@ export default function SearchPanel({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef(null);
+  const attachButtonRef = useRef(null);
   const queryInputRef = useRef(null);
   const [query, setQuery] = useState(initialQuery);
   const [photo, setPhoto] = useState(null); // newly selected { file, url }
@@ -63,6 +64,20 @@ export default function SearchPanel({
     return () => URL.revokeObjectURL(photo.url);
   }, [photo]);
 
+  // A photo carried over from the dashboard lives in location.state, not in
+  // this component, so give it a preview URL until it is removed or replaced.
+  const [initialPhotoUrl, setInitialPhotoUrl] = useState('');
+  useEffect(() => {
+    if (!initialPhoto || photo || photoRemoved) {
+      setInitialPhotoUrl('');
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(initialPhoto);
+    setInitialPhotoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [initialPhoto, photo, photoRemoved]);
+
   function handleFileChange(event) {
     const file = event.target.files?.[0];
     event.target.value = ''; // allow re-selecting the same file later
@@ -84,6 +99,7 @@ export default function SearchPanel({
   function removePhoto() {
     setPhoto(null);
     setPhotoRemoved(true);
+    attachButtonRef.current?.focus();
   }
 
   function handleSubmit(event) {
@@ -117,6 +133,13 @@ export default function SearchPanel({
 
   const describedBy = error ? `${hintId} ${errorId}` : hintId;
   const hasPhoto = Boolean(photo || (!photoRemoved && initialPhoto));
+  // The chip shows the photo picked here, or the one carried in from the
+  // dashboard until it is removed.
+  const shownPhoto =
+    photo ??
+    (!photoRemoved && initialPhoto && initialPhotoUrl
+      ? { file: initialPhoto, url: initialPhotoUrl }
+      : null);
 
   if (compact) {
     return (
@@ -186,23 +209,24 @@ export default function SearchPanel({
         <button
           type="button"
           className="btn search-inline__attach"
+          ref={attachButtonRef}
           onClick={() => fileInputRef.current?.click()}
         >
           <Icon name="photo_camera" size={16} strokeWidth={1.5} />
           <span>{hasPhoto ? 'Change photo' : 'Add photo'}</span>
         </button>
-        {photo && (
+        {shownPhoto && (
           <div className="photo-chip search-inline__photo">
             <img
               className="photo-chip__img"
-              src={photo.url}
+              src={shownPhoto.url}
               alt="Preview of the photo you selected"
               width="48"
               height="48"
               decoding="async"
             />
             <p className="photo-chip__name">
-              {photo.file.name}
+              {shownPhoto.file.name}
               <small>Used to match similar items</small>
             </p>
             <button
@@ -297,6 +321,7 @@ export default function SearchPanel({
             <button
               type="button"
               className="search-console__attach"
+              ref={attachButtonRef}
               onClick={() => fileInputRef.current?.click()}
             >
               <Icon
@@ -324,18 +349,18 @@ export default function SearchPanel({
           )}
         </div>
 
-        {photo && (
+        {shownPhoto && (
           <div className="photo-chip">
             <img
               className="photo-chip__img"
-              src={photo.url}
+              src={shownPhoto.url}
               alt="Preview of the photo you selected"
               width="48"
               height="48"
               decoding="async"
             />
             <p className="photo-chip__name">
-              {photo.file.name}
+              {shownPhoto.file.name}
               <small>Used to match similar items</small>
             </p>
             <button
