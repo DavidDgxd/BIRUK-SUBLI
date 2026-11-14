@@ -1252,6 +1252,22 @@ input[type='search']::-webkit-search-decoration {
   font-weight: var(--weight-strong);
 }
 
+.recent-items { margin-block-start: var(--space-5); }
+
+.recent-items__head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--space-3); }
+
+.recent-items__list { display: grid; gap: var(--space-3); margin-block-start: var(--space-4); list-style: none; }
+
+.recent-items__list .result { padding: var(--space-3); border: var(--border); border-radius: var(--radius-panel); }
+
+@media (min-width: 40rem) {
+  .recent-items__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-block-start: var(--space-5); padding-block-start: var(--space-4); border-block-start: var(--border); }
+
+.pager__status { color: var(--ink-muted); }
+
 .results__count {
   margin-block: var(--space-4) var(--space-2);
   color: var(--ink-muted);

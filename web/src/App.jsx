@@ -24,6 +24,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/search" element={<SearchResults />} />
+      <Route path="/browse" element={<SearchResults browse />} />
       <Route path="/items/:id" element={<ItemDetails />} />
       <Route path="/report/lost" element={<ReportLost />} />
       <Route path="/report/found" element={<ReportFound />} />
