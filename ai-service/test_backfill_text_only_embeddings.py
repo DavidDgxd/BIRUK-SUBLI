@@ -125,7 +125,8 @@ class MainTests(unittest.TestCase):
         self.assertEqual([call[0] for call in order.mock_calls],
                          ["write_backup", "patch_item"])
     def test_timeout_and_json_errors_fail_the_row_without_crashing(self):
-        for error in (TimeoutError("slow"), json.JSONDecodeError("bad", "{", 0)):
+        for error in (TimeoutError("slow"), json.JSONDecodeError("bad", "{", 0),
+                      RuntimeError("photo unavailable")):
             with self.subTest(error=type(error).__name__):
                 values = patched(self, build_new_vector=mock.Mock(side_effect=error))
                 code, _, err = run(["--apply", "--ref-code", "BS-0139", "--yes"])
@@ -142,6 +143,5 @@ class MainTests(unittest.TestCase):
         code, _, err = run(["--apply", "--ref-code", "BS-0139", "--yes"])
         self.assertEqual(code, 1)
         self.assertIn("write affected 0 rows", err)
-
 if __name__ == "__main__":
     unittest.main()

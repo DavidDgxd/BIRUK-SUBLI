@@ -219,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             new_vector, _, had_photo = build_new_vector(ai_url, row, args.allow_text_only)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError,
-                ValueError, KeyError) as error:
+                RuntimeError, ValueError, KeyError) as error:
             failures += 1
             print(f"{row['ref_code']:10} FAILED: {error}", file=sys.stderr)
             continue
