@@ -90,6 +90,14 @@ async function mockBackends(page, role) {
     if (url.pathname === '/rest/v1/rpc/list_office_logins') {
       return json(route, [{ office_id: OFFICE.id, email: USERS.office.email }]);
     }
+    if (url.pathname === '/rest/v1/rpc/list_public_items') {
+      return json(route, [{
+        id: '11111111-1111-1111-1111-111111111111', title: 'Blue umbrella',
+        category: 'Umbrella', status: 'held', image_url: null,
+        date_received: '2026-11-01', holding_office_id: OFFICE.id,
+        holding_office_name: OFFICE.name,
+      }]);
+    }
     if (url.pathname === '/rest/v1/rpc/get_usage_report') {
       return json(route, [
         {
@@ -156,6 +164,7 @@ export const ROUTES = [
   { path: '/', role: null },
   { path: '/search', role: null },
   { path: '/search?q=umbrella', role: null },
+  { path: '/browse', role: null },
   { path: '/report/lost', role: null },
   { path: '/report/found', role: null },
   { path: '/offices', role: null },

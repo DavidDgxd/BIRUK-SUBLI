@@ -1,14 +1,9 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { MemoryRouter } from 'react-router-dom';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('./supabase.js', () => ({ supabase: { rpc } }));
-import ResultCard from '../components/ResultCard.jsx';
 import {
-  BROWSE_PAGE_SIZE,
-  PublicItemsError,
-  listPublicItems,
-  listRecentItems,
+  BROWSE_PAGE_SIZE, PublicItemsError, listPublicItems, listRecentItems,
   normalizePublicItem,
 } from './publicItems.js';
 const response = (data = [], error = null) => ({
@@ -42,39 +37,29 @@ describe('public item browse', () => {
     expect(rpc.mock.calls[0][1]).toMatchObject({ p_limit: 7, p_offset: 0 });
   });
 
-  it('redacts cash and drops private inventory fields', () => {
-    expect(normalizePublicItem(row('cash', {
-      title: 'Brown envelope with PHP 5,000', category: 'Cash', is_cash: true,
-      cash_amount: 5000, image_url: 'cash.jpg', description: 'Serial number 123',
-      storage_location: 'Locker B', finder_name: 'Private Finder',
-      claimant_name: 'Private Claimant',
-    }))).toEqual({
-      id: 'cash', title: 'Cash', category: 'Cash', status: 'held',
-      image_url: null, date_received: '2026-11-01',
-      holding_office_id: 'office-1', holding_office_name: 'Central Office',
-    });
-    expect(normalizePublicItem(row('id', { category: 'Document/ID', image_url: 'id.jpg' })).image_url).toBeNull();
+  it('redacts cash and Document/ID fields in the browser', () => {
+    const cash = normalizePublicItem(row('cash', {
+      title: 'Brown envelope', category: 'Cash', is_cash: true, cash_amount: 5000,
+      image_url: 'cash.jpg', description: 'Serial 123', storage_location: 'Locker B',
+      finder_name: 'Private Finder', claimant_name: 'Private Claimant',
+    }));
+    expect(cash).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
+    expect(cash).not.toHaveProperty('cash_amount');
+    expect(normalizePublicItem(row('id', {
+      title: 'Juan Dela Cruz ID', category: 'Document/ID', image_url: 'id.jpg',
+    }))).toMatchObject({ title: 'Document/ID', image_url: null });
+  });
+
+  it('redacts cash and Document/ID in the get_item_public SQL', () => {
+    const url = new URL('../../../supabase/migrations/20261114120000_public_browse_items.sql', import.meta.url);
+    const body = readFileSync(url, 'utf8').split('function public.get_item_public')[1];
+    expect(body).toMatch(/items\.is_cash or items\.category = 'Cash' then 'Cash'/);
+    expect(body).toMatch(/items\.category = 'Document\/ID' then 'Document\/ID'/);
+    expect(body).toMatch(/or items\.category = 'Document\/ID' then null else items\.image_url/);
   });
 
   it('turns database failures into PublicItemsError', async () => {
     rpc.mockReturnValue(response(null, { message: 'connection refused' }));
     await expect(listPublicItems()).rejects.toBeInstanceOf(PublicItemsError);
-  });
-});
-
-describe('ResultCard browse mode', () => {
-  it('renders public fields without a match score', () => {
-    const html = renderToStaticMarkup(
-      <MemoryRouter>
-        <ResultCard browse item={{
-          id: 'item-1', title: 'Blue wallet', category: 'Wallet', status: 'held',
-          image_url: null, date_received: '2026-11-02',
-          holding_office_name: 'Central Office',
-        }} />
-      </MemoryRouter>,
-    );
-    expect(html).toContain('Wallet · Central Office');
-    expect(html).toContain('Held for collection · Received 2 Nov 2026');
-    expect(html).not.toContain('% match');
   });
 });

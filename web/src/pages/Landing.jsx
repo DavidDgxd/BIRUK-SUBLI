@@ -10,8 +10,6 @@ import { listRecentItems } from '../lib/publicItems.js';
 
 export default function Landing() {
   const [recent, setRecent] = useState(null);
-  const [failed, setFailed] = useState(false);
-
   useEffect(() => {
     const controller = new AbortController();
     listRecentItems({ signal: controller.signal })
@@ -19,8 +17,7 @@ export default function Landing() {
         if (!controller.signal.aborted) setRecent(items);
       })
       .catch((error) => {
-        if (controller.signal.aborted || error.name === 'AbortError') return;
-        setFailed(true);
+        if (!controller.signal.aborted && error.name !== 'AbortError') setRecent(false);
       });
     return () => controller.abort();
   }, []);
@@ -55,23 +52,19 @@ export default function Landing() {
               </Link>
             </div>
 
-            {!recent && !failed && (
-              <p className="loading" role="status">
-                Loading recent items&hellip;
-              </p>
+            {recent === null && (
+              <p className="loading" role="status">Loading recent items&hellip;</p>
             )}
-            {failed && (
+            {recent === false && (
               <p className="state__text" role="alert">
                 We could not load recent items right now.
               </p>
             )}
             {recent?.length === 0 && (
-              <p className="state__text">
-                No items are being held right now.
-              </p>
+              <p className="state__text">No items are being held right now.</p>
             )}
             {recent?.length > 0 && (
-              <ul className="recent-items__list">
+              <ul className="results__list">
                 {recent.map((item) => (
                   <li key={item.id}>
                     <ResultCard item={item} browse />

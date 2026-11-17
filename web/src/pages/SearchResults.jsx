@@ -134,17 +134,9 @@ export default function SearchResults({ browse = false }) {
     if (!browse) return undefined;
     const controller = new AbortController();
 
-    listPublicItems({
-      page,
-      office,
-      dateFrom,
-      dateTo,
-      signal: controller.signal,
-    })
+    listPublicItems({ page, office, dateFrom, dateTo, signal: controller.signal })
       .then((result) => {
-        if (!controller.signal.aborted) {
-          setOutcome({ key: browseKey, ...result });
-        }
+        if (!controller.signal.aborted) setOutcome({ key: browseKey, ...result });
       })
       .catch((error) => {
         if (controller.signal.aborted || error.name === 'AbortError') return;
@@ -245,6 +237,9 @@ export default function SearchResults({ browse = false }) {
         : state === 'none'
           ? 'No close match found.'
           : '';
+  const browseAnnouncement = browse && !browseLoading && !browseError
+    ? `${browseItems.length} held ${browseItems.length === 1 ? 'item' : 'items'} on page ${page}.`
+    : '';
 
   // Also on a wording switch: the link that was clicked unmounts, and focus
   // would otherwise fall to <body>.
@@ -352,17 +347,13 @@ export default function SearchResults({ browse = false }) {
           )}
 
           {browseLoading && (
-            <p className="loading" role="status">
-              Loading held items&hellip;
-            </p>
+            <p className="loading" role="status">Loading held items&hellip;</p>
           )}
 
           {browseError && (
             <section className="state state--error" role="alert">
               <h2 className="state__title">Something went wrong</h2>
-              <p className="state__text">
-                We could not load held items right now.
-              </p>
+              <p className="state__text">We could not load held items right now.</p>
             </section>
           )}
 
@@ -371,34 +362,30 @@ export default function SearchResults({ browse = false }) {
               <h2 className="state__title">
                 {hasFilters ? 'No held items in that range' : 'No held items'}
               </h2>
-              <p className="state__text">
-                {hasFilters
-                  ? 'Try a wider date range or another holding office.'
-                  : 'Nothing is being held right now.'}
-              </p>
+              <p className="state__text">{hasFilters
+                ? 'Try a wider date range or another holding office.'
+                : 'Nothing is being held right now.'}</p>
             </section>
           )}
 
-          {browseItems.length > 0 && (
+          {(browseItems.length > 0 || page > 1) && (
             <>
-              <ul className="results__list">
-                {browseItems.map((item) => (
-                  <li key={item.id}>
-                    <ResultCard item={item} browse />
-                  </li>
-                ))}
-              </ul>
+              {browseItems.length > 0 && (
+                <ul className="results__list">
+                  {browseItems.map((item) => (
+                    <li key={item.id}>
+                      <ResultCard item={item} browse />
+                    </li>
+                  ))}
+                </ul>
+              )}
               <nav className="pager" aria-label="Browse pages">
-                <button type="button" className="btn btn--quiet"
-                  onClick={() => goToPage(page - 1)} disabled={page <= 1}>
+                <button type="button" className="btn btn--quiet" onClick={() => page > 1 && goToPage(page - 1)} disabled={page <= 1}>
                   <Icon name="arrow_back" size={17} />
                   Previous
                 </button>
-                <span className="pager__status">
-                  Page {page} · Up to {BROWSE_PAGE_SIZE} per page
-                </span>
-                <button type="button" className="btn btn--quiet"
-                  onClick={() => goToPage(page + 1)} disabled={!browseHasNext}>
+                <span className="pager__status">Page {page} · Up to {BROWSE_PAGE_SIZE} per page</span>
+                <button type="button" className="btn btn--quiet" onClick={() => browseHasNext && goToPage(page + 1)} aria-disabled={!browseHasNext}>
                   Next
                   <Icon name="arrow_forward" size={17} />
                 </button>
@@ -435,8 +422,8 @@ export default function SearchResults({ browse = false }) {
             </section>
           )}
 
-          <p className="visually-hidden" role="status">
-            {announcement}
+          <p className="visually-hidden" role="status" aria-live="polite">
+            {announcement || browseAnnouncement}
           </p>
 
           {state === 'results' && (
