@@ -248,3 +248,9 @@ jobs:
             fi
           done
           exit "$fail"
+
+      # Structural checks for the US-33 lost-report closure guarantees. The job
+      # has no Postgres, so the suite asserts on the privileges and predicates
+      # in the SQL that ships rather than executing it.
+      - name: Lost-report closure guarantees
+        run: python3 -m unittest discover -s supabase/tests -p 'test_*.py' -v
