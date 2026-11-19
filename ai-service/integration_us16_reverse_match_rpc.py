@@ -406,7 +406,7 @@ def _psql(sql):
 
 # pg_get_function_identity_arguments renders the stored types, not the source
 # aliases: `float` becomes `double precision`, `int` becomes `integer`, and a
-# vector typmod stays attached.
+# vector typmod is dropped on function arguments (`vector(512)` -> `vector`).
 EXPECTED_IDENTITY = {
     "match_lost_reports": (
         "item_id uuid, match_threshold double precision, match_count integer"
@@ -415,10 +415,10 @@ EXPECTED_IDENTITY = {
     "submit_staff_custody": (
         "p_office_id text, p_title text, p_description text, "
         "p_storage_location text, p_image_url text, p_category text, "
-        "p_embedding vector(512), p_date_received date, p_cash_amount numeric, "
+        "p_embedding vector, p_date_received date, p_cash_amount numeric, "
         "p_finder_name text, p_finder_contact text, p_found_report_id uuid, "
-        "p_ai_caption text, p_text_embedding vector(384), "
-        "p_image_embedding vector(512)"
+        "p_ai_caption text, p_text_embedding vector, "
+        "p_image_embedding vector"
     ),
 }
 
@@ -622,17 +622,19 @@ class ReverseMatchRpcTests(unittest.TestCase):
         item = _seed_item(self.office_id, SAME)
         report = _seed_lost_report(SAME)
 
+        # PostgREST maps an anonymous permission-denied to 401; 403 is used
+        # when an authenticated role lacks the privilege.
         match_status, _ = _rpc(
             "match_lost_reports", {"item_id": item["id"]}, self.anon_key
         )
-        self.assertEqual(match_status, 403)
+        self.assertEqual(match_status, 401)
 
         dismiss_status, _ = _rpc(
             "dismiss_lost_report_match",
             {"p_item_id": item["id"], "p_lost_report_id": report["id"]},
             self.anon_key,
         )
-        self.assertEqual(dismiss_status, 403)
+        self.assertEqual(dismiss_status, 401)
         self.assertEqual(_dismissed_count(item["id"], report["id"]), 0)
 
         submit_status, rows = _rpc(
@@ -761,7 +763,8 @@ class ReverseMatchRpcTests(unittest.TestCase):
                 "SELECT proname, pg_get_function_identity_arguments(oid), "
                 "pg_get_function_result(oid), prosecdef, "
                 "coalesce(array_to_string(proconfig, ','), ''), "
-                "encode(convert_to(prosrc, 'UTF8'), 'base64') "
+                "translate(encode(convert_to(prosrc, 'UTF8'), 'base64'), "
+                "chr(10), '') "
                 "FROM pg_proc "
                 "WHERE pronamespace = 'public'::regnamespace "
                 "AND proname IN ('match_lost_reports', "
