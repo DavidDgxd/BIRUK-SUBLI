@@ -19,15 +19,32 @@ import { combineEmbeddings } from './searchItems.js';
  *
  * The row is written through the submit_lost_report RPC rather than a table
  * insert. lost_reports has an INSERT policy for anon but no SELECT policy
- * (contact_info is staff-visible PII), so a plain insert could never return the
- * generated ref_code. The RPC is SECURITY DEFINER and returns only that code.
+ * (contact_info is PII and close_key is a bearer secret), so a plain insert
+ * could never return the generated ref_code. The RPC is SECURITY DEFINER and
+ * returns the receipt — ref_code and the private close_key — exactly once.
  */
+
+/** The one row a table-returning RPC resolves to, whether wrapped or not. */
+function receiptRow(data) {
+  return Array.isArray(data) ? (data[0] ?? null) : (data ?? null);
+}
+
+/** The private link a citizen keeps after filing a lost report. */
+export function buildCloseLink({
+  refCode,
+  closeKey,
+  origin = window.location.origin,
+}) {
+  const ref = encodeURIComponent(String(refCode ?? '').trim());
+  const key = encodeURIComponent(String(closeKey ?? '').trim());
+  return `${origin}/close-report?ref=${ref}&key=${key}`;
+}
 
 /**
  * Embeds the description and the optional photo concurrently, averages the
  * vectors, and stores the report.
  *
- * Resolves to { refCode, usedPhoto }. Throws SearchError with code
+ * Resolves to { refCode, closeKey, usedPhoto }. Throws SearchError with code
  * 'ai-unreachable' | 'ai-failed' | 'ai-bad-response' | 'db'.
  */
 export async function submitLostReport({
@@ -64,5 +81,14 @@ export async function submitLostReport({
   const { data, error } = await query;
   if (error) throw new SearchError('db', error.message);
 
-  return { refCode: data, usedPhoto: Boolean(photoEmbedding) };
+  const receipt = receiptRow(data);
+  if (!receipt?.ref_code || !receipt?.close_key) {
+    throw new SearchError('db', 'The report receipt was incomplete.');
+  }
+
+  return {
+    refCode: receipt.ref_code,
+    closeKey: receipt.close_key,
+    usedPhoto: Boolean(photoEmbedding),
+  };
 }
