@@ -41,10 +41,13 @@ async function mockReport(page, onConvert = () => {}) {
   await page.route('**/rest/v1/rpc/submit_staff_custody', (route) => {
     onConvert(route.request().postDataJSON());
     converted = true;
+    // US-16: table (ref_code, item_id) arrives as a one-row array.
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify('BS-0201'),
+      body: JSON.stringify([
+        { ref_code: 'BS-0201', item_id: 'e2e-item-reused-caption' },
+      ]),
     });
   });
   await page.route(REPORT.image_url, (route) =>

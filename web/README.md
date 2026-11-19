@@ -203,6 +203,33 @@ the item and flips the report to `converted_at_intake` in one transaction. A
 stale selection (already converted at another counter) raises `P0002` and rolls
 the insert back.
 
+### Possible lost-item matches (US-16)
+
+`submit_staff_custody` returns the receipt reference and the new item's id, and
+the custody receipt uses that id to check the item against open lost-item
+reports. The check is advisory: nothing is sent to the person who reported the
+loss, the item is not reserved, and a failed check leaves the item logged and
+the receipt valid. The officer calls the contact outside the system.
+
+The panel calls `match_lost_reports` with the item id only, so the vector stays
+in the database and only a signed-in session can run the check. The floor is
+0.55 cosine similarity and cannot be lowered (a caller may raise it); at most
+five reports come back, highest similarity first. Only `open` reports are
+considered, an item that has left custody matches nothing, and a pairing already
+dismissed for this item is left out. Dismissal is scoped to the one item, so the
+same report stays eligible for a different item.
+
+The panel shows a loading state while the check runs; rows with description,
+area, date lost, contact detail and similarity; a no-close-reports message when
+nothing matches (with no dismiss controls); and an error with Try again when the
+check fails. Try again re-runs the check for the same item and never resubmits
+custody. Dismissing a row writes the pair to `dismissed_matches` and removes the
+row; a failed dismissal keeps the row and shows an inline error. The dev-mock
+session (`VITE_STAFF_DEV_SESSION`) runs on the anon key, which has no execute
+grant on the match or dismissal RPC, so the panel shows an explicit unavailable
+state and makes no call. Flags and contact detail live in memory for the life of
+the receipt only; nothing is written to client storage.
+
 ## Announcement drafts (US-24)
 
 The custody receipt carries a ready-to-post announcement, editable and copyable
