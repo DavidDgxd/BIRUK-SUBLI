@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import AnnouncementDraft from './AnnouncementDraft.jsx';
+import LostReportFlags from './LostReportFlags.jsx';
 import { captionImage, captionImageFromUrlOrNull } from '../lib/aiService.js';
 import {
   captionForSubmission,
@@ -551,6 +552,7 @@ export default function StaffIntakeForm({
             <dd>{receipt.staffEmail}</dd>
           </div>
         </dl>
+        <LostReportFlags itemId={receipt.itemId} />
         <AnnouncementDraft key={receipt.refCode} item={receipt} />
         {!receipt.usedPhoto && (
           <p className="state__text">

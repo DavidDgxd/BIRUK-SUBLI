@@ -17,8 +17,9 @@ import { uploadItemImage } from './storage.js';
  * is mandatory and is kept in the shared `item-photos` bucket (under its own
  * `staff-intake/` folder), the title/category/description are embedded for later
  * search, and the row is written through the submit_staff_custody RPC — which
- * always opens it as 'held' and returns the generated ref_code used as the
- * custody receipt reference.
+ * always opens it as 'held' and returns the generated ref_code (the custody
+ * receipt reference) plus the new item's id, which the receipt uses to request
+ * reverse matching (US-16).
  *
  * `description` is the staff verification record (marks, serial numbers,
  * condition). It is deliberately NOT embedded: the public text index is built
@@ -46,9 +47,9 @@ import { uploadItemImage } from './storage.js';
  * Uploads the photo, embeds the intake text and the photo concurrently, averages
  * the vectors, and opens the custody record.
  *
- * Resolves to { refCode, imageUrl, usedPhoto }. Throws SearchError with code
- * 'ai-unreachable' | 'ai-failed' | 'ai-bad-response' | 'db', or a StorageError
- * with code 'image-convert' | 'image-upload'.
+ * Resolves to { refCode, itemId, imageUrl, usedPhoto }. Throws SearchError with
+ * code 'ai-unreachable' | 'ai-failed' | 'ai-bad-response' | 'db', or a
+ * StorageError with code 'image-convert' | 'image-upload'.
  */
 export async function submitStaffCustody({
   officeId,
@@ -136,8 +137,17 @@ export async function submitStaffCustody({
     throw new SearchError('db', error.message);
   }
 
+  // submit_staff_custody returns table (ref_code, item_id); PostgREST returns
+  // a returns-table function as an array of rows, and the submit produces
+  // exactly one. Older deployments returned the reference as a bare string,
+  // so accept both shapes while the migration rolls out. [FR-001]
+  const first = Array.isArray(data) ? data[0] : data;
+  const row = first && typeof first === 'object' ? first : null;
+  const legacyRefCode = typeof first === 'string' ? first : null;
+
   return {
-    refCode: data,
+    refCode: legacyRefCode ?? row?.ref_code ?? null,
+    itemId: row?.item_id ?? null,
     imageUrl,
     usedPhoto: Boolean(photoEmbedding),
     reusedPhoto,
