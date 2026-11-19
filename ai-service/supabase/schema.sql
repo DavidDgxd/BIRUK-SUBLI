@@ -1163,26 +1163,37 @@ grant execute on function public.get_item_public(uuid)
 
 -- ============================================================================
 -- 7. RPC: REVERSE MATCHING ENGINE
--- Compares newly logged items against open citizen lost-reports.
--- Excludes previously reviewed or dismissed candidate pairings.
+-- Compares a newly logged item against open citizen lost-reports. The caller
+-- passes the item id and never a vector: the item's stored embedding is read
+-- here, so the endpoint is SECURITY DEFINER and granted to authenticated only.
+-- Excludes previously reviewed or dismissed candidate pairings, and items that
+-- have left custody (US-16, same exclusion list as US-15).
 -- ============================================================================
+-- The old vector-parameter signature returned contact_info and was callable by
+-- anon; it is dropped rather than replaced. Supabase grants EXECUTE on new
+-- public functions to `anon` by default, so `anon` is revoked explicitly
+-- alongside `public` on both new RPCs.
+drop function if exists public.match_lost_reports(
+    uuid, vector, double precision, integer
+);
+
 create or replace function public.match_lost_reports (
-    item_id_input uuid,
-    item_embedding vector(512),
-    match_threshold float default 0.20,
-    match_count int default 5
+    item_id         uuid,
+    match_threshold float default 0.55,
+    match_count     int   default 5
 )
 returns table (
     lost_report_id uuid,
-    ref_code text,
-    description text,
-    image_url text,
-    area_route text,
-    date_lost date,
-    contact_info text,
-    similarity float
+    ref_code       text,
+    description    text,
+    image_url      text,
+    area_route     text,
+    date_lost      date,
+    contact_info   text,
+    similarity     float
 )
 language sql stable
+security definer
 set search_path = public, pg_temp
 as $$
     select
@@ -1193,17 +1204,60 @@ as $$
         lr.area_route,
         lr.date_lost,
         lr.contact_info,
-        1 - (lr.embedding <=> item_embedding) as similarity
-    from public.lost_reports lr
-    where lr.status = 'open'
+        1 - (lr.embedding <=> items.embedding) as similarity
+    from public.items
+    cross join public.lost_reports lr
+    where items.id = item_id
+      -- An item outside this list has left custody (or never had a vector) and
+      -- is no longer a match target. Empty result, never an error.
+      and items.status not in ('released', 'resolved', 'transferred', 'disposed')
+      and items.embedding is not null
+      and lr.status = 'open'
       and not exists (
-          select 1 from public.dismissed_matches dm 
-          where dm.item_id = item_id_input and dm.lost_report_id = lr.id
+          select 1 from public.dismissed_matches dm
+          where dm.item_id = items.id and dm.lost_report_id = lr.id
       )
-      and (1 - (lr.embedding <=> item_embedding)) > match_threshold
+      -- Hard floor: callers may raise the bar but never drop below 0.55. A null
+      -- threshold falls back to the floor instead of bypassing it. The same
+      -- `>=` comparison as the search RPCs, so a row exactly at the floor is
+      -- treated the same way everywhere.
+      and (1 - (lr.embedding <=> items.embedding))
+          >= greatest(coalesce(match_threshold, 0.55), 0.55)
     order by similarity desc
-    limit match_count;
+    -- Clamp server-side: a null or oversized match_count cannot widen the
+    -- result past the intended 1..25 contact rows.
+    limit least(greatest(coalesce(match_count, 5), 1), 25);
 $$;
+
+revoke all on function public.match_lost_reports(uuid, double precision, integer)
+    from public, anon;
+grant execute on function public.match_lost_reports(uuid, double precision, integer)
+    to authenticated;
+
+
+-- Dismissal RPC: persists the (item, lost report) pair the staffer reviewed.
+-- The table's unique pair makes a repeat dismissal harmless; an unknown id
+-- fails on the foreign key so a fictional pairing is never recorded.
+create or replace function public.dismiss_lost_report_match(
+    p_item_id        uuid,
+    p_lost_report_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+    insert into public.dismissed_matches (item_id, lost_report_id)
+    values (p_item_id, p_lost_report_id)
+    on conflict (item_id, lost_report_id) do nothing;
+end;
+$$;
+
+revoke all on function public.dismiss_lost_report_match(uuid, uuid)
+    from public, anon;
+grant execute on function public.dismiss_lost_report_match(uuid, uuid)
+    to authenticated;
 
 
 -- ============================================================================
@@ -1672,8 +1726,8 @@ using (bucket_id = 'item-photos');
 -- photo is in the item-photos bucket and the title/category/description has
 -- been embedded. It opens the custody record as 'held' — the status is not a
 -- parameter — and stamps the office as both the current holder and the logging
--- desk. Returns the generated ref_code, which the counter quotes as the
--- custody receipt reference.
+-- desk. Returns the generated ref_code (the custody receipt reference) and the
+-- new item's id, which the receipt uses to request reverse matching (US-16).
 --
 -- Cash is the one category with a statutory rule: the trigger
 -- calculate_cash_reward_date() sets reward_date to receipt date + 6 months
@@ -1686,6 +1740,8 @@ using (bucket_id = 'item-photos');
 -- ============================================================================
 -- US-5 adds p_ai_caption and US-10 adds p_found_report_id. Drop every prior
 -- overload first so only the combined 13-argument signature remains.
+-- US-16 changes the return type to table (ref_code, item_id), so the current
+-- 15-argument signature is dropped in the same block rather than replaced.
 drop function if exists public.submit_staff_custody(
     text, text, text, text, text, text, vector, date, numeric, text, text
 );
@@ -1719,13 +1775,17 @@ create or replace function public.submit_staff_custody(
     p_text_embedding   vector(384) default null,
     p_image_embedding  vector(512) default null
 )
-returns text
+returns table (
+    ref_code text,
+    item_id  uuid
+)
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
 declare
     v_ref_code text;
+    v_item_id  uuid;
     v_category text;
     v_is_cash  boolean := false;
     v_amount   numeric(10, 2) := 0.00;
@@ -1783,6 +1843,8 @@ begin
         end if;
     end if;
 
+    -- ref_code/item_id are the OUT names of the returns-table signature, so the
+    -- insert returns only the id and the reference is read back by alias.
     insert into public.items (
         title, description, category, status,
         image_url, date_received,
@@ -1809,9 +1871,11 @@ begin
         nullif(btrim(coalesce(p_finder_contact, '')), ''),
         nullif(btrim(coalesce(p_ai_caption, '')), '')
     )
-    returning ref_code into v_ref_code;
+    returning id into v_item_id;
 
-    return v_ref_code;
+    select i.ref_code into v_ref_code from public.items i where i.id = v_item_id;
+
+    return query select v_ref_code, v_item_id;
 end;
 $$;
 
