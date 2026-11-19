@@ -173,9 +173,11 @@ export const ROUTES = [
   { path: '/search?q=umbrella', role: null },
   { path: '/report/lost', role: null },
   { path: '/report/found', role: null },
+  { path: '/close-report', role: null },
   { path: '/offices', role: null },
   { path: '/staff/login', role: null },
   { path: '/staff/intake', role: 'office' },
+  { path: '/staff/items', role: 'office' },
   { path: '/admin/offices', role: 'admin' },
   { path: '/admin/synonyms', role: 'admin' },
 ];
