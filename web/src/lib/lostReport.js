@@ -177,3 +177,89 @@ export async function closeLostReport({ refCode, closeKey, signal }) {
     closedAt: row.closed_at ?? null,
   };
 }
+
+/**
+ * Staff counter lookup by ref_code (AC 4). Never requests close_key, and the
+ * RPC projects no contact details either. Resolves to a report summary, or
+ * null when no report matches.
+ */
+export async function staffLookupLostReport({ refCode, signal }) {
+  const normalizedRef = String(refCode ?? '').trim().toUpperCase();
+  if (!normalizedRef) return null;
+
+  let query = supabase.rpc('staff_lookup_lost_report', {
+    p_ref_code: normalizedRef,
+  });
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await runRpc(query);
+  if (error) {
+    throw new LostReportError(
+      'db',
+      'We could not look up that report right now.',
+    );
+  }
+
+  const row = receiptRow(data);
+  if (!row) return null;
+
+  return {
+    refCode: row.ref_code,
+    description: row.description,
+    areaRoute: row.area_route,
+    dateLost: row.date_lost,
+    status: row.status,
+  };
+}
+
+/**
+ * Staff counter close (AC 4). The office session is checked again inside the
+ * RPC; the UI gate is not the boundary.
+ *
+ * Resolves to { refCode, status, closedAt }.
+ */
+export async function staffCloseLostReport({ refCode, signal }) {
+  const normalizedRef = String(refCode ?? '').trim().toUpperCase();
+  if (!normalizedRef) {
+    throw new LostReportError(
+      'validation',
+      'Enter the citizen’s reference code.',
+    );
+  }
+
+  let query = supabase.rpc('staff_close_lost_report', {
+    p_ref_code: normalizedRef,
+  });
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await runRpc(query);
+  if (error) {
+    if (
+      error.code === NOT_FOUND_ERROR_CODE ||
+      /no lost report found/i.test(error.message ?? '')
+    ) {
+      throw new LostReportError(
+        'not-found',
+        'No lost report found for that reference code.',
+      );
+    }
+    throw new LostReportError(
+      'db',
+      'We could not close that report right now.',
+    );
+  }
+
+  const row = receiptRow(data);
+  if (!row?.ref_code) {
+    throw new LostReportError(
+      'db',
+      'We could not close that report right now.',
+    );
+  }
+
+  return {
+    refCode: row.ref_code,
+    status: row.status,
+    closedAt: row.closed_at ?? null,
+  };
+}
