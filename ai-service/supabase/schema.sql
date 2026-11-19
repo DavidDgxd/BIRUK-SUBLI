@@ -718,8 +718,19 @@ create table if not exists public.lost_reports (
     contact_info text,                                 -- Staff-visible contact for notification
     embedding vector(512) not null,                    -- Pre-calculated vector for background matching
     status text not null default 'open' check (
-        status in ('open', 'resolved', 'closed_by_user')
+        status in ('open', 'resolved', 'closed_by_user', 'closed')
     ),
+    -- Bearer secret returned once with ref_code (US-33). Never projected to the
+    -- public; only close_lost_report_by_key reads it. The format is enforced by
+    -- the table so a manual insert cannot store a guessable key.
+    close_key text not null
+        default (
+            replace(gen_random_uuid()::text, '-', '')
+            || replace(gen_random_uuid()::text, '-', '')
+        )
+        check (close_key ~ '^[0-9a-f]{64}$'),
+    closed_at timestamptz,
+    closed_by text check (closed_by is null or closed_by in ('self', 'staff')),
     created_at timestamptz default timezone('utc'::text, now()) not null
 );
 
@@ -727,6 +738,13 @@ create index if not exists lost_reports_embedding_hnsw_idx
 on public.lost_reports using hnsw (embedding vector_cosine_ops);
 
 create index if not exists lost_reports_status_idx on public.lost_reports (status);
+
+create unique index if not exists lost_reports_close_key_idx
+on public.lost_reports (close_key);
+
+create index if not exists lost_reports_closed_at_idx
+on public.lost_reports (closed_at)
+where closed_at is not null;
 
 -- Junction table tracking false or dismissed pairings
 -- Connects items to lost_reports, ensuring staff do not re-evaluate ignored alerts.
@@ -1213,6 +1231,7 @@ as $$
       and items.status not in ('released', 'resolved', 'transferred', 'disposed')
       and items.embedding is not null
       and lr.status = 'open'
+      and lr.closed_at is null
       and not exists (
           select 1 from public.dismissed_matches dm
           where dm.item_id = items.id and dm.lost_report_id = lr.id
@@ -1550,12 +1569,22 @@ on public.found_reports for insert to public with check (true);
 create policy "Staff can manage found reports" 
 on public.found_reports for all to authenticated using (true);
 
--- Lost Reports: Public can insert search alerts; only staff can view contacts
+-- Lost Reports: Public can insert search alerts; only staff can view contacts.
+-- There is deliberately no anon SELECT policy: contact_info is PII and
+-- close_key is a bearer secret (US-33). The public reads only through the
+-- SECURITY DEFINER submission receipt and keyed close RPC. Table SELECT is
+-- revoked from authenticated too, so close_key is reachable only through
+-- close_lost_report_by_key and never through PostgREST.
 create policy "Anyone can submit a lost report" 
 on public.lost_reports for insert to public with check (true);
 
 create policy "Staff can view and manage lost reports" 
 on public.lost_reports for all to authenticated using (true);
+
+revoke select on public.lost_reports from anon;
+revoke select on public.lost_reports from authenticated;
+revoke select on public.lost_reports from public;
+grant select on public.lost_reports to service_role;
 
 -- Dismissed Matches: Authenticated counter staff only
 create policy "Staff can manage dismissed matches" 
@@ -1569,9 +1598,12 @@ on public.dismissed_matches for all to authenticated using (true);
 -- policy (contact_info is staff-visible PII, so an anon SELECT policy would
 -- leak every report). Without SELECT, PostgREST cannot return the inserted
 -- row, so an anonymous client can never read back the generated ref_code.
--- This SECURITY DEFINER function inserts and returns only the ref_code, so a
--- citizen gets a receipt without any row-level read access.
+-- This SECURITY DEFINER function inserts and returns only the receipt: the
+-- ref_code and the private close_key. That is the only time close_key leaves
+-- the database (US-33).
 -- ============================================================================
+drop function if exists public.submit_lost_report(text, text, date, text, text, vector);
+
 create or replace function public.submit_lost_report(
     p_description  text,
     p_area_route   text,
@@ -1580,13 +1612,14 @@ create or replace function public.submit_lost_report(
     p_image_url    text default null,
     p_embedding    vector(512) default null
 )
-returns text
+returns table (ref_code text, close_key text)
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
 declare
-    v_ref_code text;
+    v_ref_code  text;
+    v_close_key text;
 begin
     if p_description is null or btrim(p_description) = '' then
         raise exception 'A description is required.' using errcode = '22023';
@@ -1613,14 +1646,195 @@ begin
          nullif(btrim(coalesce(p_contact_info, '')), ''),
          nullif(btrim(coalesce(p_image_url, '')), ''),
          p_embedding)
-    returning ref_code into v_ref_code;
+    returning lost_reports.ref_code, lost_reports.close_key
+      into v_ref_code, v_close_key;
 
-    return v_ref_code;
+    return query select v_ref_code, v_close_key;
 end;
 $$;
 
 revoke all on function public.submit_lost_report(text, text, date, text, text, vector) from public;
 grant execute on function public.submit_lost_report(text, text, date, text, text, vector) to anon, authenticated;
+
+
+-- ============================================================================
+-- 13b. PUBLIC SELF-CLOSE RPC (US-33)
+--
+-- The ref_code and close_key are checked in one predicate. A valid ref_code
+-- with a wrong key therefore follows exactly the same path as an unknown
+-- ref_code: no lookup branch, no writes, and one identical error message.
+-- ============================================================================
+create or replace function public.close_lost_report_by_key(
+    p_ref_code  text,
+    p_close_key text
+)
+returns table (ref_code text, status text, closed_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    c_not_found constant text := 'Report not found or invalid close link.';
+    v_ref_code  text := upper(btrim(coalesce(p_ref_code, '')));
+    v_close_key text := btrim(coalesce(p_close_key, ''));
+    v_id        uuid;
+    v_status    text;
+    v_closed_at timestamptz;
+begin
+    if v_ref_code = '' or v_close_key = '' then
+        raise exception '%', c_not_found using errcode = 'P0002';
+    end if;
+
+    select lr.id, lr.status, lr.closed_at
+      into v_id, v_status, v_closed_at
+    from public.lost_reports lr
+    where lr.ref_code = v_ref_code
+      and lr.close_key = v_close_key
+    for update;
+
+    if not found then
+        raise exception '%', c_not_found using errcode = 'P0002';
+    end if;
+
+    -- Only 'open' may change. A retried confirmation is idempotent, and a
+    -- report the citizen already resolved keeps its status and audit fields.
+    if v_status <> 'open' then
+        return query select v_ref_code, v_status, v_closed_at;
+        return;
+    end if;
+
+    update public.lost_reports
+       set status = 'closed',
+           closed_at = timezone('utc'::text, now()),
+           closed_by = 'self'
+     where id = v_id
+       and status = 'open'
+    returning lost_reports.closed_at into v_closed_at;
+
+    return query select v_ref_code, 'closed'::text, v_closed_at;
+end;
+$$;
+
+revoke all on function public.close_lost_report_by_key(text, text) from public;
+grant execute on function public.close_lost_report_by_key(text, text)
+    to anon, authenticated;
+
+
+-- ============================================================================
+-- 13c. STAFF COUNTER CLOSE RPCS (US-33)
+--
+-- A citizen who lost the private link brings their ref_code to any office.
+-- The caller must be a signed-in active office or the central admin, and the
+-- projection never includes close_key.
+-- ============================================================================
+create or replace function public.staff_lookup_lost_report(p_ref_code text)
+returns table (
+    ref_code    text,
+    description text,
+    area_route  text,
+    date_lost   date,
+    status      text
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code text := upper(btrim(coalesce(p_ref_code, '')));
+begin
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin'
+       and not exists (
+           select 1
+           from public.offices o
+           where o.auth_user_id = auth.uid()
+             and o.status = 'active'
+       ) then
+        raise exception 'Only signed-in counter staff can look up lost reports.'
+            using errcode = '42501';
+    end if;
+
+    if v_ref_code = '' then
+        return;
+    end if;
+
+    -- The projection is the whole contract with the counter UI: no close_key
+    -- and no contact_info, so a compromised staff session cannot harvest PII
+    -- or close other citizens' reports with this call alone.
+    return query
+        select lr.ref_code,
+               lr.description,
+               lr.area_route,
+               lr.date_lost,
+               lr.status
+        from public.lost_reports lr
+        where lr.ref_code = v_ref_code;
+end;
+$$;
+
+revoke all on function public.staff_lookup_lost_report(text) from public, anon;
+grant execute on function public.staff_lookup_lost_report(text) to authenticated;
+
+
+create or replace function public.staff_close_lost_report(p_ref_code text)
+returns table (ref_code text, status text, closed_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_ref_code  text := upper(btrim(coalesce(p_ref_code, '')));
+    v_id        uuid;
+    v_status    text;
+    v_closed_at timestamptz;
+begin
+    if coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'central_admin'
+       and not exists (
+           select 1
+           from public.offices o
+           where o.auth_user_id = auth.uid()
+             and o.status = 'active'
+       ) then
+        raise exception 'Only signed-in counter staff can close lost reports.'
+            using errcode = '42501';
+    end if;
+
+    if v_ref_code = '' then
+        raise exception 'A reference code is required.' using errcode = '22023';
+    end if;
+
+    select lr.id, lr.status, lr.closed_at
+      into v_id, v_status, v_closed_at
+    from public.lost_reports lr
+    where lr.ref_code = v_ref_code
+    for update;
+
+    if not found then
+        raise exception 'No lost report found for that reference code.'
+            using errcode = 'P0002';
+    end if;
+
+    -- Only 'open' may change. Closed is idempotent, and resolved /
+    -- closed_by_user keep their status and original audit fields.
+    if v_status <> 'open' then
+        return query select v_ref_code, v_status, v_closed_at;
+        return;
+    end if;
+
+    update public.lost_reports
+       set status = 'closed',
+           closed_at = timezone('utc'::text, now()),
+           closed_by = 'staff'
+     where id = v_id
+       and status = 'open'
+    returning lost_reports.closed_at into v_closed_at;
+
+    return query select v_ref_code, 'closed'::text, v_closed_at;
+end;
+$$;
+
+revoke all on function public.staff_close_lost_report(text) from public, anon;
+grant execute on function public.staff_close_lost_report(text) to authenticated;
 
 
 -- ============================================================================
