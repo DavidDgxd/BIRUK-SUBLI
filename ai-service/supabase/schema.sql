@@ -807,10 +807,14 @@ as $$
     select
         items.id,
         items.ref_code,
-        items.title,
-        items.category,
+        case
+            when items.is_cash or items.category = 'Cash' then 'Cash'
+            when lower(btrim(items.category)) in ('documents / ids', 'document/id') then 'Documents / IDs'
+            else items.title
+        end as title,
+        case when items.is_cash or items.category = 'Cash' then 'Cash' else items.category end as category,
         items.status,
-        items.image_url,
+        case when items.is_cash or items.category = 'Cash' or lower(btrim(items.category)) in ('documents / ids', 'document/id') then null else items.image_url end as image_url,
         items.holding_office_id,
         offices.name as holding_office_name,
         offices.counter_hours,
