@@ -13,12 +13,8 @@ export default function Landing() {
   useEffect(() => {
     const controller = new AbortController();
     listRecentItems({ signal: controller.signal })
-      .then((items) => {
-        if (!controller.signal.aborted) setRecent(items);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted && error.name !== 'AbortError') setRecent(false);
-      });
+      .then((items) => { if (!controller.signal.aborted) setRecent(items); })
+      .catch((error) => { if (!controller.signal.aborted && error.name !== 'AbortError') setRecent(false); });
     return () => controller.abort();
   }, []);
 
@@ -51,25 +47,12 @@ export default function Landing() {
                 <Icon name="arrow_right_sharp" size={17} />
               </Link>
             </div>
-
-            {recent === null && (
-              <p className="loading" role="status">Loading recent items&hellip;</p>
-            )}
-            {recent === false && (
-              <p className="state__text" role="alert">
-                We could not load recent items right now.
-              </p>
-            )}
-            {recent?.length === 0 && (
-              <p className="state__text">No items are being held right now.</p>
-            )}
+            {recent === null && <p className="loading" role="status">Loading recent items&hellip;</p>}
+            {recent === false && <p className="state__text" role="alert">We could not load recent items right now.</p>}
+            {recent?.length === 0 && <p className="state__text">No items are being held right now.</p>}
             {recent?.length > 0 && (
               <ul className="results__list">
-                {recent.map((item) => (
-                  <li key={item.id}>
-                    <ResultCard item={item} browse />
-                  </li>
-                ))}
+                {recent.map((item) => <li key={item.id}><ResultCard item={item} browse /></li>)}
               </ul>
             )}
           </section>

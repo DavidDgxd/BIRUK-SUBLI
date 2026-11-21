@@ -133,16 +133,9 @@ export default function SearchResults({ browse = false }) {
   useEffect(() => {
     if (!browse) return undefined;
     const controller = new AbortController();
-
     listPublicItems({ page, office, dateFrom, dateTo, signal: controller.signal })
-      .then((result) => {
-        if (!controller.signal.aborted) setOutcome({ key: browseKey, ...result });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted || error.name === 'AbortError') return;
-        setOutcome({ key: browseKey, error });
-      });
-
+      .then((result) => { if (!controller.signal.aborted) setOutcome({ key: browseKey, ...result }); })
+      .catch((error) => { if (!controller.signal.aborted && error.name !== 'AbortError') setOutcome({ key: browseKey, error }); });
     return () => controller.abort();
   }, [browse, page, office, dateFrom, dateTo, attempt, browseKey]);
 
@@ -346,48 +339,33 @@ export default function SearchResults({ browse = false }) {
             </section>
           )}
 
-          {browseLoading && (
-            <p className="loading" role="status">Loading held items&hellip;</p>
-          )}
-
+          {browseLoading && <p className="loading" role="status">Loading held items&hellip;</p>}
           {browseError && (
             <section className="state state--error" role="alert">
               <h2 className="state__title">Something went wrong</h2>
               <p className="state__text">We could not load held items right now.</p>
             </section>
           )}
-
           {browse && !browseLoading && !browseError && browseItems.length === 0 && (
             <section className="state">
-              <h2 className="state__title">
-                {hasFilters ? 'No held items in that range' : 'No held items'}
-              </h2>
-              <p className="state__text">{hasFilters
-                ? 'Try a wider date range or another holding office.'
-                : 'Nothing is being held right now.'}</p>
+              <h2 className="state__title">{hasFilters ? 'No held items in that range' : 'No held items'}</h2>
+              <p className="state__text">{hasFilters ? 'Try a wider date range or another holding office.' : 'Nothing is being held right now.'}</p>
             </section>
           )}
-
           {(browseItems.length > 0 || page > 1) && (
             <>
               {browseItems.length > 0 && (
                 <ul className="results__list">
-                  {browseItems.map((item) => (
-                    <li key={item.id}>
-                      <ResultCard item={item} browse />
-                    </li>
-                  ))}
+                  {browseItems.map((item) => <li key={item.id}><ResultCard item={item} browse /></li>)}
                 </ul>
               )}
               <nav className="pager" aria-label="Browse pages">
                 <button type="button" className="btn btn--quiet" onClick={() => page > 1 && goToPage(page - 1)} disabled={page <= 1}>
-                  <Icon name="arrow_back" size={17} />
-                  Previous
+                  <Icon name="arrow_back" size={17} />Previous
                 </button>
                 <span className="pager__status">Page {page} · Up to {BROWSE_PAGE_SIZE} per page</span>
                 <button type="button" className="btn btn--quiet" onClick={() => browseHasNext && goToPage(page + 1)} aria-disabled={!browseHasNext}>
-                  Next
-                  <Icon name="arrow_forward" size={17} />
+                  Next<Icon name="arrow_forward" size={17} />
                 </button>
               </nav>
             </>

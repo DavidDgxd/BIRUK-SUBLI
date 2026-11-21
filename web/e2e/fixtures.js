@@ -96,6 +96,11 @@ async function mockBackends(page, role) {
         category: 'Umbrella', status: 'held', image_url: null,
         date_received: '2026-11-01', holding_office_id: OFFICE.id,
         holding_office_name: OFFICE.name,
+      }, {
+        id: '22222222-2222-2222-2222-222222222222', title: 'Juan Dela Cruz ID',
+        category: 'Documents / IDs', status: 'held', image_url: 'id.jpg',
+        date_received: '2026-11-02', holding_office_id: OFFICE.id,
+        holding_office_name: OFFICE.name,
       }]);
     }
     if (url.pathname === '/rest/v1/rpc/get_usage_report') {

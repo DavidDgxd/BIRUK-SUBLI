@@ -10,8 +10,9 @@ export function browseOffset(page, pageSize = BROWSE_PAGE_SIZE) {
   return (safePage - 1) * size;
 }
 export function normalizePublicItem(row) {
-  const cash = row?.is_cash === true || row?.category === 'Cash';
-  const secret = cash || row?.category === 'Document/ID';
+  const category = String(row?.category ?? '').trim().toLowerCase();
+  const cash = row?.is_cash === true || category === 'cash';
+  const secret = cash || category === 'documents / ids' || category === 'document/id';
   return {
     id: row.id, title: cash ? 'Cash' : secret ? 'Document/ID' : row.title,
     category: cash ? 'Cash' : row.category, status: row.status ?? 'held',
@@ -21,16 +22,11 @@ export function normalizePublicItem(row) {
     holding_office_name: row.holding_office_name ?? null,
   };
 }
-export async function listPublicItems({
-  page = 1, pageSize = BROWSE_PAGE_SIZE, office = null,
-  dateFrom = null, dateTo = null, signal,
-} = {}) {
+export async function listPublicItems({ page = 1, pageSize = BROWSE_PAGE_SIZE, office = null, dateFrom = null, dateTo = null, signal } = {}) {
   const size = Number.isFinite(pageSize) && pageSize > 0 ? Math.trunc(pageSize) : BROWSE_PAGE_SIZE;
-  const query = supabase.rpc('list_public_items', {
-    p_limit: size + 1, p_offset: browseOffset(page, size),
-    p_office: office || null, p_date_from: dateFrom || null, p_date_to: dateTo || null,
+  const { data, error } = await supabase.rpc('list_public_items', {
+    p_limit: size + 1, p_offset: browseOffset(page, size), p_office: office || null, p_date_from: dateFrom || null, p_date_to: dateTo || null,
   }).abortSignal(signal);
-  const { data, error } = await query;
   if (error) throw new PublicItemsError(error.message);
   const rows = (data ?? []).map(normalizePublicItem);
   return { items: rows.slice(0, size), hasNext: rows.length > size };

@@ -72,6 +72,14 @@ for (const { path, role } of ROUTES) {
   });
 }
 
+test('browse masks Document/ID titles and photos', async ({ page }) => {
+  await openRoute(page, '/browse');
+  await expect(page.getByRole('heading', { name: 'Document/ID' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Juan Dela Cruz ID' })).toHaveCount(0);
+  await expect(page.locator('img[alt="Photo of Juan Dela Cruz ID"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Next' })).toHaveAttribute('aria-disabled', 'true');
+});
+
 test.describe('a11y /staff/login errors', () => {
   for (const theme of ['light', 'dark']) {
     test(`${theme} theme`, async ({ page }) => {
