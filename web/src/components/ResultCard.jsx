@@ -3,11 +3,23 @@ import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import { calibrateMatchScore } from '../lib/searchItems.js';
 
-export default function ResultCard({ item, possible = false }) {
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function receivedLabel(value) {
+  const [year, month, day] = (value ?? '').split('-').map(Number);
+  if (!year || !month || !day || !MONTHS[month - 1]) return '';
+  return `${day} ${MONTHS[month - 1]} ${year}`;
+}
+
+export default function ResultCard({ item, possible = false, browse = false }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = item.image_url && !imageFailed;
-  const { percent } = calibrateMatchScore(item.similarity);
+  const percent = browse ? null : calibrateMatchScore(item.similarity).percent;
   const status = item.status === 'held' ? 'Held for collection' : item.status;
+  const received = browse ? receivedLabel(item.date_received) : '';
+  const office = browse
+    ? [item.category, item.holding_office_name].filter(Boolean).join(' · ')
+    : item.holding_office_name;
 
   return (
     <article className="result">
@@ -46,14 +58,15 @@ export default function ResultCard({ item, possible = false }) {
             {item.title}
           </Link>
         </h3>
-        <p className="result__office">{item.holding_office_name}</p>
+        <p className="result__office">{office}</p>
         <p className="result__status">
           <span className="dot" aria-hidden="true" />
           <span>
             {status}
-            {!possible && typeof percent === 'number'
+            {!possible && Number.isFinite(percent)
               ? `, ${percent}% match`
               : ''}
+            {received ? ` · Received ${received}` : ''}
           </span>
         </p>
       </div>

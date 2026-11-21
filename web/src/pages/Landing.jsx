@@ -1,11 +1,23 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader.jsx';
 import SearchPanel from '../components/SearchPanel.jsx';
 import HowItWorks from '../components/HowItWorks.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
+import ResultCard from '../components/ResultCard.jsx';
 import Icon from '../components/Icon.jsx';
+import { listRecentItems } from '../lib/publicItems.js';
 
 export default function Landing() {
+  const [recent, setRecent] = useState(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    listRecentItems({ signal: controller.signal })
+      .then((items) => { if (!controller.signal.aborted) setRecent(items); })
+      .catch((error) => { if (!controller.signal.aborted && error.name !== 'AbortError') setRecent(false); });
+    return () => controller.abort();
+  }, []);
+
   return (
     <div className="landing-page">
       <a className="skip-link" href="#main">
@@ -23,6 +35,31 @@ export default function Landing() {
             <SearchPanel />
           </div>
 
+          <div className="section-divider" aria-hidden="true">
+            <span className="section-divider__mark" />
+          </div>
+
+          <section className="recent-items" aria-labelledby="recent-title">
+            <div className="recent-items__head">
+              <h2 id="recent-title">Recently handed in</h2>
+              <Link className="btn btn--quiet" to="/browse">
+                See all held items
+                <Icon name="arrow_right_sharp" size={17} />
+              </Link>
+            </div>
+            {recent === null && <p className="loading" role="status">Loading recent items&hellip;</p>}
+            {recent === false && <p className="state__text" role="alert">We could not load recent items right now.</p>}
+            {recent?.length === 0 && <p className="state__text">No items are being held right now.</p>}
+            {recent?.length > 0 && (
+              <ul className="results__list">
+                {recent.map((item) => (
+                  <li key={item.id}>
+                    <ResultCard item={item} browse />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           <div className="section-divider" aria-hidden="true">
             <span className="section-divider__mark" />
           </div>

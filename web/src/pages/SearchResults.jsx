@@ -12,6 +12,7 @@ import SearchFilters from '../components/SearchFilters.jsx';
 import SearchPanel from '../components/SearchPanel.jsx';
 import Icon from '../components/Icon.jsx';
 import { listOfficeOptions } from '../lib/offices.js';
+import { BROWSE_PAGE_SIZE, listPublicItems } from '../lib/publicItems.js';
 import { searchItems } from '../lib/searchItems.js';
 
 const ERROR_COPY = {
@@ -29,6 +30,10 @@ function readDate(value) {
   return DATE_PATTERN.test(value ?? '') ? value : '';
 }
 
+function readPage(value) {
+  const page = Number.parseInt(value ?? '1', 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
 function ResultList({ items, possible = false }) {
   return (
     <ul className="results__list">
@@ -63,7 +68,7 @@ function requestKey(
   ].join('|');
 }
 
-export default function SearchResults() {
+export default function SearchResults({ browse = false }) {
   const [params] = useSearchParams();
   const { state: locationState } = useLocation();
   const navigate = useNavigate();
@@ -72,6 +77,7 @@ export default function SearchResults() {
   const office = (params.get('office') ?? '').trim();
   const dateFrom = readDate(params.get('from'));
   const dateTo = readDate(params.get('to'));
+  const page = browse ? readPage(params.get('page')) : 1;
   // "Search my exact words" (US-23). The flag holds the query it was chosen
   // for, because the compact SearchPanel copies every param into the next
   // search: a bare exact=1 would silently stick to whatever is typed next.
@@ -122,11 +128,21 @@ export default function SearchResults() {
     return () => controller.abort();
   }, [hasQuery, q, exact, color, photo, office, dateFrom, dateTo, attempt]);
 
+  const browseKey = [office, dateFrom, dateTo, page, attempt].join('|');
+  useEffect(() => {
+    if (!browse) return undefined;
+    const controller = new AbortController();
+    listPublicItems({ page, office, dateFrom, dateTo, signal: controller.signal })
+      .then((result) => { if (!controller.signal.aborted) setOutcome({ key: browseKey, ...result }); })
+      .catch((error) => { if (!controller.signal.aborted && error.name !== 'AbortError') setOutcome({ key: browseKey, error }); });
+    return () => controller.abort();
+  }, [browse, page, office, dateFrom, dateTo, attempt, browseKey]);
+
   // The filter only needs the active offices' id and name. A failure leaves the
   // office select with "All offices"; the other filters and the search itself
   // still work.
   useEffect(() => {
-    if (!hasQuery) return undefined;
+    if (!hasQuery && !browse) return undefined;
     const controller = new AbortController();
 
     listOfficeOptions({ signal: controller.signal })
@@ -139,7 +155,7 @@ export default function SearchResults() {
       });
 
     return () => controller.abort();
-  }, [hasQuery]);
+  }, [hasQuery, browse]);
 
   function applyFilters(next) {
     const nextParams = new URLSearchParams(params);
@@ -150,10 +166,22 @@ export default function SearchResults() {
     else nextParams.delete('from');
     if (next.dateTo) nextParams.set('to', next.dateTo);
     else nextParams.delete('to');
+    if (browse) nextParams.delete('page');
 
+    const pathname = browse ? '/browse' : '/search';
     navigate(
-      { pathname: '/search', search: nextParams.toString() },
+      { pathname, search: nextParams.toString() },
       { replace: true, state: locationState },
+    );
+  }
+
+  function goToPage(next) {
+    const nextParams = new URLSearchParams(params);
+    if (next <= 1) nextParams.delete('page');
+    else nextParams.set('page', String(next));
+    navigate(
+      { pathname: '/browse', search: nextParams.toString() },
+      { state: locationState },
     );
   }
 
@@ -173,11 +201,15 @@ export default function SearchResults() {
     hasQuery &&
     outcome?.key !==
       requestKey(q, exact, color, photo, office, dateFrom, dateTo, attempt);
-  const error = !loading && outcome?.error;
+  const error = !browse && !loading && outcome?.error;
   const best = !loading && !error && outcome?.best ? outcome.best : null;
   const possible =
     !loading && !error && outcome?.possible ? outcome.possible : null;
-  const state = !loading && !error ? outcome?.state : null;
+  const state = !browse && !loading && !error ? outcome?.state : null;
+  const browseLoading = browse && outcome?.key !== browseKey;
+  const browseError = browse && !browseLoading && outcome?.error;
+  const browseItems = browse && !browseLoading && !browseError ? (outcome?.items ?? []) : [];
+  const browseHasNext = browse && !browseLoading && !browseError && outcome?.hasNext;
   const announcement =
     state === 'results'
       ? `${best.length} best ${best.length === 1 ? 'match' : 'matches'}${
@@ -194,6 +226,9 @@ export default function SearchResults() {
         : state === 'none'
           ? 'No close match found.'
           : '';
+  const browseAnnouncement = browse && !browseLoading && !browseError
+    ? `${browseItems.length} held ${browseItems.length === 1 ? 'item' : 'items'} on page ${page}.`
+    : '';
 
   // Also on a wording switch: the link that was clicked unmounts, and focus
   // would otherwise fall to <body>.
@@ -218,8 +253,9 @@ export default function SearchResults() {
   // The expansion is additive: the typed words are still searched, with these
   // English synonyms alongside them. Hidden while loading so stale additions
   // never label new results.
-  const additions =
-    !loading && !exact && outcome?.additions?.length ? outcome.additions : null;
+  const additions = !browse && !loading && !exact && outcome?.additions?.length
+    ? outcome.additions
+    : null;
 
   return (
     <>
@@ -231,8 +267,13 @@ export default function SearchResults() {
         <main id="main" className="results">
           <div className="page-head">
             <h1 tabIndex={-1} ref={headingRef}>
-              Search results
+              {browse ? 'Browse held items' : 'Search results'}
             </h1>
+            {browse && (
+              <p className="lead">
+                Newest first. Cash amounts stay hidden until collection.
+              </p>
+            )}
             {hasQuery && (
               <SearchPanel
                 compact
@@ -267,7 +308,7 @@ export default function SearchResults() {
             )}
           </div>
 
-          {hasQuery && (
+          {(hasQuery || browse) && (
             <SearchFilters
               offices={officeOptions}
               office={office}
@@ -278,7 +319,7 @@ export default function SearchResults() {
             />
           )}
 
-          {!hasQuery && (
+          {!hasQuery && !browse && (
             <section className="state">
               <h2 className="state__title">Nothing to search yet</h2>
               <p className="state__text">
@@ -292,6 +333,37 @@ export default function SearchResults() {
                 </Link>
               </div>
             </section>
+          )}
+          {browseLoading && <p className="loading" role="status">Loading held items&hellip;</p>}
+          {browseError && (
+            <section className="state state--error" role="alert">
+              <h2 className="state__title">Something went wrong</h2>
+              <p className="state__text">We could not load held items right now.</p>
+            </section>
+          )}
+          {browse && !browseLoading && !browseError && browseItems.length === 0 && (
+            <section className="state">
+              <h2 className="state__title">{hasFilters ? 'No held items in that range' : 'No held items'}</h2>
+              <p className="state__text">{hasFilters ? 'Try a wider date range or another holding office.' : 'Nothing is being held right now.'}</p>
+            </section>
+          )}
+          {(browseItems.length > 0 || page > 1) && (
+            <>
+              {browseItems.length > 0 && (
+                <ul className="results__list">
+                  {browseItems.map((item) => <li key={item.id}><ResultCard item={item} browse /></li>)}
+                </ul>
+              )}
+              <nav className="pager" aria-label="Browse pages">
+                <button type="button" className="btn btn--quiet" onClick={() => page > 1 && goToPage(page - 1)} disabled={page <= 1}>
+                  <Icon name="arrow_back" size={17} />Previous
+                </button>
+                <span className="pager__status">Page {page} · Up to {BROWSE_PAGE_SIZE} per page</span>
+                <button type="button" className="btn btn--quiet" onClick={() => browseHasNext && goToPage(page + 1)} aria-disabled={!browseHasNext}>
+                  Next<Icon name="arrow_forward" size={17} />
+                </button>
+              </nav>
+            </>
           )}
 
           {loading && (
@@ -323,8 +395,8 @@ export default function SearchResults() {
             </section>
           )}
 
-          <p className="visually-hidden" role="status">
-            {announcement}
+          <p className="visually-hidden" role="status" aria-live="polite">
+            {announcement || browseAnnouncement}
           </p>
 
           {state === 'results' && (

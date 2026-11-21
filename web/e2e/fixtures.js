@@ -90,6 +90,17 @@ async function mockBackends(page, role) {
     if (url.pathname === '/rest/v1/rpc/list_office_logins') {
       return json(route, [{ office_id: OFFICE.id, email: USERS.office.email }]);
     }
+    if (url.pathname === '/rest/v1/rpc/list_public_items') {
+      const held = (id, title, category, imageUrl, dateReceived) => ({
+        id, title, category, status: 'held', image_url: imageUrl,
+        date_received: dateReceived, holding_office_id: OFFICE.id,
+        holding_office_name: OFFICE.name,
+      });
+      return json(route, [
+        held('11111111-1111-1111-1111-111111111111', 'Blue umbrella', 'Umbrella', null, '2026-11-01'),
+        held('22222222-2222-2222-2222-222222222222', 'Juan Dela Cruz ID', 'Documents / IDs', 'id.jpg', '2026-11-02'),
+      ]);
+    }
     // US-16: the receipt panel asks for reverse matches right after a custody
     // submit. Defaults keep every flow that does not care about flags on the
     // clean no-matches path, and give a submit without its own mock a valid
@@ -171,6 +182,7 @@ export const ROUTES = [
   { path: '/', role: null },
   { path: '/search', role: null },
   { path: '/search?q=umbrella', role: null },
+  { path: '/browse', role: null },
   { path: '/report/lost', role: null },
   { path: '/report/found', role: null },
   { path: '/close-report', role: null },
