@@ -103,6 +103,21 @@ async function mockBackends(page, role) {
         holding_office_name: OFFICE.name,
       }]);
     }
+    // US-16: the receipt panel asks for reverse matches right after a custody
+    // submit. Defaults keep every flow that does not care about flags on the
+    // clean no-matches path, and give a submit without its own mock a valid
+    // one-row receipt instead of a null reference.
+    if (url.pathname === '/rest/v1/rpc/submit_staff_custody') {
+      return json(route, [
+        { ref_code: 'BS-0000', item_id: 'e2e-item-default' },
+      ]);
+    }
+    if (url.pathname === '/rest/v1/rpc/match_lost_reports') {
+      return json(route, []);
+    }
+    if (url.pathname === '/rest/v1/rpc/dismiss_lost_report_match') {
+      return json(route, {});
+    }
     if (url.pathname === '/rest/v1/rpc/get_usage_report') {
       return json(route, [
         {

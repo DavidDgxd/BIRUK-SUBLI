@@ -28,7 +28,11 @@ test('drafts, edits and copies a public announcement without private notes', asy
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify('BS-0123'),
+      // US-16: the RPC returns table (ref_code, item_id), so PostgREST sends
+      // an array with one row.
+      body: JSON.stringify([
+        { ref_code: 'BS-0123', item_id: 'e2e-item-announcement' },
+      ]),
     }),
   );
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -104,7 +108,11 @@ test('copies the photo separately as a PNG for Facebook', async ({ page }) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify('BS-0123'),
+      // US-16: the RPC returns table (ref_code, item_id), so PostgREST sends
+      // an array with one row.
+      body: JSON.stringify([
+        { ref_code: 'BS-0123', item_id: 'e2e-item-announcement' },
+      ]),
     }),
   );
   await page.route('**/storage/v1/object/public/**', (route) =>
