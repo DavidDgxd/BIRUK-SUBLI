@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
 import FieldLabel from './FieldLabel.jsx';
 import PhotoDropzone from './PhotoDropzone.jsx';
-import { submitLostReport } from '../lib/lostReport.js';
+import { submitLostReport, buildCloseLink } from '../lib/lostReport.js';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -42,13 +42,15 @@ export default function LostReportForm({ onReceiptChange }) {
   const [photo, setPhoto] = useState(null); // { file, url }
   const [error, setError] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'submitting' | 'done'
-  const [receipt, setReceipt] = useState(null); // { refCode, usedPhoto }
+  const [receipt, setReceipt] = useState(null); // { refCode, closeKey, usedPhoto }
+  const [copyState, setCopyState] = useState('idle'); // 'idle' | 'copied' | 'fallback'
 
   const descriptionRef = useRef(null);
   const areaRouteRef = useRef(null);
   const dateLostRef = useRef(null);
   const fileInputRef = useRef(null);
   const receiptRef = useRef(null);
+  const closeLinkRef = useRef(null);
   const controllerRef = useRef(null);
 
   const descriptionId = useId();
@@ -61,6 +63,9 @@ export default function LostReportForm({ onReceiptChange }) {
   const photoId = useId();
   const photoHintId = useId();
   const errorId = useId();
+  const closeLinkId = useId();
+  const closeLinkHintId = useId();
+  const receiptTitleId = useId();
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
   useEffect(() => {
@@ -154,6 +159,20 @@ export default function LostReportForm({ onReceiptChange }) {
     }
   }
 
+  async function handleCopyLink(closeLink) {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('no clipboard');
+      await navigator.clipboard.writeText(closeLink);
+      setCopyState('copied');
+    } catch {
+      // Clipboard access can be denied by the browser. Selecting the field
+      // leaves the link ready for the keyboard shortcut instead.
+      setCopyState('fallback');
+      closeLinkRef.current?.focus();
+      closeLinkRef.current?.select();
+    }
+  }
+
   function startAnother() {
     setDescription('');
     setAreaRoute('');
@@ -161,17 +180,84 @@ export default function LostReportForm({ onReceiptChange }) {
     setContactInfo('');
     setPhoto(null);
     setReceipt(null);
+    setCopyState('idle');
     setError('');
     setStatus('idle');
   }
 
   if (status === 'done' && receipt) {
+    const closeLink = buildCloseLink({
+      refCode: receipt.refCode,
+      closeKey: receipt.closeKey,
+    });
+
     return (
-      <section className="state state--success receipt-panel" role="status">
-        <p className="receipt" tabIndex={-1} ref={receiptRef}>
-          <span className="visually-hidden">Reference code </span>
-          {receipt.refCode}
+      <section
+        className="state state--success receipt-panel"
+        role="status"
+        aria-labelledby={receiptTitleId}
+      >
+        <h2 className="receipt-panel__title" id={receiptTitleId}>
+          Save your receipt
+        </h2>
+        <dl className="receipt-details">
+          <div className="receipt-details__row">
+            <dt>Reference code</dt>
+            <dd>
+              <p className="receipt" tabIndex={-1} ref={receiptRef}>
+                {receipt.refCode}
+              </p>
+            </dd>
+          </div>
+          <div className="receipt-details__row">
+            <dt>
+              <label htmlFor={closeLinkId}>Private close link</label>
+            </dt>
+            <dd>
+              <input
+                id={closeLinkId}
+                ref={closeLinkRef}
+                className="field__control receipt-link"
+                type="text"
+                readOnly
+                value={closeLink}
+                aria-describedby={closeLinkHintId}
+                onFocus={(event) => event.target.select()}
+              />
+              <p className="field__hint" id={closeLinkHintId}>
+                Anyone with this link can close the report. Keep it private.
+              </p>
+            </dd>
+          </div>
+        </dl>
+
+        <div className="receipt-copy">
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => handleCopyLink(closeLink)}
+          >
+            <Icon name="content_copy" />
+            {copyState === 'copied' ? 'Copied!' : 'Copy close link'}
+          </button>
+          <p className="receipt-copy__status" role="status" aria-live="polite">
+            {copyState === 'fallback'
+              ? 'Copy is blocked here. The link is selected — press Ctrl+C or Cmd+C.'
+              : copyState === 'copied'
+                ? 'Private close link copied.'
+                : ''}
+          </p>
+        </div>
+
+        <p className="receipt-warning">
+          <Icon name="warning" />
+          <span>
+            Save this link and reference code now. The private close link is
+            shown only once and cannot be recovered. Once you find your item,
+            open the link and confirm to stop new matches.
+          </span>
         </p>
+
         <p className="state__text">
           Keep this reference code. Staff will ask for it when an item matching
           your description is handed in at a counter.

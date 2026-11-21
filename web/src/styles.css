@@ -1640,6 +1640,11 @@ input[type='search']::-webkit-search-decoration {
   resize: vertical;
 }
 
+.field__control--mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
 .field__control--select {
   padding-inline-end: var(--space-5);
 }
@@ -1844,6 +1849,54 @@ textarea {
 
 .receipt-actions {
   margin-block-start: var(--space-5);
+}
+
+.receipt-panel__title {
+  font-size: var(--text-title);
+}
+
+.receipt-link {
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+}
+
+.receipt-details dd .field__hint {
+  margin-block-start: var(--space-1);
+}
+
+.receipt-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-block-start: var(--space-4);
+}
+
+.receipt-copy .btn {
+  flex: none;
+}
+
+.receipt-copy__status {
+  margin: 0;
+  color: var(--success);
+  font-weight: var(--weight-strong);
+}
+
+.receipt-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-weight: var(--weight-strong);
+}
+
+.receipt-warning .icon {
+  flex: none;
+  margin-block-start: 0.1em;
 }
 
 /* Announcement draft (US-24) --------------------------------------------- */
@@ -2305,6 +2358,102 @@ textarea {
 
 .staff-item:hover .staff-item__chevron {
   color: var(--primary);
+}
+
+/* Counter lost-report closure (US-33) ------------------------------------ */
+
+.counter-close {
+  max-inline-size: 46rem;
+  margin-block-start: var(--space-6);
+  padding-block-start: var(--space-5);
+  border-block-start: var(--border);
+}
+
+.counter-close__title {
+  font-size: var(--text-title);
+}
+
+.counter-close__hint {
+  margin-block-start: var(--space-2);
+  color: var(--ink-muted);
+  max-inline-size: 60ch;
+}
+
+.counter-close__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+
+.counter-close__form .field {
+  flex: 1 1 16rem;
+}
+
+.counter-close__form .btn {
+  flex: none;
+}
+
+.counter-close__report {
+  margin-block-start: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+
+.counter-close__ref {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+}
+
+.counter-close__status {
+  font-weight: var(--weight-strong);
+  text-transform: capitalize;
+}
+
+.counter-close__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+}
+
+.counter-close__confirm {
+  margin-block-start: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.counter-close__confirm p {
+  font-weight: var(--weight-strong);
+}
+
+.counter-close__empty,
+.counter-close__closed {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.counter-close__empty {
+  color: var(--ink-muted);
+}
+
+.counter-close__closed {
+  color: var(--success);
+  font-weight: var(--weight-strong);
+}
+
+.counter-close__empty .icon,
+.counter-close__closed .icon {
+  flex: none;
+  margin-block-start: 0.1em;
 }
 
 /* Admin ------------------------------------------------------------------ */
