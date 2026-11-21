@@ -77,9 +77,9 @@ for (const { path, role } of ROUTES) {
   });
 }
 
-test('browse masks Document/ID titles and photos', async ({ page }) => {
+test('browse masks Documents / IDs titles and photos', async ({ page }) => {
   await openRoute(page, '/browse');
-  await expect(page.getByRole('heading', { name: 'Document/ID' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Documents / IDs' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Juan Dela Cruz ID' })).toHaveCount(0);
   await expect(page.locator('img[alt="Photo of Juan Dela Cruz ID"]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Next' })).toHaveAttribute('aria-disabled', 'true');

@@ -18,7 +18,7 @@ const sqlProjection = (() => {
   return (item) => {
     const cash = item.is_cash || item.category === 'Cash';
     const secret = categories.includes(String(item.category).trim().toLowerCase());
-    return { title: cash ? 'Cash' : secret ? 'Document/ID' : item.title, image_url: cash || secret ? null : item.image_url };
+    return { title: cash ? 'Cash' : secret ? 'Documents / IDs' : item.title, image_url: cash || secret ? null : item.image_url };
   };
 })();
 describe('public item browse', () => {
@@ -35,17 +35,17 @@ describe('public item browse', () => {
     expect(await listRecentItems()).toHaveLength(6);
     expect(rpc.mock.calls[0][1]).toMatchObject({ p_limit: 7, p_offset: 0 });
   });
-  it('redacts cash and both Document/ID spellings in the browser', () => {
+  it('redacts cash and both document category spellings in the browser', () => {
     const cash = normalizePublicItem(row('cash', { title: 'Brown envelope', category: 'Cash', is_cash: true, cash_amount: 5000, image_url: 'cash.jpg', description: 'Serial 123', storage_location: 'Locker B', finder_name: 'Private Finder', claimant_name: 'Private Claimant' }));
     expect(cash).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
     expect(cash).not.toHaveProperty('cash_amount');
     for (const category of DOC) {
-      expect(normalizePublicItem(row('id', { title: 'Juan Dela Cruz ID', category, image_url: 'id.jpg' }))).toMatchObject({ title: 'Document/ID', image_url: null });
+      expect(normalizePublicItem(row('id', { title: 'Juan Dela Cruz ID', category, image_url: 'id.jpg' }))).toMatchObject({ title: 'Documents / IDs', image_url: null });
     }
   });
   it('executes the get_item_public projection for both spellings', () => {
     for (const category of DOC) {
-      expect(sqlProjection({ category, title: 'Juan Dela Cruz ID', image_url: 'id.jpg' })).toEqual({ title: 'Document/ID', image_url: null });
+      expect(sqlProjection({ category, title: 'Juan Dela Cruz ID', image_url: 'id.jpg' })).toEqual({ title: 'Documents / IDs', image_url: null });
     }
     expect(sqlProjection({ category: 'General', title: 'Umbrella', image_url: 'u.jpg' })).toEqual({ title: 'Umbrella', image_url: 'u.jpg' });
   });

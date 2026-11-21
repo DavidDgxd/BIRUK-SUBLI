@@ -1117,10 +1117,7 @@ grant execute on function public.match_items_two_tower(
     vector, vector, double precision, integer, text, date, date, text
 ) to anon, authenticated, service_role;
 
-
--- ============================================================================
 -- 6a. RPC: PUBLIC BROWSE (US-32) - same redaction as get_item_public.
--- ============================================================================
 drop function if exists public.list_public_items(integer, integer, text, date, date);
 create or replace function public.list_public_items (
     p_limit int default 12, p_offset int default 0, p_office text default null,
@@ -1130,7 +1127,11 @@ returns table (id uuid, title text, category text, status text, image_url text, 
 language sql stable security definer set search_path = public, pg_temp
 as $$
     select items.id,
-        case when items.is_cash or items.category = 'Cash' then 'Cash' when lower(btrim(items.category)) in ('documents / ids', 'document/id') then 'Document/ID' else items.title end as title,
+        case
+            when items.is_cash or items.category = 'Cash' then 'Cash'
+            when lower(btrim(items.category)) in ('documents / ids', 'document/id') then 'Documents / IDs'
+            else items.title
+        end as title,
         case when items.is_cash or items.category = 'Cash' then 'Cash' else items.category end as category,
         items.status,
         case when items.is_cash or items.category = 'Cash' or lower(btrim(items.category)) in ('documents / ids', 'document/id') then null else items.image_url end as image_url,
@@ -1145,7 +1146,6 @@ as $$
 $$;
 revoke all on function public.list_public_items(integer, integer, text, date, date) from public;
 grant execute on function public.list_public_items(integer, integer, text, date, date) to anon, authenticated, service_role;
-
 
 -- ============================================================================
 -- 6b. RPC: PUBLIC ITEM DETAIL (US-18)
@@ -1190,7 +1190,7 @@ as $$
         items.ref_code,
         case
             when items.is_cash or items.category = 'Cash' then 'Cash'
-            when lower(btrim(items.category)) in ('documents / ids', 'document/id') then 'Document/ID'
+            when lower(btrim(items.category)) in ('documents / ids', 'document/id') then 'Documents / IDs'
             else items.title
         end as title,
         case when items.is_cash or items.category = 'Cash' then 'Cash' else items.category end as category,

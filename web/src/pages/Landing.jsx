@@ -52,11 +52,14 @@ export default function Landing() {
             {recent?.length === 0 && <p className="state__text">No items are being held right now.</p>}
             {recent?.length > 0 && (
               <ul className="results__list">
-                {recent.map((item) => <li key={item.id}><ResultCard item={item} browse /></li>)}
+                {recent.map((item) => (
+                  <li key={item.id}>
+                    <ResultCard item={item} browse />
+                  </li>
+                ))}
               </ul>
             )}
           </section>
-
           <div className="section-divider" aria-hidden="true">
             <span className="section-divider__mark" />
           </div>

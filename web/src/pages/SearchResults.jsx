@@ -34,7 +34,6 @@ function readPage(value) {
   const page = Number.parseInt(value ?? '1', 10);
   return Number.isFinite(page) && page > 0 ? page : 1;
 }
-
 function ResultList({ items, possible = false }) {
   return (
     <ul className="results__list">
@@ -169,11 +168,9 @@ export default function SearchResults({ browse = false }) {
     else nextParams.delete('to');
     if (browse) nextParams.delete('page');
 
+    const pathname = browse ? '/browse' : '/search';
     navigate(
-      {
-        pathname: browse ? '/browse' : '/search',
-        search: nextParams.toString(),
-      },
+      { pathname, search: nextParams.toString() },
       { replace: true, state: locationState },
     );
   }
@@ -211,8 +208,7 @@ export default function SearchResults({ browse = false }) {
   const state = !browse && !loading && !error ? outcome?.state : null;
   const browseLoading = browse && outcome?.key !== browseKey;
   const browseError = browse && !browseLoading && outcome?.error;
-  const browseItems =
-    browse && !browseLoading && !browseError ? (outcome?.items ?? []) : [];
+  const browseItems = browse && !browseLoading && !browseError ? (outcome?.items ?? []) : [];
   const browseHasNext = browse && !browseLoading && !browseError && outcome?.hasNext;
   const announcement =
     state === 'results'
@@ -338,7 +334,6 @@ export default function SearchResults({ browse = false }) {
               </div>
             </section>
           )}
-
           {browseLoading && <p className="loading" role="status">Loading held items&hellip;</p>}
           {browseError && (
             <section className="state state--error" role="alert">

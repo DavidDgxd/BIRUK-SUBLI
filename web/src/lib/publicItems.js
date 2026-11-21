@@ -14,7 +14,7 @@ export function normalizePublicItem(row) {
   const cash = row?.is_cash === true || category === 'cash';
   const secret = cash || category === 'documents / ids' || category === 'document/id';
   return {
-    id: row.id, title: cash ? 'Cash' : secret ? 'Document/ID' : row.title,
+    id: row.id, title: cash ? 'Cash' : secret ? 'Documents / IDs' : row.title,
     category: cash ? 'Cash' : row.category, status: row.status ?? 'held',
     image_url: secret ? null : row.image_url ?? null,
     date_received: row.date_received ?? null,
