@@ -500,7 +500,13 @@ describe('searchItems confidence tiers', () => {
       )
       .mockReturnValueOnce(
         resolvedRpc({
-          data: [{ id: 'legacy', status: 'held', similarity: 0.7 }],
+          data: [
+            { id: 'general', status: 'held', similarity: 0.7, title: 'Blue umbrella', category: 'General', image_url: 'u.jpg' },
+            { id: 'cash', status: 'held', similarity: 0.7, title: 'Brown envelope', category: 'Cash', image_url: 'cash.jpg' },
+            { id: 'cash-flag', status: 'held', similarity: 0.7, title: 'Wallet with cash', category: 'Other', is_cash: true, image_url: 'flag.jpg' },
+            { id: 'doc', status: 'held', similarity: 0.7, title: 'Juan Dela Cruz ID', category: 'Documents / IDs', image_url: 'id.jpg' },
+            { id: 'legacy', status: 'held', similarity: 0.7, title: 'Maria Santos passport', category: 'Document/ID', image_url: 'passport.jpg' },
+          ],
         }),
       );
 
@@ -514,7 +520,18 @@ describe('searchItems confidence tiers', () => {
       'match_items',
       expect.objectContaining({ query_embedding: [1, 0, 0] }),
     );
-    expect(result.best.map((item) => item.id)).toEqual(['legacy']);
+    expect(result.best.map((item) => item.id)).toEqual([
+      'general',
+      'cash',
+      'cash-flag',
+      'doc',
+      'legacy',
+    ]);
+    expect(result.best[0]).toMatchObject({ title: 'Blue umbrella', category: 'General', image_url: 'u.jpg' });
+    expect(result.best[1]).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
+    expect(result.best[2]).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
+    expect(result.best[3]).toMatchObject({ title: 'Documents / IDs', category: 'Documents / IDs', image_url: null });
+    expect(result.best[4]).toMatchObject({ title: 'Documents / IDs', category: 'Document/ID', image_url: null });
   });
 
   it('keeps photo search alive when the text tower fails', async () => {
