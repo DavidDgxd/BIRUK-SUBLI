@@ -3,9 +3,10 @@ import Icon from './Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /*
- * Minimal site header: the wordmark and one session-aware staff link.
- * Nothing renders while the session check is loading, so neither link flashes
- * up and swaps, and the link is hidden on the page it would open.
+ * Site header: the UB seal and system title, one offices link and one
+ * session-aware staff link. Nothing renders while the session check is
+ * loading, so neither link flashes up and swaps, and the link is hidden on
+ * the page it would open.
  */
 function staffLinkFor(status, isAdmin) {
   if (status === 'unauthenticated') {
@@ -31,22 +32,24 @@ export default function SiteHeader({ isHome = false }) {
   return (
     <header className="site-header">
       <Link className="site-header__brand" to="/">
-        {isHome && (
-          <Icon
-            name="ledger_crest"
-            className="site-header__crest"
-            size={18}
-            strokeWidth={1.5}
-          />
-        )}
+        {/* Official University of Baguio seal, used as shipped. The alt is
+            empty because the titles beside it name the university. */}
+        <img
+          className="site-header__seal"
+          src="/assets/ub/ub-seal.png"
+          alt=""
+          width="40"
+          height="40"
+          decoding="async"
+        />
         <span className="site-header__titles">
-          <span className="site-header__name">Biruk-Subli</span>
+          <span className="site-header__name">University of Baguio</span>
           <span
             className={`site-header__place${
               isHome ? ' site-header__place--ledger' : ''
             }`}
           >
-            {isHome ? 'BAGUIO CITY CIVIC LEDGER' : 'Baguio City lost & found'}
+            Lost &amp; Found System
           </span>
         </span>
       </Link>
