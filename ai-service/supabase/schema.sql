@@ -808,6 +808,26 @@ $$;
 revoke all on function public.mask_public_title(text, text, boolean) from public;
 revoke all on function public.mask_public_image_url(text, text, boolean) from public;
 
+-- Public-safe lexical text for the search RPCs (#128). Masked rows are scored
+-- against their masked title and public category only, so lexical_score and
+-- score cannot confirm a guessed amount or owner's name hidden in the raw
+-- title or caption. Queries such as "cash" or "id" still get a keyword boost.
+create or replace function public.mask_public_search_text (
+    p_search_text text, p_category text, p_is_cash boolean
+) returns text
+language sql immutable
+set search_path = public
+as $$
+    select case
+        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'cash cash'
+        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id')
+            then lower('Documents / IDs ' || p_category)
+        else p_search_text
+    end
+$$;
+
+revoke all on function public.mask_public_search_text(text, text, boolean) from public;
+
 create or replace function public.match_items (
     query_embedding vector(512),
     match_threshold float default 0.55,
@@ -871,7 +891,8 @@ grant execute on function public.match_items(vector, double precision, integer, 
 -- ============================================================================
 -- 6a. RPC: CITIZEN HYBRID SEARCH (US-22 follow-up)
 -- Blends the cosine similarity above with a lexical match over `search_text`,
--- which only contains public-safe fields (title, category, photo caption). The
+-- which only contains public-safe fields (title, category, photo caption), and
+-- over the masked title and category for Cash and Documents / IDs rows. The
 -- AI service appends English synonyms for Filipino queries, so the same call
 -- serves both languages without a translator on the critical path.
 --
@@ -968,12 +989,17 @@ as $$
     join public.offices on items.holding_office_id = offices.id
     cross join input
     cross join lateral (
+        select public.mask_public_search_text(
+            items.search_text, items.category, items.is_cash
+        ) as search_text
+    ) as src
+    cross join lateral (
         select greatest(
             coalesce(
                 (
                     select max(
                         case
-                            when items.search_text ~ ('\m' || token || '\M')
+                            when src.search_text ~ ('\m' || token || '\M')
                             then 1.0
                             else 0.0
                         end
@@ -984,7 +1010,7 @@ as $$
             ),
             coalesce(
                 similarity(
-                    items.search_text,
+                    src.search_text,
                     lower(coalesce(query_text, ''))
                 ),
                 0.0
@@ -1103,12 +1129,17 @@ as $$
         end as value
     ) as vector_score
     cross join lateral (
+        select public.mask_public_search_text(
+            items.search_text, items.category, items.is_cash
+        ) as search_text
+    ) as src
+    cross join lateral (
         select greatest(
             coalesce(
                 (
                     select max(
                         case
-                            when items.search_text ~ ('\m' || token || '\M')
+                            when src.search_text ~ ('\m' || token || '\M')
                             then 1.0
                             else 0.0
                         end
@@ -1119,7 +1150,7 @@ as $$
             ),
             coalesce(
                 similarity(
-                    items.search_text,
+                    src.search_text,
                     lower(coalesce(query_text, ''))
                 ),
                 0.0
