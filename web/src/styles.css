@@ -1,73 +1,175 @@
 /* ==========================================================================
-   Biruk-Subli — civic ledger design system
-   Pine ink on green-tinted paper, editorial serif headings, ruled rows,
-   generous whitespace, one primary action per screen.
+   University of Baguio — Lost & Found System
+   UB crimson on light institutional surfaces, Poppins headings over a
+   Raleway body, ruled rows, generous whitespace, one primary action
+   per screen. Biruk-Subli capstone demo wearing the UB identity.
    ========================================================================== */
 
+/* University of Baguio type pairing, self-hosted: Poppins carries headings,
+   labels, badges and controls; Raleway is a variable file carrying body copy.
+   Latin + latin-ext subsets so the peso sign renders in the brand face. */
 @font-face {
-  font-family: 'Newsreader';
-  font-style: normal;
-  font-weight: 400 600;
-  font-display: swap;
-  src: url('/fonts/newsreader-latin.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Atkinson Hyperlegible';
+  font-family: 'Poppins';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/atkinson-hyperlegible-400.woff2') format('woff2');
+  src: url('/assets/ub/fonts/poppins-latin-400.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: 'Atkinson Hyperlegible';
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/ub/fonts/poppins-latin-ext-400.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/ub/fonts/poppins-latin-500.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/ub/fonts/poppins-latin-ext-500.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/ub/fonts/poppins-latin-600.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/ub/fonts/poppins-latin-ext-600.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Poppins';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('/fonts/atkinson-hyperlegible-700.woff2') format('woff2');
+  src: url('/assets/ub/fonts/poppins-latin-700.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/assets/ub/fonts/poppins-latin-ext-700.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/assets/ub/fonts/raleway-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/assets/ub/fonts/raleway-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
   color-scheme: light dark;
 
-  /* Colour — light */
-  --paper: #f6fbf4;
+  /* Colour — light. Official University of Baguio web palette: crimson
+     #C3151C (Elementor global primary), charcoal ink, institutional gray,
+     and the seal's green reserved for found/success. */
+  --paper: #f7f7f8;
   --raised: #ffffff;
-  --inset: #eaefe8;
-  --ink: #181d19;
-  --ink-muted: #4e6354;
-  --rule: #c0c9c0;
-  --rule-strong: #707972;
+  --inset: #ececee;
+  --ink: #121212;
+  --ink-muted: #64656a;
+  --rule: #d4d5d9;
+  --rule-strong: #6c6d6f;
 
-  --primary: #2e6b4f;
-  --primary-hover: #24563f;
+  --primary: #c3151c;
+  --primary-hover: #a01016;
   --on-primary: #ffffff;
-  --primary-wash: #d7e9d9;
-  --primary-ink: #142b1d;
+  --primary-wash: #f9e4e5;
+  --primary-ink: #5c0d10;
 
-  --lost: #963246;
-  --lost-wash: #f6dde1;
+  --lost: #3c3736;
+  --lost-wash: #efeff1;
   --on-lost: #ffffff;
-  --found: #4a2f5e;
-  --found-wash: #e8def8;
+  --found: #007136;
+  --found-wash: #e3f1e9;
 
-  --success: #2e6b4f;
-  --success-wash: #d7e9d9;
-  --warning: #453400;
-  --warning-wash: #f7e8bf;
+  --success: #007136;
+  --success-wash: #e3f1e9;
+  --warning: #8a1118;
+  --warning-wash: #f9e4e5;
   --error: #b3261e;
   --error-wash: #f9dedc;
 
-  --focus: #2e6b4f;
-  --scrim: rgb(16 21 17 / 55%);
+  --focus: #c3151c;
+  --scrim: rgb(12 12 14 / 55%);
 
   /* Compatibility alias for the existing dark-mode assertion. */
-  --md-sys-color-surface: #f6fbf4;
+  --md-sys-color-surface: #f7f7f8;
 
   /* Type — four sizes, two weights */
-  --font-body: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-body: 'Raleway', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Poppins', 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', monospace;
   --text-body: 1rem;
   --text-lead: 1.125rem;
@@ -92,50 +194,50 @@
   --radius-panel: 0.5rem;
   --border: 1px solid var(--rule);
   --border-strong: 1px solid var(--rule-strong);
-  --shadow-overlay: 0 8px 24px rgb(16 21 17 / 14%);
+  --shadow-overlay: 0 8px 24px rgb(12 12 14 / 14%);
 
   /* Surface roles for the report forms. Aliases, so they follow either theme. */
   --surface-canvas: var(--paper);
   --surface-elevated: var(--raised);
   --surface-subtle: var(--inset);
   --text-primary: var(--ink);
-  /* Pine-tinted rule that still clears 3:1 against --surface-subtle. */
+  /* Crimson-tinted rule that still clears 3:1 against --surface-subtle. */
   --border-subtle: color-mix(in srgb, var(--primary) 75%, var(--inset));
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #101511;
-    --raised: #171d18;
-    --inset: #1c241e;
-    --ink: #e7ebe5;
-    --ink-muted: #b4ccba;
-    --rule: #3c463e;
-    --rule-strong: #6f7d72;
+    --paper: #17181c;
+    --raised: #1f2024;
+    --inset: #26272c;
+    --ink: #f2f3f5;
+    --ink-muted: #b0b2b8;
+    --rule: #3a3b41;
+    --rule-strong: #8a8c93;
 
-    --primary: #9ad8b7;
-    --primary-hover: #b5e7cb;
-    --on-primary: #0b2a1b;
-    --primary-wash: #173326;
-    --primary-ink: #d7f3e2;
+    --primary: #ff8f92;
+    --primary-hover: #ffb0b2;
+    --on-primary: #3a0608;
+    --primary-wash: #36181b;
+    --primary-ink: #ffd6d7;
 
-    --lost: #ffb2bc;
-    --lost-wash: #3a1d23;
-    --on-lost: #3a0710;
-    --found: #e9ddff;
-    --found-wash: #32253f;
+    --lost: #c9cbcf;
+    --lost-wash: #2a2b30;
+    --on-lost: #17181c;
+    --found: #5fd39a;
+    --found-wash: #16342a;
 
-    --success: #9ad8b7;
-    --success-wash: #173326;
-    --warning: #ffe08a;
-    --warning-wash: #44360f;
+    --success: #5fd39a;
+    --success-wash: #16342a;
+    --warning: #ff9d9c;
+    --warning-wash: #3a1618;
     --error: #ffb4ab;
     --error-wash: #4d1713;
 
-    --focus: #9ad8b7;
+    --focus: #ff8f92;
     --scrim: rgb(0 0 0 / 65%);
 
-    --md-sys-color-surface: #101511;
+    --md-sys-color-surface: #17181c;
     --shadow-overlay: 0 8px 24px rgb(0 0 0 / 55%);
   }
 }
@@ -333,46 +435,46 @@ h2[tabindex='-1']:focus,
 }
 
 .landing-page {
-  --paper: #f6fbf4;
+  --paper: #f7f7f8;
   --raised: #ffffff;
-  --inset: #eaefe8;
-  --ink: #181d19;
-  --ink-muted: #4e6354;
-  --rule: rgba(46, 107, 79, 0.24);
-  --rule-strong: rgba(46, 107, 79, 0.45);
-  --primary: #2e6b4f;
-  --primary-hover: #24563f;
+  --inset: #ececee;
+  --ink: #121212;
+  --ink-muted: #64656a;
+  --rule: rgba(18, 18, 18, 0.16);
+  --rule-strong: rgba(18, 18, 18, 0.42);
+  --primary: #c3151c;
+  --primary-hover: #a01016;
   --on-primary: #ffffff;
-  --primary-wash: #d7e9d9;
-  --primary-ink: #142b1d;
-  --focus: #2e6b4f;
+  --primary-wash: #f9e4e5;
+  --primary-ink: #5c0d10;
+  --focus: #c3151c;
   --error: #b3261e;
   --error-wash: #f9dedc;
 
-  --landing-bg: #f6fbf4;
+  --landing-bg: #f7f7f8;
   --landing-panel: #ffffff;
-  --landing-border: rgba(46, 107, 79, 0.24);
-  --landing-divider: rgba(46, 107, 79, 0.22);
-  --landing-mark: rgba(46, 107, 79, 0.55);
-  --landing-heading: #172017;
-  --landing-heading-strong: #101a12;
-  --landing-muted: #4d5c50;
+  --landing-border: rgba(18, 18, 18, 0.16);
+  --landing-divider: rgba(195, 21, 28, 0.38);
+  --landing-mark: rgba(195, 21, 28, 0.75);
+  --landing-heading: #121212;
+  --landing-heading-strong: #000000;
+  --landing-muted: #5c5d61;
   --landing-tile: #ffffff;
-  --landing-tile-hover: #eef4ec;
-  --landing-console: #eef3ec;
+  --landing-tile-hover: #f9e4e5;
+  --landing-console: #efeff1;
   --landing-field: #ffffff;
-  --landing-field-border: rgba(46, 107, 79, 0.35);
-  --landing-placeholder: #5c6f61;
-  --landing-icon: #2e6b4f;
-  --landing-step: #2e6b4f;
-  --landing-focus: #2e6b4f;
-  --landing-focus-halo: rgba(46, 107, 79, 0.22);
-  --landing-attach-ink: #2e4a39;
-  --landing-attach-hover: #e3ece4;
-  --landing-lost-wash: #f6dde1;
-  --landing-lost-ink: #963246;
-  --landing-found-wash: #efe8f6;
-  --landing-found-ink: #4a2f5e;
+  --landing-field-border: rgba(18, 18, 18, 0.55);
+  --landing-placeholder: #6b6c71;
+  --landing-icon: #c3151c;
+  --landing-step: #c3151c;
+  --landing-focus: #c3151c;
+  --landing-focus-halo: rgba(195, 21, 28, 0.22);
+  --landing-attach-ink: #3c3736;
+  --landing-attach-hover: #ececee;
+  --landing-lost-wash: #ececee;
+  --landing-lost-ink: #3c3736;
+  --landing-found-wash: #e3f1e9;
+  --landing-found-ink: #007136;
 
   min-block-size: 100dvh;
   background: var(--landing-bg);
@@ -381,52 +483,52 @@ h2[tabindex='-1']:focus,
 
 @media (prefers-color-scheme: dark) {
   .landing-page {
-    --paper: #101511;
-    --raised: #18241b;
-    --inset: #162019;
-    --ink: #e8eee8;
-    --ink-muted: #a9c2b0;
-    --rule: rgba(70, 130, 95, 0.28);
-    --rule-strong: rgba(70, 130, 95, 0.45);
-    --primary: #9ad8b7;
-    --primary-hover: #b5e7cb;
-    --on-primary: #0b2a1b;
-    --primary-wash: #173326;
-    --primary-ink: #d7f3e2;
-    --focus: #9ad8b7;
+    --paper: #17181c;
+    --raised: #1f2024;
+    --inset: #26272c;
+    --ink: #f2f3f5;
+    --ink-muted: #b0b2b8;
+    --rule: rgba(242, 243, 245, 0.16);
+    --rule-strong: rgba(242, 243, 245, 0.42);
+    --primary: #ff8f92;
+    --primary-hover: #ffb0b2;
+    --on-primary: #3a0608;
+    --primary-wash: #36181b;
+    --primary-ink: #ffd6d7;
+    --focus: #ff8f92;
     --error: #ffb4ab;
     --error-wash: #4d1713;
 
-    --landing-bg: #101511;
-    --landing-panel: #141d17;
-    --landing-border: rgba(70, 130, 95, 0.28);
-    --landing-divider: rgba(46, 107, 79, 0.3);
-    --landing-mark: rgba(70, 130, 95, 0.7);
-    --landing-heading: #e8eee8;
-    --landing-heading-strong: #eef4ee;
-    --landing-muted: #a9c2b0;
-    --landing-tile: #162218;
-    --landing-tile-hover: #1c2c20;
-    --landing-console: #101511;
-    --landing-field: #18241b;
-    --landing-field-border: rgba(70, 130, 95, 0.32);
-    --landing-placeholder: #8da796;
-    --landing-icon: #7fb693;
-    --landing-step: #46825f;
-    --landing-focus: #9ad8b7;
-    --landing-focus-halo: rgba(154, 216, 183, 0.32);
-    --landing-attach-ink: #c7d8ca;
-    --landing-attach-hover: #162019;
-    --landing-lost-wash: rgba(150, 50, 70, 0.18);
-    --landing-lost-ink: #e6a3b0;
-    --landing-found-wash: rgba(184, 158, 201, 0.16);
-    --landing-found-ink: #cdb7e0;
+    --landing-bg: #17181c;
+    --landing-panel: #1f2024;
+    --landing-border: rgba(242, 243, 245, 0.16);
+    --landing-divider: rgba(255, 143, 146, 0.42);
+    --landing-mark: rgba(255, 143, 146, 0.8);
+    --landing-heading: #f2f3f5;
+    --landing-heading-strong: #ffffff;
+    --landing-muted: #b0b2b8;
+    --landing-tile: #1f2024;
+    --landing-tile-hover: #36181b;
+    --landing-console: #17181c;
+    --landing-field: #1f2024;
+    --landing-field-border: rgba(242, 243, 245, 0.35);
+    --landing-placeholder: #8a8c93;
+    --landing-icon: #ff8f92;
+    --landing-step: #ff8f92;
+    --landing-focus: #ff8f92;
+    --landing-focus-halo: rgba(255, 143, 146, 0.32);
+    --landing-attach-ink: #c9cbcf;
+    --landing-attach-hover: #26272c;
+    --landing-lost-wash: #2a2b30;
+    --landing-lost-ink: #c9cbcf;
+    --landing-found-wash: #16342a;
+    --landing-found-ink: #5fd39a;
   }
 }
 
 .landing-page ::selection {
-  background: #2e6b4f;
-  color: #f6fbf4;
+  background: #c3151c;
+  color: #ffffff;
 }
 
 .shell--landing {
@@ -464,30 +566,34 @@ h2[tabindex='-1']:focus,
 
 .site-header__name {
   font-family: var(--font-display);
-  font-size: var(--text-title);
+  font-size: clamp(1.0625rem, 0.55rem + 1.2vw, 1.375rem);
   font-weight: var(--weight-strong);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
   white-space: nowrap;
 }
 
-.site-header__crest {
-  color: var(--primary);
+/* Official University of Baguio seal. Presented as shipped: never recolored,
+   cropped, stretched or overlapped, with clear space on all sides. */
+.site-header__seal {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  flex: none;
 }
 
 .site-header__place {
-  display: none;
-  color: var(--ink-muted);
-  font-size: var(--text-body);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .shell--landing .site-header__place--ledger {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: var(--weight-strong);
-  letter-spacing: 0.12em;
-  line-height: 1.4;
-  text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 .site-header__nav {
@@ -523,8 +629,41 @@ h2[tabindex='-1']:focus,
   color: var(--ink-muted);
 }
 
+.site-footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-end: var(--space-2);
+  color: var(--ink);
+}
+
+.site-footer__name {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.01em;
+}
+
+.site-footer__system {
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
 .site-footer p {
   max-inline-size: 62ch;
+}
+
+.site-footer__disclosure {
+  margin-block-start: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .shell--landing .site-header {
@@ -534,12 +673,6 @@ h2[tabindex='-1']:focus,
 
 .shell--landing .site-header__brand {
   color: var(--ink);
-}
-
-.shell--landing .site-header__crest {
-  inline-size: 18px;
-  block-size: 18px;
-  stroke-width: 1.5;
 }
 
 .shell--landing .site-header__name {
@@ -770,11 +903,11 @@ h2[tabindex='-1']:focus,
 }
 
 .action-tile--lost {
-  border-color: rgba(150, 50, 70, 0.5);
+  border-color: rgba(60, 55, 54, 0.55);
 }
 
 .action-tile--found {
-  border-color: rgba(138, 92, 170, 0.5);
+  border-color: rgba(0, 113, 54, 0.55);
 }
 
 .action-tile__badge {
@@ -1615,7 +1748,7 @@ input[type='search']::-webkit-search-decoration {
 
 .form__legend--required {
   padding: var(--space-3) var(--space-4);
-  border-inline-start: 4px solid var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
   border-radius: var(--radius-control);
   background: var(--primary-wash);
   color: var(--primary-ink);

@@ -1,9 +1,16 @@
 export default function SiteFooter() {
   return (
     <footer className="site-footer">
+      <div className="site-footer__brand">
+        <span className="site-footer__name">University of Baguio</span>
+        <span className="site-footer__system">Lost &amp; Found System</span>
+      </div>
       <p>
-        Biruk-Subli is a Baguio City lost-and-found demo. Items are held and
-        released only at participating city office counters.
+        Items are held and released only at participating office counters. Bring
+        a valid ID to collect an item.
+      </p>
+      <p className="site-footer__disclosure">
+        University capstone demo. Not an official University of Baguio service.
       </p>
     </footer>
   );
