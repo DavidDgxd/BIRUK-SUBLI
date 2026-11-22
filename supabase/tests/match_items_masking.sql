@@ -1,4 +1,4 @@
--- Issue #123: real-Postgres masking tests for every public item RPC.
+-- Issues #123 and #128: real-Postgres masking tests for every public item RPC.
 -- Run: psql -h localhost -p 5433 -U postgres -v ON_ERROR_STOP=1 -f supabase/tests/match_items_masking.sql
 \set ON_ERROR_STOP on
 
@@ -37,6 +37,7 @@ $$;
 
 \ir ../migrations/20261114120000_public_browse_items.sql
 \ir ../migrations/20261121120000_match_items_redact_cash_documents.sql
+\ir ../migrations/20261123120000_mask_lexical_search_text.sql
 
 create function pg_temp.vec(a float, b float default 0) returns vector(512)
 language sql as $$ select ('[' || a || ',' || b || ',' || repeat('0,', 509) || '0]')::vector(512) $$;
@@ -99,4 +100,74 @@ begin
     select title into t from public.match_items(pg_temp.vec(1, 0), 0.55, 50, null, null, null)
       order by similarity desc limit 1;
     if t is distinct from 'Blue umbrella' then raise exception 'ranking regressed: %', t; end if;
+end $$;
+
+-- Issue #128: keyword scores must not reveal masked text. Controls share each
+-- masked row's public text and vectors but hide different text, so any score
+-- gap between a masked row and its control would come from the hidden text.
+insert into public.items (id, ref_code, title, category, status, image_url, holding_office_id, date_received, created_at, is_cash, embedding, text_embedding, search_text) values
+    ('11111111-1111-1111-1111-111111111110', 'REF-CASH-CONTROL', 'Coin purse', 'Cash', 'held', 'purse.jpg', 'office-1', current_date - 10, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Coin purse Cash')),
+    ('11111111-1111-1111-1111-111111111111', 'REF-DOC-CONTROL', 'Library card', 'Documents / IDs', 'held', 'card.jpg', 'office-1', current_date - 11, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Library card Documents / IDs')),
+    ('11111111-1111-1111-1111-111111111112', 'REF-DOC-LEGACY-CONTROL', 'Bus pass', 'Document/ID', 'held', 'pass.jpg', 'office-1', current_date - 12, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Bus pass Document/ID'));
+
+create temp table lexical as
+    select q.label, 'match_items_hybrid' rpc, h.id, h.lexical_score, h.score
+    from (values ('secret', 'juan dela cruz maria santos passport brown envelope wallet 5000'),
+                 ('cash', 'cash'), ('documents', 'documents'), ('umbrella', 'umbrella'), ('empty', '')) q(label, text)
+    cross join lateral public.match_items_hybrid(pg_temp.vec(1, 0), 0.55, 50, null, null, null, q.text) h
+    union all
+    select q.label, 'match_items_two_tower', t.id, t.lexical_score, t.score
+    from (values ('secret', 'juan dela cruz maria santos passport brown envelope wallet 5000'),
+                 ('cash', 'cash'), ('documents', 'documents'), ('umbrella', 'umbrella'), ('empty', '')) q(label, text)
+    cross join lateral public.match_items_two_tower(pg_temp.vec384(1, 0), null, 0.0, 50, null, null, null, q.text) t
+    union all
+    -- query_text null: the photo-only path, where search_tokens yields no tokens.
+    select 'photo-only', 'match_items_hybrid', h.id, h.lexical_score, h.score
+    from public.match_items_hybrid(pg_temp.vec(1, 0), 0.55, 50, null, null, null, null) h
+    union all
+    select 'photo-only', 'match_items_two_tower', t.id, t.lexical_score, t.score
+    from public.match_items_two_tower(pg_temp.vec384(1, 0), null, 0.0, 50, null, null, null, null) t;
+
+-- Each masked row paired with the control that has the same public text.
+create temp table masked_pairs (masked uuid, control uuid);
+insert into masked_pairs values
+    ('11111111-1111-1111-1111-111111111102', '11111111-1111-1111-1111-111111111110'),
+    ('11111111-1111-1111-1111-111111111103', '11111111-1111-1111-1111-111111111110'),
+    ('11111111-1111-1111-1111-111111111104', '11111111-1111-1111-1111-111111111111'),
+    ('11111111-1111-1111-1111-111111111105', '11111111-1111-1111-1111-111111111112');
+
+do $$
+declare
+    n int;
+begin
+    select count(*) into n from (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    cross join masked_pairs p
+    left join lexical m on m.label = 'secret' and m.rpc = r.rpc and m.id = p.masked
+    left join lexical c on c.label = 'secret' and c.rpc = r.rpc and c.id = p.control
+    where m.id is null or c.id is null
+       or m.lexical_score is distinct from c.lexical_score or m.score is distinct from c.score;
+    if n > 0 then raise exception '% masked rows score differently from their control: hidden text leaks', n; end if;
+
+    select count(*) into n from lexical
+    where label = 'secret' and id in (select masked from masked_pairs) and lexical_score >= 1;
+    if n > 0 then raise exception '% masked rows got a keyword hit on hidden text', n; end if;
+
+    select count(*) into n from (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    cross join (values ('cash', '11111111-1111-1111-1111-111111111102'::uuid),
+                       ('cash', '11111111-1111-1111-1111-111111111103'::uuid),
+                       ('documents', '11111111-1111-1111-1111-111111111104'::uuid),
+                       ('documents', '11111111-1111-1111-1111-111111111105'::uuid),
+                       ('umbrella', '11111111-1111-1111-1111-111111111101'::uuid)) e(label, id)
+    left join lexical x on x.label = e.label and x.rpc = r.rpc and x.id = e.id
+    where x.lexical_score is distinct from 1::float;
+    if n > 0 then raise exception '% public-text keyword hits were lost', n; end if;
+
+    select count(*) into n from lexical where label in ('empty', 'photo-only') and lexical_score is not null;
+    if n > 0 then raise exception '% rows returned a lexical_score for a query with no tokens', n; end if;
+
+    select count(*) into n from (values ('empty'), ('photo-only')) q(label)
+    cross join (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    left join (select label, rpc, count(*) total from lexical group by label, rpc) c on c.label = q.label and c.rpc = r.rpc
+    where c.total is distinct from 8;
+    if n > 0 then raise exception '% no-token queries returned the wrong row count', n; end if;
 end $$;
