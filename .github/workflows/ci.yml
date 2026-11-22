@@ -143,6 +143,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v6
         with:
@@ -254,3 +267,10 @@ jobs:
       # in the SQL that ships rather than executing it.
       - name: Lost-report closure guarantees
         run: python3 -m unittest discover -s supabase/tests -p 'test_*.py' -v
+
+      - name: Database masking tests
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -f supabase/tests/match_items_masking.sql

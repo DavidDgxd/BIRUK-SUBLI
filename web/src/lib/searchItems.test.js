@@ -500,7 +500,14 @@ describe('searchItems confidence tiers', () => {
       )
       .mockReturnValueOnce(
         resolvedRpc({
-          data: [{ id: 'legacy', status: 'held', similarity: 0.7 }],
+          data: [
+            // is_cash rows arrive as category 'Cash' after the SQL RPC masks them.
+            { id: 'general', status: 'held', similarity: 0.7, title: 'Blue umbrella', category: 'General', image_url: 'u.jpg' },
+            { id: 'cash', status: 'held', similarity: 0.7, title: 'Brown envelope', category: 'Cash', image_url: 'cash.jpg' },
+            { id: 'cash-flag', status: 'held', similarity: 0.7, title: 'Wallet with cash', category: 'Cash', image_url: 'flag.jpg' },
+            { id: 'doc', status: 'held', similarity: 0.7, title: 'Juan Dela Cruz ID', category: 'Documents / IDs', image_url: 'id.jpg' },
+            { id: 'legacy', status: 'held', similarity: 0.7, title: 'Maria Santos passport', category: 'Document/ID', image_url: 'passport.jpg' },
+          ],
         }),
       );
 
@@ -514,7 +521,39 @@ describe('searchItems confidence tiers', () => {
       'match_items',
       expect.objectContaining({ query_embedding: [1, 0, 0] }),
     );
-    expect(result.best.map((item) => item.id)).toEqual(['legacy']);
+    expect(result.best.map((item) => item.id)).toEqual([
+      'general',
+      'cash',
+      'cash-flag',
+      'doc',
+      'legacy',
+    ]);
+    expect(result.best[0]).toMatchObject({ title: 'Blue umbrella', category: 'General', image_url: 'u.jpg' });
+    expect(result.best[1]).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
+    expect(result.best[2]).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
+    expect(result.best[3]).toMatchObject({ title: 'Documents / IDs', category: 'Documents / IDs', image_url: null });
+    expect(result.best[4]).toMatchObject({ title: 'Documents / IDs', category: 'Document/ID', image_url: null });
+  });
+
+  it('masks Cash and Documents / IDs from two-tower and hybrid responses', async () => {
+    const signal = new AbortController().signal;
+    rpc.mockReturnValueOnce(resolvedRpc({
+      data: [
+        row('cash', 0.9, { lexical_score: 1, title: 'Brown envelope', category: 'Cash', image_url: 'cash.jpg' }),
+        row('doc', 0.9, { lexical_score: 1, title: 'Juan Dela Cruz ID', category: 'Documents / IDs', image_url: 'id.jpg' }),
+      ],
+    }));
+    const twoTower = await searchItems({ text: 'wallet', signal });
+    expect(twoTower.best[0]).toMatchObject({ title: 'Cash', category: 'Cash', image_url: null });
+    expect(twoTower.best[1]).toMatchObject({ title: 'Documents / IDs', image_url: null });
+
+    embedQuery.mockRejectedValue(new Error('text tower offline'));
+    rpc.mockReturnValueOnce(resolvedRpc({
+      data: [row('legacy', 0.9, { lexical_score: 1, title: 'Maria Santos passport', category: 'Document/ID', image_url: 'passport.jpg' })],
+    }));
+    const hybrid = await searchItems({ text: 'wallet', signal });
+    expect(rpc).toHaveBeenLastCalledWith('match_items_hybrid', expect.anything());
+    expect(hybrid.best[0]).toMatchObject({ title: 'Documents / IDs', image_url: null });
   });
 
   it('keeps photo search alive when the text tower fails', async () => {

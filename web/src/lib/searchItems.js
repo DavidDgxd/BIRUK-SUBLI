@@ -54,6 +54,26 @@ export function isSearchableItemStatus(status) {
   );
 }
 
+const DOCUMENT_CATEGORIES = ['documents / ids', 'document/id'];
+
+/**
+ * Defense-in-depth for a stale or unpatched search RPC. The SQL RPCs already
+ * convert `is_cash = true` rows to `category = 'Cash'` / `title = 'Cash'`, so
+ * the response has no is_cash column and the category is the only signal here.
+ */
+export function maskSearchItem(item) {
+  const category = String(item?.category ?? '').trim().toLowerCase();
+  const cash = category === 'cash';
+  const document = DOCUMENT_CATEGORIES.includes(category);
+  if (!cash && !document) return item;
+  return {
+    ...item,
+    title: cash ? 'Cash' : 'Documents / IDs',
+    category: cash ? 'Cash' : item.category,
+    image_url: null,
+  };
+}
+
 /**
  * Turns a raw cosine similarity into a readable percentage and colour tier.
  * Only best matches display it; possible matches hide it because 0.64 (the best
@@ -386,7 +406,7 @@ export async function searchItems({
       isSearchableItemStatus(item.status) &&
       scoreOf(item) >= MATCH_THRESHOLD &&
       (!office || item.holding_office_id === office),
-  );
+  ).map(maskSearchItem);
 
   // The RPC already sorts, but sorting here keeps the cap deterministic if a
   // stale function or a test fixture returns rows in another order.
