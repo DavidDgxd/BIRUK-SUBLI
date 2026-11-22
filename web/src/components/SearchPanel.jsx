@@ -279,7 +279,7 @@ export default function SearchPanel({
               enterKeyHint="search"
               autoComplete="off"
               maxLength={MAX_QUERY_LENGTH}
-              placeholder="e.g., umbrella left at Burnham Park, wallet along Session Road..."
+              placeholder="e.g., umbrella left at the UB Cardinals Gym, wallet along the Main Building hall..."
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);

@@ -509,7 +509,7 @@ export default function ItemDetails() {
                             setClaimantIdRef(event.target.value);
                             setReleaseError('');
                           }}
-                          placeholder="e.g. UMID-4921"
+                          placeholder="e.g. UBID-4921"
                           autoComplete="off"
                           maxLength={100}
                           required

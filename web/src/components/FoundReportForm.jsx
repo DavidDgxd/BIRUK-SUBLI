@@ -264,7 +264,7 @@ export default function FoundReportForm({ onReceiptChange }) {
           className="field__control"
           type="text"
           maxLength={MAX_SHORT_LENGTH}
-          placeholder="Session Road, near the market entrance"
+          placeholder="UB Cardinals Gym, near the bleacher entrance"
           required
           value={foundLocation}
           aria-describedby={

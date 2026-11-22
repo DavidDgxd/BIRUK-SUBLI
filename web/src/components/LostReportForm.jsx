@@ -252,7 +252,7 @@ export default function LostReportForm({ onReceiptChange }) {
           className="field__control"
           type="text"
           maxLength={MAX_SHORT_LENGTH}
-          placeholder="Session Road, or jeepney to Aurora Hill"
+          placeholder="UB Cardinals Gym, or the covered walk from the main gate"
           required
           value={areaRoute}
           aria-describedby={error ? `${areaHintId} ${errorId}` : areaHintId}

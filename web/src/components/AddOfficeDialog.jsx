@@ -210,7 +210,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             className="field__control"
             type="text"
             maxLength={MAX_ID}
-            placeholder="CITY_HALL_INFO"
+            placeholder="UB_GYM_DESK"
             pattern="[A-Za-z0-9_-]{2,40}"
             required
             value={form.id}
@@ -221,7 +221,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             onChange={setField('id')}
           />
           <p className="field__hint" id={siteCodeHintId}>
-            Short unique key for this counter, e.g. BCPIO. Letters, numbers,
+            Short unique key for this counter, e.g. SAO_DESK. Letters, numbers,
             underscores and hyphens.
           </p>
         </div>
@@ -323,7 +323,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
               className="field__control"
               type="email"
               maxLength={MAX_EMAIL}
-              placeholder="office@baguio.gov.ph"
+              placeholder="office@ub-demo.edu.ph"
               required
               value={form.email}
               aria-describedby={error ? errorIds : undefined}
