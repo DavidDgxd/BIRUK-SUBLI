@@ -17,8 +17,8 @@ export default function Landing() {
           <div className="home__intro">
             <h1>Find what you lost.</h1>
             <p className="lead">
-              Official public registry for items held across Baguio City
-              counters and stations. No account required.
+              Search items held at University of Baguio offices and counters. No
+              account required.
             </p>
             <SearchPanel />
           </div>

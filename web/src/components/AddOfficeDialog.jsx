@@ -192,7 +192,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             className="field__control"
             type="text"
             maxLength={MAX_NAME}
-            placeholder="City Hall Information Desk"
+            placeholder="Main Building Information Desk"
             required
             value={form.name}
             aria-describedby={error ? errorIds : undefined}
@@ -235,7 +235,7 @@ export default function AddOfficeDialog({ open, onClose, onCreated }) {
             className="field__control"
             type="text"
             maxLength={MAX_ADDRESS}
-            placeholder="City Hall lobby, Baguio City"
+            placeholder="Main Building lobby, General Luna Road"
             required
             value={form.address}
             aria-describedby={error ? errorIds : undefined}

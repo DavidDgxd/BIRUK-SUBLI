@@ -184,7 +184,7 @@ export default function FoundReportForm({ onReceiptChange }) {
           {receipt.refCode}
         </p>
         <p className="state__text">
-          Keep this reference code. Hand the item in at any participating city
+          Keep this reference code. Hand the item in at any participating
           office counter and staff will log it against this code.
         </p>
         {!receipt.usedPhoto && (

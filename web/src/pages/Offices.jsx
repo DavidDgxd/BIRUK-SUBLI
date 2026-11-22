@@ -31,8 +31,8 @@ export default function Offices() {
               Drop-off offices
             </h1>
             <p className="lead">
-              Found something in Baguio? Bring it to any participating city
-              office counter below. Staff will log it against your report.
+              Found something on campus? Bring it to any participating office
+              counter below. Staff will log it against your report.
             </p>
           </div>
 

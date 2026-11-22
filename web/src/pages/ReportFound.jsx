@@ -33,8 +33,8 @@ export default function ReportFound() {
             </h1>
             {!received && (
               <p className="lead">
-                Found something in Baguio? Tell us what and where, then hand it
-                in at a city office counter. No account needed.
+                Found something on campus? Tell us what and where, then hand it
+                in at an office counter. No account needed.
               </p>
             )}
           </div>
