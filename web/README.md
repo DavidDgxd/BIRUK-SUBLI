@@ -5,7 +5,7 @@ Baguio's centralized lost-and-found system. Items are held and released at
 participating office counters. The site helps visitors find where an item is
 held and report lost or found items. It does not support peer-to-peer
 exchange, in-app messaging, or online claims. The interface wears the
-official UB identity (seal, crimson, Poppins/Raleway); see `../DESIGN.md`.
+official UB identity (seal, crimson, Poppins/Raleway).
 
 **Status:** landing page, search results, the lost- and found-item reports, office
 provisioning, and the shared office login with the staff intake counter are built.
@@ -47,7 +47,7 @@ src/
   `src/styles.css` (light, dark, and the landing-page scope). Components
   reference `var(--*)` tokens only. The palette is the official University of
   Baguio web identity: crimson `#C3151C`, charcoal ink, institutional gray,
-  and the seal's green reserved for found/success. See `../DESIGN.md`.
+  and the seal's green reserved for found/success.
 - Spacing, type scale, elevation and layout tokens are in section 1 of `styles.css`.
 - Light and dark follow `prefers-color-scheme`.
 
