@@ -778,6 +778,36 @@ create table if not exists public.dismissed_matches (
 drop function if exists public.match_items(vector, double precision, integer, text, date);
 drop function if exists public.match_items(vector, double precision, integer, text, date, date);
 
+-- Shared masking helpers so every public RPC uses one definition of the rule.
+create or replace function public.mask_public_title (
+    p_title text, p_category text, p_is_cash boolean
+) returns text
+language sql immutable
+set search_path = public
+as $$
+    select case
+        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'Cash'
+        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id') then 'Documents / IDs'
+        else p_title
+    end
+$$;
+
+create or replace function public.mask_public_image_url (
+    p_image_url text, p_category text, p_is_cash boolean
+) returns text
+language sql immutable
+set search_path = public
+as $$
+    select case
+        when coalesce(p_is_cash, false) or p_category = 'Cash'
+             or lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id') then null
+        else p_image_url
+    end
+$$;
+
+revoke all on function public.mask_public_title(text, text, boolean) from public;
+revoke all on function public.mask_public_image_url(text, text, boolean) from public;
+
 create or replace function public.match_items (
     query_embedding vector(512),
     match_threshold float default 0.55,
@@ -807,14 +837,10 @@ as $$
     select
         items.id,
         items.ref_code,
-        case
-            when items.is_cash or items.category = 'Cash' then 'Cash'
-            when lower(btrim(items.category)) in ('documents / ids', 'document/id') then 'Documents / IDs'
-            else items.title
-        end as title,
+        public.mask_public_title(items.title, items.category, items.is_cash) as title,
         case when items.is_cash or items.category = 'Cash' then 'Cash' else items.category end as category,
         items.status,
-        case when items.is_cash or items.category = 'Cash' or lower(btrim(items.category)) in ('documents / ids', 'document/id') then null else items.image_url end as image_url,
+        public.mask_public_image_url(items.image_url, items.category, items.is_cash) as image_url,
         items.holding_office_id,
         offices.name as holding_office_name,
         offices.counter_hours,
@@ -919,10 +945,10 @@ as $$
     select
         items.id,
         items.ref_code,
-        items.title,
-        items.category,
+        public.mask_public_title(items.title, items.category, items.is_cash) as title,
+        case when items.is_cash or items.category = 'Cash' then 'Cash' else items.category end as category,
         items.status,
-        items.image_url,
+        public.mask_public_image_url(items.image_url, items.category, items.is_cash) as image_url,
         items.holding_office_id,
         offices.name as holding_office_name,
         offices.counter_hours,
@@ -1032,10 +1058,10 @@ as $$
     select
         items.id,
         items.ref_code,
-        items.title,
-        items.category,
+        public.mask_public_title(items.title, items.category, items.is_cash) as title,
+        case when items.is_cash or items.category = 'Cash' then 'Cash' else items.category end as category,
         items.status,
-        items.image_url,
+        public.mask_public_image_url(items.image_url, items.category, items.is_cash) as image_url,
         items.holding_office_id,
         offices.name as holding_office_name,
         offices.counter_hours,

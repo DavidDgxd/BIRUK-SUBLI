@@ -56,10 +56,14 @@ export function isSearchableItemStatus(status) {
 
 const DOCUMENT_CATEGORIES = ['documents / ids', 'document/id'];
 
-/** Defense-in-depth for a stale or unpatched search RPC. */
+/**
+ * Defense-in-depth for a stale or unpatched search RPC. The SQL RPCs already
+ * convert `is_cash = true` rows to `category = 'Cash'` / `title = 'Cash'`, so
+ * the response has no is_cash column and the category is the only signal here.
+ */
 export function maskSearchItem(item) {
   const category = String(item?.category ?? '').trim().toLowerCase();
-  const cash = item?.is_cash === true || category === 'cash';
+  const cash = category === 'cash';
   const document = DOCUMENT_CATEGORIES.includes(category);
   if (!cash && !document) return item;
   return {
