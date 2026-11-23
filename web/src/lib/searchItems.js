@@ -7,7 +7,8 @@ import { embedImage, embedQuery, embedText, SearchError } from './aiService.js';
 // (lexical_score >= LEXICAL_CONFIDENCE) or the relevant vector is strong on its
 // own. This stops a hub image from being "best" for an unrelated query while
 // keeping a genuine semantic match in the possible tier. A row that names the
-// query word joins the best tier regardless of the BEST_DELTA band.
+// query word and is also a strong text match joins the best tier regardless of
+// the BEST_DELTA band.
 export const MATCH_THRESHOLD = 0.3;
 export const MATCH_COUNT = 15;
 export const BEST_FLOOR = 0.72;
@@ -31,14 +32,17 @@ export const LEXICAL_CONFIDENCE = 0.5;
 // rows.
 export const LEXICAL_WEIGHT = 0.25;
 
+// Mirrors the vector blend inside match_items_two_tower: the text and image
+// similarities combine 0.65 / 0.35 when both towers return a value.
+export const TEXT_WEIGHT = 0.65;
+export const IMAGE_WEIGHT = 0.35;
+
 // Absorbs the binary rounding in a delta comparison, e.g. 0.664 - 0.07 is
 // 0.5940000000000001, which would otherwise drop an item sitting on 0.594.
 const EPSILON = 1e-9;
 
-// lexical_score is 1.0 when `search_tokens` finds the query word in the item's
-// public text (title, category or caption). A row that names the query is a
-// confident hit on its own, so it joins the best tier even when another row
-// scores higher.
+// lexical_score is 1.0 when `search_tokens` finds a query word in the item's
+// public text (title, category or caption).
 const EXACT_TOKEN_SCORE = 1 - EPSILON;
 
 /**
@@ -138,7 +142,10 @@ export function matchSimilarityOf(item) {
     Number.isFinite(item.text_similarity) &&
     Number.isFinite(item.image_similarity)
   ) {
-    return 0.65 * item.text_similarity + 0.35 * item.image_similarity;
+    return (
+      TEXT_WEIGHT * item.text_similarity +
+      IMAGE_WEIGHT * item.image_similarity
+    );
   }
   if (Number.isFinite(item.text_similarity)) return item.text_similarity;
   if (Number.isFinite(item.image_similarity)) return item.image_similarity;
@@ -175,11 +182,18 @@ function isConfident(item, score) {
   );
 }
 
-/** True when the item's own public text contains the query word. */
-function namesQuery(item) {
+/**
+ * True when the row's public text names the query and the text tower agrees.
+ * lexical_score is 1.0 when any single query token matches, so a two-word query
+ * like "black wallet" would otherwise promote every black row. Requiring a
+ * strong text similarity keeps the bypass to genuine near-ties.
+ */
+function isStrongNamedMatch(item) {
   return (
     Number.isFinite(item.lexical_score) &&
-    item.lexical_score >= EXACT_TOKEN_SCORE
+    item.lexical_score >= EXACT_TOKEN_SCORE &&
+    Number.isFinite(item.text_similarity) &&
+    item.text_similarity >= TEXT_STRONG_FLOOR
   );
 }
 
@@ -458,10 +472,11 @@ export async function searchItems({
     if (score < bestFloorOf(item, usedLegacy) || !isConfident(item, score)) {
       return false;
     }
-    // A row whose public text names the query is a confident hit even when it
-    // trails the top blended score by more than BEST_DELTA, e.g. two wallets
-    // that differ only in vector similarity for the query "wallet".
-    return namesQuery(item) || score >= top - BEST_DELTA - EPSILON;
+    // A row that names the query and carries a strong text similarity is a
+    // confident hit even when it trails the top blended score by more than
+    // BEST_DELTA, e.g. two wallets for the query "wallet". A single matching
+    // token in a multi-word query is not enough on its own.
+    return isStrongNamedMatch(item) || score >= top - BEST_DELTA - EPSILON;
   });
   const possibleLimit = best.length ? POSSIBLE_LIMIT : POSSIBLE_ONLY_LIMIT;
   const possible = ordered

@@ -31,6 +31,8 @@ import {
   VECTOR_ONLY_BEST_FLOOR,
   LEXICAL_CONFIDENCE,
   LEXICAL_WEIGHT,
+  TEXT_WEIGHT,
+  IMAGE_WEIGHT,
   MATCH_THRESHOLD,
   POSSIBLE_DELTA,
   POSSIBLE_FLOOR,
@@ -182,7 +184,7 @@ describe('searchItems confidence tiers', () => {
       resolvedRpc({
         data: [
           row('top', 0.95, { lexical_score: 1 }),
-          row('named', 0.7, { lexical_score: 1 }),
+          row('named', 0.7, { lexical_score: 1, text_similarity: 0.8 }),
         ],
       }),
     );
@@ -194,6 +196,33 @@ describe('searchItems confidence tiers', () => {
 
     expect(result.best.map((item) => item.id)).toEqual(['top']);
     expect(result.possible).toEqual([]);
+  });
+
+  it('does not promote a row when only one token of a multi-word query matches', async () => {
+    // "black wallet" gives every black row lexical_score 1.0. Only the rows
+    // whose text tower is also strong may skip the best delta band.
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('blue-wallet', 0.95, {
+            lexical_score: 1,
+            text_similarity: 0.8,
+          }),
+          row('black-fan', 0.88, {
+            lexical_score: 1,
+            text_similarity: 0.62,
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'black wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.best.map((item) => item.id)).toEqual(['blue-wallet']);
+    expect(result.possible.map((item) => item.id)).toEqual(['black-fan']);
   });
 
   it('keeps a photo-only match confident when the RPC reports no lexical score', async () => {
@@ -654,6 +683,8 @@ describe('searchItems confidence tiers', () => {
       LEGACY_STRONG_FLOOR,
       LEXICAL_CONFIDENCE,
       LEXICAL_WEIGHT,
+      TEXT_WEIGHT,
+      IMAGE_WEIGHT,
     }).toEqual({
       BEST_FLOOR: 0.72,
       BEST_DELTA: 0.05,
@@ -668,10 +699,11 @@ describe('searchItems confidence tiers', () => {
       LEGACY_STRONG_FLOOR: 0.82,
       LEXICAL_CONFIDENCE: 0.5,
       LEXICAL_WEIGHT: 0.25,
+      TEXT_WEIGHT: 0.65,
+      IMAGE_WEIGHT: 0.35,
     });
   });
 });
-
 
 describe('match score display', () => {
   it('rebuilds the vector similarity a two-tower row omits', () => {
