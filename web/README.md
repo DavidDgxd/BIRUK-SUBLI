@@ -95,9 +95,11 @@ holds the service contract:
 - `POST /caption/image` with form field `file` returns `{ "caption": string }`
 - `POST /embed/text` (used by the report forms) returns `{ "vector": number[512] }`
 
-`/embed/query` expands Filipino and Ilokano terms to English using the synonym
-vocabulary and a built-in glossary. The results page shows the synonyms that were
-added and offers "Search my exact words"; the typed query is never rewritten.
+`/embed/query` expands known Filipino terms to English using the built-in glossary
+and the editable synonym vocabulary. The glossary is Filipino-only today; other
+Philippine languages pass through unchanged. The results page shows the synonyms
+that were added and offers "Search my exact words"; the typed query is never
+rewritten.
 
 The RPC scores `0.65 * text similarity + 0.35 * image similarity` (or whichever
 modality exists) and adds `0.25 * lexical score` for an exact-token or trigram hit.
