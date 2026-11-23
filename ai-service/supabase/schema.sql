@@ -779,15 +779,32 @@ drop function if exists public.match_items(vector, double precision, integer, te
 drop function if exists public.match_items(vector, double precision, integer, text, date, date);
 
 -- Shared masking helpers so every public RPC uses one definition of the rule.
+-- mask_public_kind is the single predicate for which rows are masked: 'cash',
+-- 'documents', or null for an unmasked row. The other helpers build on it so
+-- the Cash and Documents / IDs rule cannot drift between them.
+create or replace function public.mask_public_kind (
+    p_category text, p_is_cash boolean
+) returns text
+language sql immutable
+set search_path = public
+as $$
+    select case
+        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'cash'
+        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id') then 'documents'
+    end
+$$;
+
+revoke all on function public.mask_public_kind(text, boolean) from public;
+
 create or replace function public.mask_public_title (
     p_title text, p_category text, p_is_cash boolean
 ) returns text
 language sql immutable
 set search_path = public
 as $$
-    select case
-        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'Cash'
-        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id') then 'Documents / IDs'
+    select case public.mask_public_kind(p_category, p_is_cash)
+        when 'cash' then 'Cash'
+        when 'documents' then 'Documents / IDs'
         else p_title
     end
 $$;
@@ -799,9 +816,7 @@ language sql immutable
 set search_path = public
 as $$
     select case
-        when coalesce(p_is_cash, false) or p_category = 'Cash'
-             or lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id') then null
-        else p_image_url
+        when public.mask_public_kind(p_category, p_is_cash) is null then p_image_url
     end
 $$;
 
@@ -811,17 +826,17 @@ revoke all on function public.mask_public_image_url(text, text, boolean) from pu
 -- Public-safe lexical text for the search RPCs (#128). Masked rows are scored
 -- against their masked title and public category only, so lexical_score and
 -- score cannot confirm a guessed amount or owner's name hidden in the raw
--- title or caption. Queries such as "cash" or "id" still get a keyword boost.
+-- title or caption. Queries such as "cash" or "documents" still get a keyword
+-- boost.
 create or replace function public.mask_public_search_text (
     p_search_text text, p_category text, p_is_cash boolean
 ) returns text
 language sql immutable
 set search_path = public
 as $$
-    select case
-        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'cash cash'
-        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id')
-            then lower('Documents / IDs ' || p_category)
+    select case public.mask_public_kind(p_category, p_is_cash)
+        when 'cash' then 'cash cash'
+        when 'documents' then lower('Documents / IDs ' || p_category)
         else p_search_text
     end
 $$;
