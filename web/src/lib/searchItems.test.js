@@ -639,6 +639,36 @@ describe('searchItems confidence tiers', () => {
     expect(hybrid.best[0]).toMatchObject({ title: 'Documents / IDs', image_url: null });
   });
 
+  it('does not promote a masked row whose neutral score came from a hidden match', async () => {
+    // The SQL RPC now returns a flat 0.55 for masked rows, whatever the query.
+    // Only a public-text keyword hit may lift one into the best tier.
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('masked-neutral', 0.55, {
+            lexical_score: 0,
+            text_similarity: 0.55,
+            image_similarity: null,
+            category: 'Documents / IDs',
+          }),
+          row('masked-named', 0.8, {
+            lexical_score: 1,
+            text_similarity: 0.55,
+            image_similarity: null,
+            category: 'Documents / IDs',
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'documents',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.best.map((item) => item.id)).toEqual(['masked-named']);
+  });
+
   it('keeps photo search alive when the text tower fails', async () => {
     embedQuery.mockRejectedValue(new Error('text tower offline'));
     rpc.mockReturnValue(

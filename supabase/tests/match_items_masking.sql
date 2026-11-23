@@ -80,6 +80,7 @@ $$;
 create temp table lexical_before as select * from pg_temp.lexical_rows();
 
 \ir ../migrations/20261123120000_mask_lexical_search_text.sql
+\ir ../migrations/20261124120000_mask_vector_search_scores.sql
 
 create temp table results as
     select 'match_items' rpc, id, title, category, image_url from public.match_items(pg_temp.vec(1, 0), 0.55, 50, null, null, null)
@@ -221,3 +222,81 @@ begin
     where a.pos is distinct from b.pos;
     if n > 0 then raise exception '% unmasked rows changed relative order', n; end if;
 end $$;
+
+-- Issue #130: vector scores must not reveal masked title/caption text either.
+-- A hidden-title query and an unrelated query must produce identical
+-- similarity, text_similarity, image_similarity and score for a masked row, and
+-- that row must match a control row with the same public text.
+create function pg_temp.vector_rows() returns table (
+    label text, rpc text, id uuid, similarity float,
+    text_similarity float, image_similarity float, score float
+)
+language sql as $$
+    with queries(label, text, emb512, emb384) as (values
+        ('hidden', 'juan dela cruz maria santos passport 5000',
+         pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589)),
+        ('unrelated', 'zebra', pg_temp.vec(0, 1), pg_temp.vec384(0, 1))
+    )
+    select q.label, 'match_items', m.id, m.similarity, null::float, null::float, null::float
+    from queries q
+    cross join lateral public.match_items(q.emb512, 0.0, 50, null, null, null) m
+    union all
+    select q.label, 'match_items_hybrid', h.id, h.similarity, null::float, null::float, h.score
+    from queries q
+    cross join lateral public.match_items_hybrid(q.emb512, 0.0, 50, null, null, null, q.text) h
+    union all
+    select q.label, 'match_items_two_tower', t.id, null::float, t.text_similarity, t.image_similarity, t.score
+    from queries q
+    cross join lateral public.match_items_two_tower(q.emb384, null, 0.0, 50, null, null, null, q.text) t
+$$;
+
+create temp table vector_scores as select * from pg_temp.vector_rows();
+
+do $$
+declare
+    n int;
+begin
+    -- Every masked row and its public-text control report the same vector
+    -- columns, for both a hidden-title and an unrelated query.
+    select count(*) into n
+    from (values ('match_items'), ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    cross join (values ('hidden'), ('unrelated')) q(label)
+    cross join masked_pairs p
+    left join vector_scores m on m.label = q.label and m.rpc = r.rpc and m.id = p.masked
+    left join vector_scores c on c.label = q.label and c.rpc = r.rpc and c.id = p.control
+    where m.id is null or c.id is null
+       or m.similarity is distinct from c.similarity
+       or m.text_similarity is distinct from c.text_similarity
+       or m.image_similarity is distinct from c.image_similarity
+       or m.score is distinct from c.score;
+    if n > 0 then raise exception '% masked vector scores diverge from their control', n; end if;
+
+    -- A query naming the hidden text scores a masked row exactly like an
+    -- unrelated term: nothing shifts on hidden title or caption.
+    select count(*) into n
+    from (values ('match_items'), ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    cross join masked_pairs p
+    left join vector_scores h on h.label = 'hidden' and h.rpc = r.rpc and h.id = p.masked
+    left join vector_scores u on u.label = 'unrelated' and u.rpc = r.rpc and u.id = p.masked
+    where h.id is null or u.id is null
+       or h.similarity is distinct from u.similarity
+       or h.text_similarity is distinct from u.text_similarity
+       or h.image_similarity is distinct from u.image_similarity
+       or h.score is distinct from u.score;
+    if n > 0 then raise exception '% hidden-title query shifts a masked vector score', n; end if;
+
+    -- The neutral columns are populated, not hidden behind a null.
+    select count(*) into n from vector_scores v
+    where v.id in (select masked from masked_pairs)
+      and ((v.rpc in ('match_items', 'match_items_hybrid') and v.similarity is null)
+        or (v.rpc = 'match_items_two_tower' and v.text_similarity is null)
+        or (v.rpc in ('match_items_hybrid', 'match_items_two_tower') and v.score is null));
+    if n > 0 then raise exception '% masked vector scores were null', n; end if;
+
+    -- Masked rows expose no photo signal of their own.
+    select count(*) into n from vector_scores v
+    where v.rpc = 'match_items_two_tower' and v.id in (select masked from masked_pairs)
+      and v.image_similarity is not null;
+    if n > 0 then raise exception '% masked rows leaked an image similarity', n; end if;
+end $$;
+

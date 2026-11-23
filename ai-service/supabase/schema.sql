@@ -843,6 +843,38 @@ $$;
 
 revoke all on function public.mask_public_search_text(text, text, boolean) from public;
 
+-- Issue #130: masked rows report a fixed neutral vector score (the 0.55 public
+-- floor) and no image similarity, so `similarity`, `text_similarity`,
+-- `image_similarity` and the vector part of `score` cannot confirm a hidden
+-- title or caption. Non-masked rows keep their real vectors; the staff-only
+-- reverse match still reads the full items.embedding.
+create or replace function public.mask_public_similarity (
+    p_similarity float, p_category text, p_is_cash boolean
+) returns float
+language sql immutable
+set search_path = public
+as $$
+    select case
+        when public.mask_public_kind(p_category, p_is_cash) is null then p_similarity
+        else 0.55
+    end
+$$;
+
+revoke all on function public.mask_public_similarity(float, text, boolean) from public;
+
+create or replace function public.mask_public_image_similarity (
+    p_similarity float, p_category text, p_is_cash boolean
+) returns float
+language sql immutable
+set search_path = public
+as $$
+    select case
+        when public.mask_public_kind(p_category, p_is_cash) is null then p_similarity
+    end
+$$;
+
+revoke all on function public.mask_public_image_similarity(float, text, boolean) from public;
+
 create or replace function public.match_items (
     query_embedding vector(512),
     match_threshold float default 0.55,
@@ -881,20 +913,25 @@ as $$
         offices.counter_hours,
         offices.address as office_address,
         items.created_at,
-        1 - (items.embedding <=> query_embedding) as similarity
+        sims.similarity
     from public.items
     join public.offices on items.holding_office_id = offices.id
+    cross join lateral (
+        select public.mask_public_similarity(
+            1 - (items.embedding <=> query_embedding),
+            items.category, items.is_cash
+        ) as similarity
+    ) as sims
     where
         -- Released/resolved rows (and the other terminal custody states) are
         -- not live results, even though their embeddings remain stored.
         items.status not in ('released', 'resolved', 'transferred', 'disposed')
-        and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
         and (date_to is null or items.date_received <= date_to)
         -- Hard floor: callers may raise the bar but never drop below 0.55.
-        and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.55)
-    order by similarity desc
+        and sims.similarity >= greatest(match_threshold, 0.55)
+    order by sims.similarity desc, items.date_received desc, items.id desc
     limit match_count;
 $$;
 
@@ -990,7 +1027,7 @@ as $$
         offices.counter_hours,
         offices.address as office_address,
         items.created_at,
-        1 - (items.embedding <=> query_embedding) as similarity,
+        sims.similarity,
         -- A photo-only query has no tokens, so there is nothing to match
         -- lexically. Return null instead of 0 so the client falls back to its
         -- vector floor rather than demanding a strong score with no lexical hit.
@@ -998,11 +1035,17 @@ as $$
             when cardinality(input.tokens) = 0 then null
             else lexical.lexical_score
         end as lexical_score,
-        (1 - (items.embedding <=> query_embedding))
+        sims.similarity
             + 0.25 * coalesce(lexical.lexical_score, 0) as score
     from public.items
     join public.offices on items.holding_office_id = offices.id
     cross join input
+    cross join lateral (
+        select public.mask_public_similarity(
+            1 - (items.embedding <=> query_embedding),
+            items.category, items.is_cash
+        ) as similarity
+    ) as sims
     cross join lateral (
         select public.mask_public_search_text(
             items.search_text, items.category, items.is_cash
@@ -1034,12 +1077,11 @@ as $$
     ) as lexical
     where
         items.status not in ('released', 'resolved', 'transferred', 'disposed')
-        and items.embedding is not null
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
         and (date_to is null or items.date_received <= date_to)
-        and (1 - (items.embedding <=> query_embedding)) >= greatest(match_threshold, 0.55)
-    order by score desc
+        and sims.similarity >= greatest(match_threshold, 0.55)
+    order by score desc, items.date_received desc, items.id desc
     limit match_count;
 $$;
 
@@ -1125,13 +1167,23 @@ as $$
         select
             case
                 when query_text_embedding is not null
-                     and items.text_embedding is not null
-                then 1 - (items.text_embedding <=> query_text_embedding)
+                then public.mask_public_similarity(
+                    case
+                        when items.text_embedding is not null
+                        then 1 - (items.text_embedding <=> query_text_embedding)
+                    end,
+                    items.category, items.is_cash
+                )
             end as text_similarity,
             case
                 when query_image_embedding is not null
-                     and items.image_embedding is not null
-                then 1 - (items.image_embedding <=> query_image_embedding)
+                then public.mask_public_image_similarity(
+                    case
+                        when items.image_embedding is not null
+                        then 1 - (items.image_embedding <=> query_image_embedding)
+                    end,
+                    items.category, items.is_cash
+                )
             end as image_similarity
     ) as sims
     cross join lateral (
@@ -1175,14 +1227,16 @@ as $$
     where
         items.status not in ('released', 'resolved', 'transferred', 'disposed')
         and (
-            (query_text_embedding is not null and items.text_embedding is not null)
+            (query_text_embedding is not null
+             and (public.mask_public_kind(items.category, items.is_cash) is not null
+                  or items.text_embedding is not null))
             or (query_image_embedding is not null and items.image_embedding is not null)
         )
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
         and (date_to is null or items.date_received <= date_to)
         and vector_score.value >= match_threshold
-    order by score desc
+    order by score desc, items.date_received desc, items.id desc
     limit match_count;
 $$;
 
