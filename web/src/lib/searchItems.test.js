@@ -158,6 +158,8 @@ describe('searchItems confidence tiers', () => {
             lexical_score: 1,
             text_similarity: 0.8019,
           }),
+          // 0.7505 clears TEXT_STRONG_FLOOR by only 0.0005, so a re-embed
+          // could drop this row back to the possible tier.
           row('yellow-wallet', 1.0005, {
             lexical_score: 1,
             text_similarity: 0.7505,
