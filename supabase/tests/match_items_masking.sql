@@ -46,10 +46,10 @@ language sql as $$ select ('[' || a || ',' || b || ',' || repeat('0,', 381) || '
 insert into public.offices values ('office-1', 'Central Office', 'Mon-Fri 8-5', 'City Hall');
 insert into public.items (id, ref_code, title, category, status, image_url, holding_office_id, date_received, created_at, is_cash, embedding, text_embedding, search_text) values
     ('11111111-1111-1111-1111-111111111101', 'REF-GENERAL', 'Blue umbrella', 'General', 'held', 'umbrella.jpg', 'office-1', current_date - 1, now(), false, pg_temp.vec(1, 0), pg_temp.vec384(1, 0), lower('Blue umbrella General')),
-    ('11111111-1111-1111-1111-111111111102', 'REF-CASH-CATEGORY', 'Brown envelope', 'Cash', 'held', 'cash-cat.jpg', 'office-1', current_date - 2, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Brown envelope Cash')),
-    ('11111111-1111-1111-1111-111111111103', 'REF-CASH-FLAG', 'Wallet with cash', 'Other', 'held', 'cash-flag.jpg', 'office-1', current_date - 3, now(), true, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Wallet with cash Other')),
-    ('11111111-1111-1111-1111-111111111104', 'REF-DOC-NEW', 'Juan Dela Cruz ID', 'Documents / IDs', 'held', 'id-new.jpg', 'office-1', current_date - 4, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Juan Dela Cruz ID Documents / IDs')),
-    ('11111111-1111-1111-1111-111111111105', 'REF-DOC-LEGACY', 'Maria Santos passport', 'Document/ID', 'held', 'id-legacy.jpg', 'office-1', current_date - 5, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Maria Santos passport Document/ID')),
+    ('11111111-1111-1111-1111-111111111102', 'REF-CASH-CATEGORY', 'Brown envelope', 'Cash', 'held', 'cash-cat.jpg', 'office-1', current_date - 2, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Brown envelope Cash five thousand pesos inside')),
+    ('11111111-1111-1111-1111-111111111103', 'REF-CASH-FLAG', 'Wallet with cash', 'Other', 'held', 'cash-flag.jpg', 'office-1', current_date - 3, now(), true, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Wallet with cash Other folded bills')),
+    ('11111111-1111-1111-1111-111111111104', 'REF-DOC-NEW', 'Juan Dela Cruz ID', 'Documents / IDs', 'held', 'id-new.jpg', 'office-1', current_date - 4, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Juan Dela Cruz ID Documents / IDs issued in quezon')),
+    ('11111111-1111-1111-1111-111111111105', 'REF-DOC-LEGACY', 'Maria Santos passport', 'Document/ID', 'held', 'id-legacy.jpg', 'office-1', current_date - 5, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Maria Santos passport Document/ID burgundy cover')),
     ('11111111-1111-1111-1111-111111111106', 'REF-RELEASED-DOC', 'Released ID', 'Documents / IDs', 'released', 'id-released.jpg', 'office-1', current_date - 6, now(), false, pg_temp.vec(1, 0), pg_temp.vec384(1, 0), lower('Released ID Documents / IDs')),
     ('11111111-1111-1111-1111-111111111107', 'REF-TRANSFERRED', 'Transferred wallet', 'General', 'transferred', 'wallet.jpg', 'office-1', current_date - 7, now(), false, pg_temp.vec(1, 0), pg_temp.vec384(1, 0), lower('Transferred wallet General')),
     ('11111111-1111-1111-1111-111111111108', 'REF-RESOLVED', 'Resolved bag', 'General', 'resolved', 'bag.jpg', 'office-1', current_date - 8, now(), false, pg_temp.vec(1, 0), pg_temp.vec384(1, 0), lower('Resolved bag General')),
@@ -64,7 +64,8 @@ language sql as $$
         ('mixed', 'blue umbrella wallet document id'), ('umbrella', 'umbrella'),
         ('caption', 'cracked corner'), ('cash', 'cash'), ('documents', 'documents'),
         ('secret', 'juan dela cruz maria santos passport brown envelope wallet 5000'),
-        ('hidden', 'santos 5000'), ('unrelated', 'zebra'), ('empty', ''), ('photo-only', null))
+        ('hidden', 'santos 5000'), ('caption-hidden', 'thousand quezon folded burgundy'),
+        ('unrelated', 'zebra'), ('empty', ''), ('photo-only', null))
     select q.label, 'match_items_hybrid', h.id, h.lexical_score, h.score,
            row_number() over (partition by q.label order by h.score desc, h.id)
     from queries q
@@ -151,7 +152,7 @@ declare
 begin
     -- A hidden term scores a masked row exactly like its control.
     select count(*) into n from (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
-    cross join (values ('secret'), ('hidden')) q(label)
+    cross join (values ('secret'), ('hidden'), ('caption-hidden')) q(label)
     cross join masked_pairs p
     left join lexical m on m.label = q.label and m.rpc = r.rpc and m.id = p.masked
     left join lexical c on c.label = q.label and c.rpc = r.rpc and c.id = p.control
@@ -159,18 +160,20 @@ begin
        or m.lexical_score is distinct from c.lexical_score or m.score is distinct from c.score;
     if n > 0 then raise exception '% masked rows score differently from their control: hidden text leaks', n; end if;
 
-    -- A hidden-only term scores a masked row exactly like an unrelated term.
-    -- Neither "santos 5000" nor "zebra" shares a trigram with the masked text.
+    -- A hidden-only term, from the title or only the caption, scores a masked
+    -- row exactly like an unrelated term. None of "santos 5000", "thousand
+    -- quezon folded burgundy" or "zebra" shares a trigram with the masked text.
     select count(*) into n from (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    cross join (values ('hidden'), ('caption-hidden')) q(label)
     cross join masked_pairs p
-    left join lexical h on h.label = 'hidden' and h.rpc = r.rpc and h.id = p.masked
+    left join lexical h on h.label = q.label and h.rpc = r.rpc and h.id = p.masked
     left join lexical u on u.label = 'unrelated' and u.rpc = r.rpc and u.id = p.masked
     where h.id is null or u.id is null
        or h.lexical_score is distinct from u.lexical_score or h.score is distinct from u.score;
     if n > 0 then raise exception '% masked rows score a hidden term differently from an unrelated one', n; end if;
 
     select count(*) into n from lexical
-    where label in ('secret', 'hidden') and id in (select masked from masked_pairs) and lexical_score >= 1;
+    where label in ('secret', 'hidden', 'caption-hidden') and id in (select masked from masked_pairs) and lexical_score >= 1;
     if n > 0 then raise exception '% masked rows got a keyword hit on hidden text', n; end if;
 
     -- Public text still matches: masked rows on their masked title, unmasked
