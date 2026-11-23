@@ -1,9 +1,11 @@
 # Biruk-Subli (web)
 
-Frontend for Biruk-Subli, the City of Baguio's centralized lost-and-found system.
-Items are held and released at participating city office counters. The site helps
-citizens find where an item is held and report lost or found items. It does not
-support peer-to-peer exchange, in-app messaging, or online claims.
+Frontend for Biruk-Subli, a capstone demo presenting the University of
+Baguio's centralized lost-and-found system. Items are held and released at
+participating office counters. The site helps visitors find where an item is
+held and report lost or found items. It does not support peer-to-peer
+exchange, in-app messaging, or online claims. The interface wears the
+official UB identity (seal, crimson, Poppins/Raleway).
 
 **Status:** landing page, search results, the lost- and found-item reports, office
 provisioning, and the shared office login with the staff intake counter are built.
@@ -23,8 +25,8 @@ npm run preview   # serves dist/ on http://localhost:4173
 ## Project structure
 
 ```
-index.html            fonts + Material Symbols (Google Fonts), theme-color meta
-public/favicon.svg
+index.html            self-hosted UB fonts (Poppins, Raleway), theme-color meta
+public/assets/ub/     official UB seal, wordmark, favicon crops, fonts
 src/
   main.jsx            router + theme.css + styles.css
   App.jsx             route table
@@ -41,14 +43,11 @@ src/
 
 ## Theme
 
-- All color, font and shape values live in `src/theme.css`. Components and
-  `styles.css` only reference `var(--md-sys-color-*)`, `var(--bs-*)`, `--radius-*`
-  and `--font-*`. No hex values outside `theme.css`.
-- The role values are the guide's placeholders extended with the roles the page
-  needs. Replace them with the Material Theme Builder export (seed `#2E6B4F`) when
-  the team generates it, and keep the **Biruk-Subli extension tokens** block:
-  `--bs-found-container`, `--bs-on-found-container` (ube Found accent) and the
-  `--bs-mist-*` / `--bs-pine` illustration colors.
+- All colour, font and shape values live in the token blocks at the top of
+  `src/styles.css` (light, dark, and the landing-page scope). Components
+  reference `var(--*)` tokens only. The palette is the official University of
+  Baguio web identity: crimson `#C3151C`, charcoal ink, institutional gray,
+  and the seal's green reserved for found/success.
 - Spacing, type scale, elevation and layout tokens are in section 1 of `styles.css`.
 - Light and dark follow `prefers-color-scheme`.
 
@@ -331,9 +330,10 @@ role is re-verified server-side on every admin action.
 
 ## Notes
 
-- Fonts (Roboto, Playfair Display) and Material Symbols Rounded load from Google
-  Fonts in `index.html`. Icons keep a fixed 1em box so layout does not shift if
-  the icon font is slow or blocked.
+- Fonts are self-hosted woff2 files (Poppins and Raleway, the University of
+  Baguio's pairing) in `public/assets/ub/fonts/`, declared with unicode-range
+  in `styles.css` so the peso sign renders in face. The official seal image
+  sits in the header on every page.
 - The UI is plain semantic HTML styled to Material 3 and does not use
   `@material/web`, which is not in `package.json`.
 - Deploying `dist/` to static hosting: add an SPA fallback so unknown paths serve

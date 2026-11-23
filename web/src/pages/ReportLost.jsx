@@ -34,7 +34,7 @@ export default function ReportLost() {
             {!received && (
               <p className="lead">
                 Tell us what went missing. We will match it against items handed
-                in at city counters. No account needed.
+                in at office counters. No account needed.
               </p>
             )}
           </div>
