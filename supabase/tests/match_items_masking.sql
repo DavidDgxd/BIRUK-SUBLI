@@ -233,7 +233,7 @@ create function pg_temp.vector_rows() returns table (
 )
 language sql as $$
     with queries(label, text, emb512, emb384) as (values
-        ('hidden', 'juan dela cruz maria santos passport 5000',
+        ('hidden', 'santos 5000',
          pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589)),
         ('unrelated', 'zebra', pg_temp.vec(0, 1), pg_temp.vec384(0, 1))
     )
