@@ -593,8 +593,11 @@ h2[tabindex='-1']:focus,
 }
 
 /* The capstone's own name sits below the university line as a quiet credit;
-   the seal, title and crimson system line keep the UB identity primary. */
-.site-header__tagline {
+   the seal, title and crimson system line keep the UB identity primary.
+   #125 dropped the name during the UB restyle, so a later restyle should
+   keep this line rather than remove it again. */
+.site-header__tagline,
+.site-footer__tagline {
   color: var(--ink-muted);
   font-family: var(--font-display);
   font-size: 0.68rem;
@@ -663,16 +666,6 @@ h2[tabindex='-1']:focus,
   font-size: 0.72rem;
   font-weight: var(--weight-strong);
   letter-spacing: 0.14em;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.site-footer__tagline {
-  color: var(--ink-muted);
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  font-weight: var(--weight-strong);
-  letter-spacing: 0.12em;
   line-height: 1.4;
   text-transform: uppercase;
 }
