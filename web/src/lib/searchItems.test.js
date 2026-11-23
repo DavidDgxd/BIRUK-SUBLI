@@ -31,12 +31,16 @@ import {
   VECTOR_ONLY_BEST_FLOOR,
   LEXICAL_CONFIDENCE,
   LEXICAL_WEIGHT,
+  TEXT_WEIGHT,
+  IMAGE_WEIGHT,
   MATCH_THRESHOLD,
   POSSIBLE_DELTA,
   POSSIBLE_FLOOR,
   POSSIBLE_LIMIT,
   POSSIBLE_ONLY_LIMIT,
   TEXT_STRONG_FLOOR,
+  calibrateMatchScore,
+  matchSimilarityOf,
   searchItems,
 } from './searchItems.js';
 
@@ -142,6 +146,85 @@ describe('searchItems confidence tiers', () => {
     expect(result.state).toBe('results');
     expect(result.best.map((item) => item.id)).toEqual(['top']);
     expect(result.possible.map((item) => item.id)).toEqual(['next']);
+  });
+
+  it('promotes a row that names the query past the best delta band', async () => {
+    // Reproduces "wallet" against the demo inventory: both rows contain the
+    // word, but the second trails by more than BEST_DELTA.
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('blue-wallet', 1.0519, {
+            lexical_score: 1,
+            text_similarity: 0.8019,
+          }),
+          // 0.7505 clears TEXT_STRONG_FLOOR by only 0.0005, so a re-embed
+          // could drop this row back to the possible tier.
+          row('yellow-wallet', 1.0005, {
+            lexical_score: 1,
+            text_similarity: 0.7505,
+          }),
+          row('gray-backpack', 0.7899, { lexical_score: 0.24 }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.best.map((item) => item.id)).toEqual([
+      'blue-wallet',
+      'yellow-wallet',
+    ]);
+    expect(result.possible).toEqual([]);
+  });
+
+  it('keeps a named row below BEST_FLOOR out of the best tier', async () => {
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('top', 0.95, { lexical_score: 1 }),
+          row('named', 0.7, { lexical_score: 1, text_similarity: 0.8 }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.best.map((item) => item.id)).toEqual(['top']);
+    expect(result.possible).toEqual([]);
+  });
+
+  it('does not promote a row when only one token of a multi-word query matches', async () => {
+    // "black wallet" gives every black row lexical_score 1.0. Only the rows
+    // whose text tower is also strong may skip the best delta band.
+    rpc.mockReturnValue(
+      resolvedRpc({
+        data: [
+          row('blue-wallet', 0.95, {
+            lexical_score: 1,
+            text_similarity: 0.8,
+          }),
+          row('black-fan', 0.88, {
+            lexical_score: 1,
+            text_similarity: 0.62,
+          }),
+        ],
+      }),
+    );
+
+    const result = await searchItems({
+      text: 'black wallet',
+      signal: new AbortController().signal,
+    });
+
+    expect(result.best.map((item) => item.id)).toEqual(['blue-wallet']);
+    expect(result.possible.map((item) => item.id)).toEqual(['black-fan']);
   });
 
   it('keeps a photo-only match confident when the RPC reports no lexical score', async () => {
@@ -602,6 +685,8 @@ describe('searchItems confidence tiers', () => {
       LEGACY_STRONG_FLOOR,
       LEXICAL_CONFIDENCE,
       LEXICAL_WEIGHT,
+      TEXT_WEIGHT,
+      IMAGE_WEIGHT,
     }).toEqual({
       BEST_FLOOR: 0.72,
       BEST_DELTA: 0.05,
@@ -616,6 +701,45 @@ describe('searchItems confidence tiers', () => {
       LEGACY_STRONG_FLOOR: 0.82,
       LEXICAL_CONFIDENCE: 0.5,
       LEXICAL_WEIGHT: 0.25,
+      TEXT_WEIGHT: 0.65,
+      IMAGE_WEIGHT: 0.35,
     });
+  });
+});
+
+describe('match score display', () => {
+  it('rebuilds the vector similarity a two-tower row omits', () => {
+    expect(
+      matchSimilarityOf({
+        score: 0.95,
+        text_similarity: 0.7,
+        image_similarity: null,
+      }),
+    ).toBe(0.7);
+    expect(
+      matchSimilarityOf({ text_similarity: 0.8, image_similarity: 0.6 }),
+    ).toBeCloseTo(0.73);
+    expect(matchSimilarityOf({ image_similarity: 0.9 })).toBe(0.9);
+    expect(matchSimilarityOf({ similarity: 0.74, score: 0.9 })).toBe(0.74);
+  });
+
+  it('hides the percentage instead of returning NaN for a missing score', () => {
+    expect(matchSimilarityOf({})).toBeNull();
+    expect(calibrateMatchScore(undefined)).toEqual({
+      percent: null,
+      tier: 'none',
+    });
+    expect(calibrateMatchScore(null)).toEqual({ percent: null, tier: 'none' });
+    expect(calibrateMatchScore(NaN)).toEqual({ percent: null, tier: 'none' });
+  });
+
+  it('still calibrates a finite score into a percentage tier', () => {
+    expect(calibrateMatchScore(0.65)).toEqual({
+      percent: 84,
+      tier: 'moderate',
+    });
+    expect(calibrateMatchScore(0.7).percent).toBe(98);
+    expect(calibrateMatchScore(0.69).percent).toBe(95);
+    expect(calibrateMatchScore(0.64).percent).toBe(81);
   });
 });

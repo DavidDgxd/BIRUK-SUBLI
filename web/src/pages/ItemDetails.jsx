@@ -257,8 +257,9 @@ export default function ItemDetails() {
   const showImage = Boolean(item?.image_url) && !imageFailed;
   const logged = formatLoggedDate(item?.created_at);
 
-  const similarity =
-    typeof state?.similarity === 'number' ? state.similarity : null;
+  const similarity = Number.isFinite(state?.similarity)
+    ? state.similarity
+    : null;
   const match = similarity === null ? null : calibrateMatchScore(similarity);
 
   /*
@@ -388,7 +389,8 @@ export default function ItemDetails() {
                   <p className="item-meta">
                     {item.category}. Reference {item.ref_code}.
                     {logged && ` Logged ${logged}.`}
-                    {match && ` ${match.percent}% search match.`}
+                    {match?.percent != null &&
+                      ` ${match.percent}% search match.`}
                   </p>
 
                   {releasedTo && (

@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
-import { calibrateMatchScore } from '../lib/searchItems.js';
+import {
+  calibrateMatchScore,
+  matchSimilarityOf,
+} from '../lib/searchItems.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -14,7 +17,8 @@ function receivedLabel(value) {
 export default function ResultCard({ item, possible = false, browse = false }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = item.image_url && !imageFailed;
-  const percent = browse ? null : calibrateMatchScore(item.similarity).percent;
+  const similarity = matchSimilarityOf(item);
+  const percent = browse ? null : calibrateMatchScore(similarity).percent;
   const status = item.status === 'held' ? 'Held for collection' : item.status;
   const received = browse ? receivedLabel(item.date_received) : '';
   const office = browse
@@ -53,7 +57,7 @@ export default function ResultCard({ item, possible = false, browse = false }) {
           <Link
             className="result__link"
             to={`/items/${item.id}`}
-            state={{ similarity: possible ? null : item.similarity }}
+            state={{ similarity: possible ? null : similarity }}
           >
             {item.title}
           </Link>
