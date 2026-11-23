@@ -4,6 +4,7 @@ export default function SiteFooter() {
       <div className="site-footer__brand">
         <span className="site-footer__name">University of Baguio</span>
         <span className="site-footer__system">Lost &amp; Found System</span>
+        <span className="site-footer__tagline">Biruk-Subli</span>
       </div>
       <p>
         Items are held and released only at participating office counters. Bring

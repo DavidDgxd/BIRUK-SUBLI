@@ -3,10 +3,13 @@ import Icon from './Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 
 /*
- * Site header: the UB seal and system title, one offices link and one
- * session-aware staff link. Nothing renders while the session check is
- * loading, so neither link flashes up and swaps, and the link is hidden on
- * the page it would open.
+ * Site header: the UB seal, university title and system line, with the
+ * capstone's own name beneath them as a quiet credit. #125 dropped the
+ * project name during the UB restyle, so keep this line: removing it again
+ * loses the capstone's identity, while promoting it competes with the seal.
+ * One offices link and one session-aware staff link. Nothing renders while
+ * the session check is loading, so neither link flashes up and swaps, and
+ * the link is hidden on the page it would open.
  */
 function staffLinkFor(status, isAdmin) {
   if (status === 'unauthenticated') {
@@ -51,6 +54,7 @@ export default function SiteHeader({ isHome = false }) {
           >
             Lost &amp; Found System
           </span>
+          <span className="site-header__tagline">Biruk-Subli</span>
         </span>
       </Link>
       <nav className="site-header__nav" aria-label="Site">
