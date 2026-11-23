@@ -7,8 +7,9 @@ held and report lost or found items. It does not support peer-to-peer
 exchange, in-app messaging, or online claims. The interface wears the
 official UB identity (seal, crimson, Poppins/Raleway).
 
-**Status:** landing page, search results, the lost- and found-item reports, office
-provisioning, and the shared office login with the staff intake counter are built.
+**Status:** landing page, search results, public item pages, the lost- and found-item
+reports, the office directory, the shared office login with counter intake and held
+items, and the admin offices and search-synonym screens are built.
 
 ## Getting started
 
@@ -28,17 +29,16 @@ npm run preview   # serves dist/ on http://localhost:4173
 index.html            self-hosted UB fonts (Poppins, Raleway), theme-color meta
 public/assets/ub/     official UB seal, wordmark, favicon crops, fonts
 src/
-  main.jsx            router + theme.css + styles.css
+  main.jsx            mounts the app and imports styles.css
   App.jsx             route table
-  theme.css           SHARED Material 3 tokens, light + dark (team-agreed changes only)
-  styles.css          app-wide styles, one section per area (tokens, base, layout, ...)
-  pages/
-    Landing.jsx
-    RoutePlaceholder.jsx   temporary page for routes that are not built yet
-  components/
-    SiteHeader.jsx  MistHero.jsx  SearchPanel.jsx  ReportCard.jsx
-    HowItWorks.jsx  SiteFooter.jsx  Icon.jsx
-  assets/
+  styles.css          tokens and all UI, one section per area
+  context/
+    StaffAuthContext.jsx   shared office session and sign-out
+  lib/                Supabase client, search, reports, intake, release
+  pages/              Landing, SearchResults, ItemDetails, ReportLost, ReportFound,
+                      Offices, StaffIntake, StaffItems, StaffLogin, AdminOffices,
+                      AdminSynonyms
+  components/         SearchPanel, ResultCard, report forms, dialogs, staff bar
 ```
 
 ## Theme
@@ -48,6 +48,7 @@ src/
   reference `var(--*)` tokens only. The palette is the official University of
   Baguio web identity: crimson `#C3151C`, charcoal ink, institutional gray,
   and the seal's green reserved for found/success.
+- Headings use Poppins; body copy uses Raleway.
 - Spacing, type scale, elevation and layout tokens are in section 1 of `styles.css`.
 - Light and dark follow `prefers-color-scheme`.
 
@@ -67,8 +68,8 @@ The Supabase client is created at import time, so the app needs the two
 Optional, for working on the counter pages without a credential:
 
 ```
-VITE_STAFF_DEV_SESSION=true      # acts as BCPIO; labelled "not real auth"
-VITE_STAFF_OFFICE_ID=BCPIO       # office to act as
+VITE_STAFF_DEV_SESSION=true      # acts as UB_SECURITY; labelled "not real auth"
+VITE_STAFF_OFFICE_ID=UB_SECURITY       # office to act as
 VITE_STAFF_OFFICE_NAME=...
 ```
 
@@ -84,37 +85,49 @@ web origin (for example `http://localhost:5173`).
 
 ## Search flow (`/search`)
 
-`src/lib/searchItems.js` embeds the text and/or photo through the AI service, averages
-the vectors if both are given, then calls the `match_items` RPC. `src/lib/aiService.js`
-holds the assumed service contract:
+`src/lib/searchItems.js` embeds the query and/or photo through the AI service, then
+calls the `match_items_two_tower` RPC. Text and image are scored in their own towers
+and fused in the database; the browser does not average them. `src/lib/aiService.js`
+holds the service contract:
 
-- `POST /embed/text` with form field `text` returns `{ "vector": number[512] }`
+- `POST /embed/query` with form field `text` returns `{ "vector": number[384], "expanded_text": string, "additions": string[] }`
 - `POST /embed/image` with form field `file` returns `{ "vector": number[512] }`
 - `POST /caption/image` with form field `file` returns `{ "caption": string }`
+- `POST /embed/text` (used by the report forms) returns `{ "vector": number[512] }`
 
-The service does not translate Filipino yet. If `/embed/text` starts returning
-`translated_text`, the results page shows it.
+`/embed/query` expands Filipino and Ilokano terms to English using the synonym
+vocabulary and a built-in glossary. The results page shows the synonyms that were
+added and offers "Search my exact words"; the typed query is never rewritten.
+
+The RPC scores `0.65 * text similarity + 0.35 * image similarity` (or whichever
+modality exists) and adds `0.25 * lexical score` for an exact-token or trigram hit.
+It applies a 0.30 candidate floor. The results page splits confident hits from
+weaker candidates so a loose match is not shown as a firm one. `MATCH_THRESHOLD`,
+`BEST_FLOOR`, `POSSIBLE_FLOOR` and `MATCH_COUNT` live in `searchItems.js`.
+
+If the AI service or the two-tower RPC is unavailable, the client falls back to the
+legacy CLIP text embedding with `match_items_hybrid`, then `match_items`. The page
+has loading, empty, error (with retry) and no-query states.
 
 US-5: the staff intake form sends a newly selected photo to `/caption/image`.
 The returned caption pre-fills the private verification notes when they are
 empty and is always shown as a suggestion the staffer can edit or re-apply. The
 raw caption is stored separately in `items.ai_caption`.
 
-The color filter is prepended to the text before embedding. `MATCH_THRESHOLD` and
-`MATCH_COUNT` live in `searchItems.js`. The page has loading, empty, error (with retry)
-and no-query states.
+The color filter is prepended to the text before embedding, so it participates in
+the text tower.
 
-US-15: only items still in custody are eligible. `match_items` excludes
+US-15: only items still in custody are eligible. `match_items_two_tower` excludes
 `released`, `resolved`, `transferred` and `disposed` rows before ranking, and
 `searchItems.js` repeats that status guard on the returned page so a stale RPC
 or a status change mid-query cannot surface an item that is already gone.
 
 US-20 adds a filter bar on the results page. The holding-office and receipt-date
-range are applied by the `match_items` RPC (`filter_office`, `date_from`,
-`date_to`) before its match limit, so a narrow filter cannot be defeated by a
-full page of other matches. The applied values are kept in `/search` query
-parameters (`office`, `from`, `to`) so the filtered results survive a refresh or
-can be shared.
+range are applied by the RPC (`filter_office`, `date_from`, `date_to`) before its
+match limit, so a narrow filter cannot be defeated by a full page of other
+matches. The applied values are kept in `/search` query parameters
+(`office`, `from`, `to`) so the filtered results survive a refresh or can be
+shared.
 
 ## Routes and the search hand-off
 
@@ -122,18 +135,21 @@ can be shared.
 |---|---|
 | `/` | Landing page (built) |
 | `/search` | Search results (built) |
+| `/items/:id` | Public item details with counter, hours and collection checklist (built) |
 | `/report/lost` | Lost-item report form (built) |
 | `/report/found` | Found-item report form (built) |
 | `/offices` | Public drop-off office directory (built) |
-| `/admin/offices` | Central admin — participating offices, logins & credential reset (built) |
 | `/staff/login` | Shared office login, and the central admin's sign-in (built) |
 | `/staff/intake` | Staff counter intake (built) |
+| `/staff/items` | Items currently held by the signed-in office (built) |
+| `/admin/offices` | Central admin: participating offices, held counts, logins and credential reset (built) |
+| `/admin/synonyms` | Central admin: search synonym vocabulary (built) |
 | `*` | Not-found placeholder |
 
 `SearchPanel` navigates to `/search` with:
 
-- `?q=<text>`: free text, English or Filipino. Translation and embedding happen
-  server side; the results page should show the translated text back to the user.
+- `?q=<text>`: free text, English or Filipino. Synonym expansion and embedding
+  happen server side; the results page shows the synonyms that were added.
 - `?color=<color>`: optional lowercase color filter (`black`, `white`, `gray`,
   `brown`, `red`, `blue`, `green`, `yellow`).
 - `location.state.photo`: optional `File` (JPG, PNG or WebP, 8 MB max). It is
@@ -334,8 +350,8 @@ role is re-verified server-side on every admin action.
   Baguio's pairing) in `public/assets/ub/fonts/`, declared with unicode-range
   in `styles.css` so the peso sign renders in face. The official seal image
   sits in the header on every page.
-- The UI is plain semantic HTML styled to Material 3 and does not use
-  `@material/web`, which is not in `package.json`.
+- The UI is plain semantic HTML styled from the tokens in `styles.css`; there is
+  no Material 3 dependency or shared theme layer.
 - Deploying `dist/` to static hosting: add an SPA fallback so unknown paths serve
   `index.html` (for example a Netlify `_redirects` rule `/* /index.html 200`, or
   the equivalent rewrite on your host), otherwise refreshing `/search` will 404.
