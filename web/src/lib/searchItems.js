@@ -6,7 +6,8 @@ import { embedImage, embedQuery, embedText, SearchError } from './aiService.js';
 // as confident when the query named something in its public text
 // (lexical_score >= LEXICAL_CONFIDENCE) or the relevant vector is strong on its
 // own. This stops a hub image from being "best" for an unrelated query while
-// keeping a genuine semantic match in the possible tier.
+// keeping a genuine semantic match in the possible tier. A row that names the
+// query word joins the best tier regardless of the BEST_DELTA band.
 export const MATCH_THRESHOLD = 0.3;
 export const MATCH_COUNT = 15;
 export const BEST_FLOOR = 0.72;
@@ -33,6 +34,12 @@ export const LEXICAL_WEIGHT = 0.25;
 // Absorbs the binary rounding in a delta comparison, e.g. 0.664 - 0.07 is
 // 0.5940000000000001, which would otherwise drop an item sitting on 0.594.
 const EPSILON = 1e-9;
+
+// lexical_score is 1.0 when `search_tokens` finds the query word in the item's
+// public text (title, category or caption). A row that names the query is a
+// confident hit on its own, so it joins the best tier even when another row
+// scores higher.
+const EXACT_TOKEN_SCORE = 1 - EPSILON;
 
 /**
  * Inventory statuses that mean an item is no longer held. `resolved` is not an
@@ -87,6 +94,10 @@ export function calibrateMatchScore(similarity) {
   const SECONDARY_MIN = 0.55;
   const SECONDARY_MAX = 0.599;
 
+  // A row without a usable score (stale RPC, missing column) hides the badge
+  // instead of rendering "NaN% match".
+  if (!Number.isFinite(similarity)) return { percent: null, tier: 'none' };
+
   if (similarity < PRIMARY_MIN) {
     const low = Math.min(Math.max(similarity, SECONDARY_MIN), SECONDARY_MAX);
     const normalized = (low - SECONDARY_MIN) / (SECONDARY_MAX - SECONDARY_MIN);
@@ -110,6 +121,28 @@ function scoreOf(item) {
   if (Number.isFinite(item.score)) return item.score;
   if (Number.isFinite(item.similarity)) return item.similarity;
   return 0;
+}
+
+/**
+ * The similarity the match badge should display for a row. The two-tower RPC
+ * carries `score` (a blended rank that can exceed 1) and no `similarity`, so
+ * reading `item.similarity` directly fed NaN into the percentage. Rebuild the
+ * SQL's vector blend from the component similarities instead; a legacy row
+ * still supplies `similarity` on its own.
+ *
+ * Returns null when the row has no usable value, so the badge can stay hidden.
+ */
+export function matchSimilarityOf(item) {
+  if (Number.isFinite(item.similarity)) return item.similarity;
+  if (
+    Number.isFinite(item.text_similarity) &&
+    Number.isFinite(item.image_similarity)
+  ) {
+    return 0.65 * item.text_similarity + 0.35 * item.image_similarity;
+  }
+  if (Number.isFinite(item.text_similarity)) return item.text_similarity;
+  if (Number.isFinite(item.image_similarity)) return item.image_similarity;
+  return null;
 }
 
 /**
@@ -139,6 +172,14 @@ function isConfident(item, score) {
       item.text_similarity >= TEXT_STRONG_FLOOR) ||
     (Number.isFinite(item.image_similarity) &&
       item.image_similarity >= IMAGE_STRONG_FLOOR)
+  );
+}
+
+/** True when the item's own public text contains the query word. */
+function namesQuery(item) {
+  return (
+    Number.isFinite(item.lexical_score) &&
+    item.lexical_score >= EXACT_TOKEN_SCORE
   );
 }
 
@@ -414,11 +455,13 @@ export async function searchItems({
   const top = ordered.length ? scoreOf(ordered[0]) : 0;
   const best = ordered.filter((item) => {
     const score = scoreOf(item);
-    return (
-      score >= bestFloorOf(item, usedLegacy) &&
-      isConfident(item, score) &&
-      score >= top - BEST_DELTA - EPSILON
-    );
+    if (score < bestFloorOf(item, usedLegacy) || !isConfident(item, score)) {
+      return false;
+    }
+    // A row whose public text names the query is a confident hit even when it
+    // trails the top blended score by more than BEST_DELTA, e.g. two wallets
+    // that differ only in vector similarity for the query "wallet".
+    return namesQuery(item) || score >= top - BEST_DELTA - EPSILON;
   });
   const possibleLimit = best.length ? POSSIBLE_LIMIT : POSSIBLE_ONLY_LIMIT;
   const possible = ordered
