@@ -4,21 +4,46 @@
 -- lexical_score and score to anon. A guessed amount or owner's name could be
 -- confirmed from the score. Masked rows are now scored against their public
 -- text only: the masked title plus the public category ("cash cash",
--- "documents / ids documents / ids"). Queries such as "cash" or "id" still get
--- a keyword boost; the item's hidden title and caption no longer count, so
--- searching "dela cruz" or "5000" ranks those items on the vector score alone.
--- Signatures, return types, SECURITY DEFINER, pinned search_path, status
--- exclusion and ranking for unmasked rows are unchanged.
+-- "documents / ids documents / ids"). Queries such as "cash" or "documents"
+-- still get a keyword boost; the item's hidden title and caption no longer
+-- count, so searching "dela cruz" or "5000" ranks those items on the vector
+-- score alone. Signatures, return types, SECURITY DEFINER, pinned search_path,
+-- status exclusion and ranking for unmasked rows are unchanged.
 
-create or replace function public.mask_public_search_text(p_search_text text, p_category text, p_is_cash boolean)
+-- One definition of which rows are masked, shared by every mask helper so the
+-- Cash and Documents / IDs rule cannot drift between them. Returns 'cash',
+-- 'documents' or null for an unmasked row.
+create or replace function public.mask_public_kind(p_category text, p_is_cash boolean)
 returns text language sql immutable set search_path = public as $$
     select case
-        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'cash cash'
-        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id')
-            then lower('Documents / IDs ' || p_category)
+        when coalesce(p_is_cash, false) or p_category = 'Cash' then 'cash'
+        when lower(btrim(coalesce(p_category, ''))) in ('documents / ids', 'document/id') then 'documents'
+    end
+$$;
+revoke all on function public.mask_public_kind(text, boolean) from public;
+
+create or replace function public.mask_public_title(p_title text, p_category text, p_is_cash boolean)
+returns text language sql immutable set search_path = public as $$
+    select case public.mask_public_kind(p_category, p_is_cash)
+        when 'cash' then 'Cash'
+        when 'documents' then 'Documents / IDs'
+        else p_title
+    end
+$$;
+create or replace function public.mask_public_image_url(p_image_url text, p_category text, p_is_cash boolean)
+returns text language sql immutable set search_path = public as $$
+    select case when public.mask_public_kind(p_category, p_is_cash) is null then p_image_url end
+$$;
+create or replace function public.mask_public_search_text(p_search_text text, p_category text, p_is_cash boolean)
+returns text language sql immutable set search_path = public as $$
+    select case public.mask_public_kind(p_category, p_is_cash)
+        when 'cash' then 'cash cash'
+        when 'documents' then lower('Documents / IDs ' || p_category)
         else p_search_text
     end
 $$;
+revoke all on function public.mask_public_title(text, text, boolean) from public;
+revoke all on function public.mask_public_image_url(text, text, boolean) from public;
 revoke all on function public.mask_public_search_text(text, text, boolean) from public;
 
 create or replace function public.match_items_hybrid(
