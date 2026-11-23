@@ -107,8 +107,8 @@ begin
        set status = 'closed',
            closed_at = timezone('utc'::text, now()),
            closed_by = 'staff'
-     where id = v_id
-       and status = 'open'
+     where lost_reports.id = v_id
+       and lost_reports.status = 'open'
     returning lost_reports.closed_at into v_closed_at;
 
     return query select v_ref_code, 'closed'::text, v_closed_at;
