@@ -147,7 +147,7 @@ class PublicCloseRpc(unittest.TestCase):
                 "v_status, v_closed_at",
                 fn,
             )
-            self.assertIn("where id = v_id and status = 'open'", fn)
+            self.assertIn("where lost_reports.id = v_id and lost_reports.status = 'open'", fn)
             self.assertIn(
                 "set status = 'closed', closed_at = timezone('utc'::text, "
                 "now()), closed_by = 'self'",
@@ -181,7 +181,7 @@ class StaffCloseRpc(unittest.TestCase):
                 "v_status, v_closed_at",
                 fn,
             )
-            self.assertIn("where id = v_id and status = 'open'", fn)
+            self.assertIn("where lost_reports.id = v_id and lost_reports.status = 'open'", fn)
             self.assertIn("closed_by = 'staff'", fn)
             self.assertNotIn("close_key", fn)
 
