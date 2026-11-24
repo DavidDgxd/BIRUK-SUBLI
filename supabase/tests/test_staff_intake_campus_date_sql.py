@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MIGRATION_SQL = ROOT / "supabase" / "migrations" / "20261124120000_staff_intake_campus_date.sql"
+MIGRATION_SQL = ROOT / "supabase" / "migrations" / "20261124130000_staff_intake_campus_date.sql"
 SCHEMA_SQL = ROOT / "ai-service" / "supabase" / "schema.sql"
 CAMPUS_TODAY = "(now() at time zone 'asia/manila')::date"
 
