@@ -602,7 +602,10 @@ describe('searchItems confidence tiers', () => {
     expect(rpc).toHaveBeenNthCalledWith(
       3,
       'match_items',
-      expect.objectContaining({ query_embedding: [1, 0, 0] }),
+      expect.objectContaining({
+        query_embedding: [1, 0, 0],
+        query_text: 'wallet',
+      }),
     );
     expect(result.best.map((item) => item.id)).toEqual([
       'general',

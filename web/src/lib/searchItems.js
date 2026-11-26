@@ -340,6 +340,7 @@ async function fetchLegacy({
       filter_office: office || null,
       date_from: dateFrom || null,
       date_to: dateTo || null,
+      query_text: legacy?.expandedText ?? queryText ?? null,
     })
     .abortSignal(signal);
 

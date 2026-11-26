@@ -166,7 +166,7 @@ def main() -> None:
 
     # Sanity check: ask match_items for the item's own vector. It should rank itself first.
     r = requests.post(f"{supabase_url}/rest/v1/rpc/match_items", headers=headers,
-                      json={"query_embedding": vector, "match_count": 3}, timeout=TIMEOUT)
+                      json={"query_embedding": vector, "match_count": 3, "query_text": public_text}, timeout=TIMEOUT)
     check(r, "match_items check")
     ids = [m["id"] for m in r.json()]
     if item["id"] in ids:
