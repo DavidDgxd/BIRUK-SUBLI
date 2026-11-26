@@ -1779,7 +1779,7 @@ begin
     if p_date_lost is null then
         raise exception 'A date is required.' using errcode = '22023';
     end if;
-    if p_date_lost > current_date then
+    if p_date_lost > (now() at time zone 'Asia/Manila')::date then
         raise exception 'The date cannot be in the future.' using errcode = '22023';
     end if;
     if p_embedding is null then
@@ -2021,7 +2021,7 @@ begin
     if p_found_date is null then
         raise exception 'A date is required.' using errcode = '22023';
     end if;
-    if p_found_date > current_date then
+    if p_found_date > (now() at time zone 'Asia/Manila')::date then
         raise exception 'The date cannot be in the future.' using errcode = '22023';
     end if;
     if p_image_url is null or btrim(p_image_url) = '' then
