@@ -67,6 +67,12 @@ export function isSearchableItemStatus(status) {
 
 const DOCUMENT_CATEGORIES = ['documents / ids', 'document/id'];
 
+/** True when the RPC masks this row's title, image and vector scores. */
+function isMaskedCategory(category) {
+  const value = String(category ?? '').trim().toLowerCase();
+  return value === 'cash' || DOCUMENT_CATEGORIES.includes(value);
+}
+
 /**
  * Defense-in-depth for a stale or unpatched search RPC. The SQL RPCs already
  * convert `is_cash = true` rows to `category = 'Cash'` / `title = 'Cash'`, so
@@ -460,7 +466,13 @@ export async function searchItems({
     (item) =>
       isSearchableItemStatus(item.status) &&
       scoreOf(item) >= MATCH_THRESHOLD &&
-      (!office || item.holding_office_id === office),
+      (!office || item.holding_office_id === office) &&
+      // A stale RPC may still return neutral masked rows; drop them unless
+      // their public text named the query. Rows without a lexical column come
+      // from the vector-only fallback, which gates them server-side.
+      (!isMaskedCategory(item.category) ||
+        !('lexical_score' in item) ||
+        item.lexical_score >= LEXICAL_CONFIDENCE),
   ).map(maskSearchItem);
 
   // The RPC already sorts, but sorting here keeps the cap deterministic if a

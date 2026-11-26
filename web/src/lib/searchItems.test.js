@@ -640,33 +640,25 @@ describe('searchItems confidence tiers', () => {
   });
 
   it('does not promote a masked row whose neutral score came from a hidden match', async () => {
-    // The SQL RPC now returns a flat 0.55 for masked rows, whatever the query.
-    // Only a public-text keyword hit may lift one into the best tier.
-    rpc.mockReturnValue(
-      resolvedRpc({
-        data: [
-          row('masked-neutral', 0.55, {
-            lexical_score: 0,
-            text_similarity: 0.55,
-            image_similarity: null,
-            category: 'Documents / IDs',
-          }),
-          row('masked-named', 0.8, {
-            lexical_score: 1,
-            text_similarity: 0.55,
-            image_similarity: null,
-            category: 'Documents / IDs',
-          }),
-        ],
-      }),
-    );
-
-    const result = await searchItems({
-      text: 'documents',
-      signal: new AbortController().signal,
-    });
-
+    // The RPC returns a flat 0.55 for masked rows; only a public keyword hit
+    // may lift one into the best tier.
+    rpc.mockReturnValue(resolvedRpc({ data: [
+      row('masked-neutral', 0.55, { lexical_score: 0, text_similarity: 0.55, image_similarity: null, category: 'Documents / IDs' }),
+      row('masked-named', 0.8, { lexical_score: 1, text_similarity: 0.55, image_similarity: null, category: 'Documents / IDs' }),
+    ] }));
+    const result = await searchItems({ text: 'documents', signal: new AbortController().signal });
     expect(result.best.map((item) => item.id)).toEqual(['masked-named']);
+  });
+
+  it('drops masked neutral rows for an unrelated query', async () => {
+    // A stale RPC can still return the fixed 0.55 for every held masked row.
+    // Without a public keyword hit they must not fill the possible slots.
+    rpc.mockReturnValue(resolvedRpc({ data: [
+      row('masked-cash', 0.55, { lexical_score: 0, text_similarity: 0.55, image_similarity: null, category: 'Cash' }),
+      row('masked-doc', 0.55, { lexical_score: 0, text_similarity: 0.55, image_similarity: null, category: 'Documents / IDs' }),
+    ] }));
+    const result = await searchItems({ text: 'zebra', signal: new AbortController().signal });
+    expect(result).toMatchObject({ best: [], possible: [], state: 'none' });
   });
 
   it('keeps photo search alive when the text tower fails', async () => {

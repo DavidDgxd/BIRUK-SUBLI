@@ -844,33 +844,19 @@ $$;
 revoke all on function public.mask_public_search_text(text, text, boolean) from public;
 
 -- Issue #130: masked rows report a fixed neutral vector score (the 0.55 public
--- floor) and no image similarity, so `similarity`, `text_similarity`,
--- `image_similarity` and the vector part of `score` cannot confirm a hidden
--- title or caption. Non-masked rows keep their real vectors; the staff-only
--- reverse match still reads the full items.embedding.
+-- floor) and no image similarity, so returned scores cannot confirm hidden text.
 create or replace function public.mask_public_similarity (
     p_similarity float, p_category text, p_is_cash boolean
-) returns float
-language sql immutable
-set search_path = public
-as $$
-    select case
-        when public.mask_public_kind(p_category, p_is_cash) is null then p_similarity
-        else 0.55
-    end
+) returns float language sql immutable set search_path = public as $$
+    select case when public.mask_public_kind(p_category, p_is_cash) is null then p_similarity else 0.55 end
 $$;
 
 revoke all on function public.mask_public_similarity(float, text, boolean) from public;
 
 create or replace function public.mask_public_image_similarity (
     p_similarity float, p_category text, p_is_cash boolean
-) returns float
-language sql immutable
-set search_path = public
-as $$
-    select case
-        when public.mask_public_kind(p_category, p_is_cash) is null then p_similarity
-    end
+) returns float language sql immutable set search_path = public as $$
+    select case when public.mask_public_kind(p_category, p_is_cash) is null then p_similarity end
 $$;
 
 revoke all on function public.mask_public_image_similarity(float, text, boolean) from public;
@@ -881,7 +867,8 @@ create or replace function public.match_items (
     match_count int default 15,
     filter_office text default null,
     date_from date default null,
-    date_to date default null
+    date_to date default null,
+    query_text text default null
 )
 returns table (
     id uuid,
@@ -901,6 +888,7 @@ language sql stable
 security definer
 set search_path = public, pg_temp
 as $$
+    with input as (select public.search_tokens(query_text) as tokens)
     select
         items.id,
         items.ref_code,
@@ -916,16 +904,24 @@ as $$
         sims.similarity
     from public.items
     join public.offices on items.holding_office_id = offices.id
+    cross join input
     cross join lateral (
-        select public.mask_public_similarity(
-            1 - (items.embedding <=> query_embedding),
-            items.category, items.is_cash
-        ) as similarity
+        select public.mask_public_similarity(1 - (items.embedding <=> query_embedding),
+            items.category, items.is_cash) as similarity
     ) as sims
+    cross join lateral (
+        select public.mask_public_search_text(items.search_text, items.category, items.is_cash) as search_text
+    ) as src
+    cross join lateral (
+        select coalesce(max(case when src.search_text ~ ('\m' || token || '\M') then 1.0 else 0.0 end), 0.0)::float as lexical_score
+        from unnest(input.tokens) as token
+    ) as lexical
     where
         -- Released/resolved rows (and the other terminal custody states) are
         -- not live results, even though their embeddings remain stored.
         items.status not in ('released', 'resolved', 'transferred', 'disposed')
+        and (public.mask_public_kind(items.category, items.is_cash) is null
+             or lexical.lexical_score >= 0.5)
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
         and (date_to is null or items.date_received <= date_to)
@@ -935,8 +931,8 @@ as $$
     limit match_count;
 $$;
 
-revoke all on function public.match_items(vector, double precision, integer, text, date, date) from public;
-grant execute on function public.match_items(vector, double precision, integer, text, date, date)
+revoke all on function public.match_items(vector, double precision, integer, text, date, date, text) from public;
+grant execute on function public.match_items(vector, double precision, integer, text, date, date, text)
     to anon, authenticated, service_role;
 
 
@@ -1077,6 +1073,8 @@ as $$
     ) as lexical
     where
         items.status not in ('released', 'resolved', 'transferred', 'disposed')
+        and (public.mask_public_kind(items.category, items.is_cash) is null
+             or lexical.lexical_score >= 0.5)
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
         and (date_to is null or items.date_received <= date_to)
@@ -1165,26 +1163,12 @@ as $$
     cross join input
     cross join lateral (
         select
-            case
-                when query_text_embedding is not null
-                then public.mask_public_similarity(
-                    case
-                        when items.text_embedding is not null
-                        then 1 - (items.text_embedding <=> query_text_embedding)
-                    end,
-                    items.category, items.is_cash
-                )
-            end as text_similarity,
-            case
-                when query_image_embedding is not null
-                then public.mask_public_image_similarity(
-                    case
-                        when items.image_embedding is not null
-                        then 1 - (items.image_embedding <=> query_image_embedding)
-                    end,
-                    items.category, items.is_cash
-                )
-            end as image_similarity
+            case when query_text_embedding is not null then public.mask_public_similarity(
+                case when items.text_embedding is not null then 1 - (items.text_embedding <=> query_text_embedding) end,
+                items.category, items.is_cash) end as text_similarity,
+            case when query_image_embedding is not null then public.mask_public_image_similarity(
+                case when items.image_embedding is not null then 1 - (items.image_embedding <=> query_image_embedding) end,
+                items.category, items.is_cash) end as image_similarity
     ) as sims
     cross join lateral (
         select case
@@ -1232,6 +1216,8 @@ as $$
                   or items.text_embedding is not null))
             or (query_image_embedding is not null and items.image_embedding is not null)
         )
+        and (public.mask_public_kind(items.category, items.is_cash) is null
+             or lexical.lexical_score >= 0.5)
         and (filter_office is null or items.holding_office_id = filter_office)
         and (date_from is null or items.date_received >= date_from)
         and (date_to is null or items.date_received <= date_to)
