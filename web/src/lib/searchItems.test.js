@@ -602,7 +602,10 @@ describe('searchItems confidence tiers', () => {
     expect(rpc).toHaveBeenNthCalledWith(
       3,
       'match_items',
-      expect.objectContaining({ query_embedding: [1, 0, 0] }),
+      expect.objectContaining({
+        query_embedding: [1, 0, 0],
+        query_text: 'wallet',
+      }),
     );
     expect(result.best.map((item) => item.id)).toEqual([
       'general',
@@ -637,6 +640,28 @@ describe('searchItems confidence tiers', () => {
     const hybrid = await searchItems({ text: 'wallet', signal });
     expect(rpc).toHaveBeenLastCalledWith('match_items_hybrid', expect.anything());
     expect(hybrid.best[0]).toMatchObject({ title: 'Documents / IDs', image_url: null });
+  });
+
+  it('does not promote a masked row whose neutral score came from a hidden match', async () => {
+    // The RPC returns a flat 0.55 for masked rows; only a public keyword hit
+    // may lift one into the best tier.
+    rpc.mockReturnValue(resolvedRpc({ data: [
+      row('masked-neutral', 0.55, { lexical_score: 0, text_similarity: 0.55, image_similarity: null, category: 'Documents / IDs' }),
+      row('masked-named', 0.8, { lexical_score: 1, text_similarity: 0.55, image_similarity: null, category: 'Documents / IDs' }),
+    ] }));
+    const result = await searchItems({ text: 'documents', signal: new AbortController().signal });
+    expect(result.best.map((item) => item.id)).toEqual(['masked-named']);
+  });
+
+  it('drops masked neutral rows for an unrelated query', async () => {
+    // A stale RPC can still return the fixed 0.55 for every held masked row.
+    // Without a public keyword hit they must not fill the possible slots.
+    rpc.mockReturnValue(resolvedRpc({ data: [
+      row('masked-cash', 0.55, { lexical_score: 0, text_similarity: 0.55, image_similarity: null, category: 'Cash' }),
+      row('masked-doc', 0.55, { lexical_score: 0, text_similarity: 0.55, image_similarity: null, category: 'Documents / IDs' }),
+    ] }));
+    const result = await searchItems({ text: 'zebra', signal: new AbortController().signal });
+    expect(result).toMatchObject({ best: [], possible: [], state: 'none' });
   });
 
   it('keeps photo search alive when the text tower fails', async () => {

@@ -80,11 +80,12 @@ $$;
 create temp table lexical_before as select * from pg_temp.lexical_rows();
 
 \ir ../migrations/20261123120000_mask_lexical_search_text.sql
+\ir ../migrations/20261124120000_mask_vector_search_scores.sql
 
 create temp table results as
-    select 'match_items' rpc, id, title, category, image_url from public.match_items(pg_temp.vec(1, 0), 0.55, 50, null, null, null)
-    union all select 'match_items_hybrid', id, title, category, image_url from public.match_items_hybrid(pg_temp.vec(1, 0), 0.55, 50, null, null, null, 'blue umbrella wallet document id')
-    union all select 'match_items_two_tower', id, title, category, image_url from public.match_items_two_tower(pg_temp.vec384(1, 0), null, 0.0, 50, null, null, null, 'blue umbrella wallet document id')
+    select 'match_items' rpc, id, title, category, image_url from public.match_items(pg_temp.vec(1, 0), 0.55, 50, null, null, null, 'cash documents')
+    union all select 'match_items_hybrid', id, title, category, image_url from public.match_items_hybrid(pg_temp.vec(1, 0), 0.55, 50, null, null, null, 'cash documents')
+    union all select 'match_items_two_tower', id, title, category, image_url from public.match_items_two_tower(pg_temp.vec384(1, 0), null, 0.0, 50, null, null, null, 'cash documents')
     union all select 'list_public_items', id, title, category, image_url from public.list_public_items(50, 0, null, null, null)
     union all select 'get_item_public', g.id, g.title, g.category, g.image_url from public.items i cross join lateral public.get_item_public(i.id) g;
 
@@ -150,27 +151,12 @@ do $$
 declare
     n int;
 begin
-    -- A hidden term scores a masked row exactly like its control.
-    select count(*) into n from (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
-    cross join (values ('secret'), ('hidden'), ('caption-hidden')) q(label)
-    cross join masked_pairs p
-    left join lexical m on m.label = q.label and m.rpc = r.rpc and m.id = p.masked
-    left join lexical c on c.label = q.label and c.rpc = r.rpc and c.id = p.control
-    where m.id is null or c.id is null
-       or m.lexical_score is distinct from c.lexical_score or m.score is distinct from c.score;
-    if n > 0 then raise exception '% masked rows score differently from their control: hidden text leaks', n; end if;
-
-    -- A hidden-only term, from the title or only the caption, scores a masked
-    -- row exactly like an unrelated term. None of "santos 5000", "thousand
-    -- quezon folded burgundy" or "zebra" shares a trigram with the masked text.
-    select count(*) into n from (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
-    cross join (values ('hidden'), ('caption-hidden')) q(label)
-    cross join masked_pairs p
-    left join lexical h on h.label = q.label and h.rpc = r.rpc and h.id = p.masked
-    left join lexical u on u.label = 'unrelated' and u.rpc = r.rpc and u.id = p.masked
-    where h.id is null or u.id is null
-       or h.lexical_score is distinct from u.lexical_score or h.score is distinct from u.score;
-    if n > 0 then raise exception '% masked rows score a hidden term differently from an unrelated one', n; end if;
+    -- Hidden-only and unrelated queries no longer return masked rows at all:
+    -- the neutral 0.55 passes the floor only behind a public lexical hit.
+    select count(*) into n from lexical
+    where label in ('secret', 'hidden', 'caption-hidden', 'unrelated')
+      and id in (select masked from masked_pairs);
+    if n > 0 then raise exception '% hidden or unrelated query surfaced a masked row', n; end if;
 
     select count(*) into n from lexical
     where label in ('secret', 'hidden', 'caption-hidden') and id in (select masked from masked_pairs) and lexical_score >= 1;
@@ -197,7 +183,7 @@ begin
     select count(*) into n from (values ('empty'), ('photo-only')) q(label)
     cross join (values ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
     left join (select label, rpc, count(*) total from lexical group by label, rpc) c on c.label = q.label and c.rpc = r.rpc
-    where c.total is distinct from 9;
+    where c.total is distinct from 2;
     if n > 0 then raise exception '% no-token queries returned the wrong row count', n; end if;
 
     -- Unmasked rows keep their #124 lexical_score, score and relative order.
@@ -220,4 +206,64 @@ begin
     ) a on a.label = b.label and a.rpc = b.rpc and a.id = b.id
     where a.pos is distinct from b.pos;
     if n > 0 then raise exception '% unmasked rows changed relative order', n; end if;
+end $$;
+
+-- Issue #130: vector scores must not reveal masked title/caption text. Masked
+-- rows keep a neutral 0.55 and null image similarity, are returned only behind
+-- a public lexical hit, and never shift for a hidden-title query. Controls get
+-- distinct vectors so the masked-vs-control check fails on the old code.
+update public.items set embedding = pg_temp.vec(0.7, 0.71414), image_embedding = pg_temp.vec(0.6, 0.8)
+where id in (select control from masked_pairs);
+update public.items set image_embedding = pg_temp.vec(0.2, 0.9798)
+where id in (select masked from masked_pairs);
+
+create function pg_temp.vector_rows() returns table (
+    label text, rpc text, id uuid, similarity float, text_similarity float, image_similarity float, lexical_score float, score float
+) language sql as $$
+    with queries(label, text, emb512, emb384) as (values
+        ('public', 'cash documents', pg_temp.vec(1, 0), pg_temp.vec384(1, 0)),
+        ('hidden', 'cash documents santos 5000', pg_temp.vec(1, 0), pg_temp.vec384(1, 0)),
+        ('unrelated', 'zebra', pg_temp.vec(0, 1), pg_temp.vec384(0, 1)),
+        ('hidden-only', 'santos 5000', pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589)))
+    select q.label, 'match_items', m.id, m.similarity, null::float, null::float, null::float, null::float
+    from queries q cross join lateral public.match_items(q.emb512, 0.0, 50, null, null, null, q.text) m
+    union all select q.label, 'match_items_hybrid', h.id, h.similarity, null::float, null::float, h.lexical_score, h.score
+    from queries q cross join lateral public.match_items_hybrid(q.emb512, 0.0, 50, null, null, null, q.text) h
+    union all select q.label, 'match_items_two_tower', t.id, null::float, t.text_similarity, t.image_similarity, t.lexical_score, t.score
+    from queries q cross join lateral public.match_items_two_tower(q.emb384, q.emb512, 0.0, 50, null, null, null, q.text) t
+$$;
+
+create temp table vector_scores as select * from pg_temp.vector_rows();
+
+do $$
+declare
+    n int;
+begin
+    -- An unrelated or hidden-only query surfaces no masked row.
+    select count(*) into n from vector_scores v
+    where v.label in ('unrelated', 'hidden-only') and v.id in (select masked from masked_pairs);
+    if n > 0 then raise exception '% unrelated query surfaced a masked row', n; end if;
+
+    -- A public hit keeps the masked row at the neutral score, a hidden term
+    -- cannot shift any column, and the control with a distinct vector matches.
+    select count(*) into n
+    from (values ('match_items'), ('match_items_hybrid'), ('match_items_two_tower')) r(rpc)
+    cross join masked_pairs p
+    left join vector_scores b on b.label = 'public' and b.rpc = r.rpc and b.id = p.masked
+    left join vector_scores h on h.label = 'hidden' and h.rpc = r.rpc and h.id = p.masked
+    left join vector_scores c on c.label = 'public' and c.rpc = r.rpc and c.id = p.control
+    where b.id is null or h.id is null or c.id is null
+       or (b.similarity, b.text_similarity, b.image_similarity, b.lexical_score, b.score)
+          is distinct from (h.similarity, h.text_similarity, h.image_similarity, h.lexical_score, h.score)
+       or (b.similarity, b.text_similarity, b.image_similarity, b.lexical_score, b.score)
+          is distinct from (c.similarity, c.text_similarity, c.image_similarity, c.lexical_score, c.score);
+    if n > 0 then raise exception '% masked vector scores diverge or leak hidden text', n; end if;
+
+    -- Neutral columns are populated and the image tower stays hidden.
+    select count(*) into n from vector_scores v
+    where v.label = 'public' and v.id in (select masked from masked_pairs)
+      and ((v.rpc in ('match_items', 'match_items_hybrid') and v.similarity is distinct from 0.55)
+        or (v.rpc = 'match_items_two_tower' and (v.text_similarity is distinct from 0.55 or v.image_similarity is not null))
+        or (v.rpc <> 'match_items' and v.score is null));
+    if n > 0 then raise exception '% masked vector scores were wrong', n; end if;
 end $$;
