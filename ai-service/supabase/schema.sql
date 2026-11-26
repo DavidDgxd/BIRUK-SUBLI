@@ -2129,7 +2129,7 @@ create or replace function public.submit_staff_custody(
     p_image_url        text,
     p_category         text default 'General',
     p_embedding        vector(512) default null,
-    p_date_received    date default current_date,
+    p_date_received    date default (now() at time zone 'Asia/Manila')::date,
     p_cash_amount      numeric default null,
     p_finder_name      text default null,
     p_finder_contact   text default null,
@@ -2178,7 +2178,7 @@ begin
     if p_date_received is null then
         raise exception 'A receipt date is required.' using errcode = '22023';
     end if;
-    if p_date_received > current_date then
+    if p_date_received > (now() at time zone 'Asia/Manila')::date then
         raise exception 'The receipt date cannot be in the future.'
             using errcode = '22023';
     end if;
