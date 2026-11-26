@@ -116,6 +116,14 @@ async function mockBackends(page, role) {
     if (url.pathname === '/rest/v1/rpc/dismiss_lost_report_match') {
       return json(route, {});
     }
+    // US-37: the sign-in form appends an attempt, and the admin history page
+    // reads it back. Defaults are quiet so unrelated flows are unaffected.
+    if (url.pathname === '/rest/v1/rpc/record_login_attempt') {
+      return json(route, null);
+    }
+    if (url.pathname === '/rest/v1/rpc/admin_list_login_history') {
+      return json(route, []);
+    }
     if (url.pathname === '/rest/v1/rpc/get_usage_report') {
       return json(route, [
         {
@@ -192,6 +200,7 @@ export const ROUTES = [
   { path: '/staff/items', role: 'office' },
   { path: '/admin/offices', role: 'admin' },
   { path: '/admin/synonyms', role: 'admin' },
+  { path: '/admin/login-history', role: 'admin' },
 ];
 
 /** Opens a route and waits until the app has rendered and settled. */

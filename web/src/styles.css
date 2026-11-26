@@ -2926,6 +2926,218 @@ textarea {
   color: var(--ink-muted);
 }
 
+/* Admin tabs (US-37) ------------------------------------------------------ */
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-block: var(--space-5) var(--space-2);
+  padding-block-end: var(--space-2);
+  border-block-end: var(--border);
+}
+
+.admin-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-block-end: 0.1875rem solid transparent;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.admin-tabs__tab:hover {
+  background: var(--inset);
+  color: var(--ink);
+}
+
+.admin-tabs__tab[aria-selected='true'] {
+  border-block-end-color: var(--primary);
+  color: var(--primary-ink);
+}
+
+/* Login history (US-37) --------------------------------------------------- */
+
+.login-history-view {
+  margin-block-start: var(--space-4);
+}
+
+.login-history-view__title {
+  font-size: var(--text-title);
+}
+
+.login-history-view__lead {
+  max-inline-size: 46rem;
+  margin-block: var(--space-2) var(--space-4);
+  color: var(--ink-muted);
+}
+
+.login-history__filters {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--inset);
+}
+
+.login-history__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.login-history__filters .form-error {
+  margin-block-start: 0;
+}
+
+.login-history__empty {
+  padding-block: var(--space-5);
+  border-block-start: var(--border);
+  color: var(--ink-muted);
+}
+
+.login-history__table-wrap {
+  margin-block-start: var(--space-4);
+  border-block-start: var(--border);
+}
+
+.login-history__table {
+  inline-size: 100%;
+}
+
+.login-history__head {
+  display: none;
+}
+
+.login-history__row {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-4);
+  border-block-end: var(--border);
+}
+
+.login-history__cell {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.login-history__when {
+  color: var(--ink-muted);
+}
+
+.login-history__account {
+  font-weight: var(--weight-strong);
+}
+
+.login-history__role,
+.login-history__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.login-history__role::before,
+.login-history__status::before,
+.login-history__device::before {
+  content: attr(data-label);
+  min-inline-size: 5.5rem;
+  color: var(--ink-muted);
+}
+
+.login-history__reason {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+
+.login-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--inset);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+}
+
+.login-badge--success {
+  background: var(--success-wash);
+  color: var(--success);
+}
+
+.login-badge--failed {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.login-badge--office_staff {
+  background: var(--inset);
+  color: var(--ink-muted);
+}
+
+.login-badge--central_admin {
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.login-badge--unknown {
+  background: var(--lost-wash);
+  color: var(--ink-muted);
+}
+
+@media (min-width: 40rem) {
+  .login-history__filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+  }
+}
+
+@media (min-width: 48rem) {
+  .login-history__head {
+    display: block;
+  }
+
+  .login-history__row {
+    grid-template-columns:
+      minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 0.9fr)
+      minmax(0, 1.1fr) minmax(0, 1.1fr);
+    gap: var(--space-3);
+    align-items: baseline;
+    padding-block: var(--space-3);
+  }
+
+  .login-history__head .login-history__row {
+    padding-block: var(--space-2);
+    border-block-end: var(--border-strong);
+  }
+
+  .login-history__head .login-history__cell {
+    color: var(--ink-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .login-history__role::before,
+  .login-history__status::before,
+  .login-history__device::before {
+    content: none;
+  }
+}
+
+
 /* Dialogs ---------------------------------------------------------------- */
 
 .office-dialog {

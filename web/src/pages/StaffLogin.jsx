@@ -4,6 +4,10 @@ import SiteHeader from '../components/SiteHeader.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
 import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
+import {
+  coarseFailureReason,
+  recordLoginAttempt,
+} from '../lib/loginHistory.js';
 
 /*
  * Office log in (US-02), and the central admin's way in (US-03). Mounted at
@@ -79,10 +83,23 @@ export default function StaffLogin() {
     setFormError('');
     setSubmitting(true);
     try {
-      await signIn(trimmedEmail, password);
+      const session = await signIn(trimmedEmail, password);
       // The provider flips isAuthenticated, which renders the redirect below.
+      // The audit write is best-effort and awaited only so a fast navigation
+      // cannot drop it; a failure resolves to false and never reaches here.
+      await recordLoginAttempt({
+        account: session?.officeName ?? trimmedEmail,
+        status: 'success',
+      });
     } catch (signInError) {
       if (import.meta.env.DEV) console.error('[StaffLogin]', signInError);
+      // Not awaited: the officer needs the error immediately, and the helper
+      // already swallows every network or RPC failure.
+      void recordLoginAttempt({
+        account: trimmedEmail,
+        status: 'failed',
+        failureReason: coarseFailureReason(signInError),
+      });
       setSubmitting(false);
       setFormError(
         signInError?.message ??

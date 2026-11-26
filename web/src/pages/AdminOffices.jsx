@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SiteHeader from '../components/SiteHeader.jsx';
 import SiteFooter from '../components/SiteFooter.jsx';
@@ -8,6 +8,7 @@ import Icon from '../components/Icon.jsx';
 import AddOfficeDialog from '../components/AddOfficeDialog.jsx';
 import ResetCredentialsDialog from '../components/ResetCredentialsDialog.jsx';
 import OfficeActionsMenu from '../components/OfficeActionsMenu.jsx';
+import LoginHistoryPanel from '../components/LoginHistoryPanel.jsx';
 import { listOffices, listOfficeLogins } from '../lib/offices.js';
 import { listOfficeHeldCounts } from '../lib/usageReport.js';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
@@ -31,6 +32,8 @@ function accountStatus(office) {
 export default function AdminOffices() {
   const { status, isAdmin } = useStaffAuth();
   const headingRef = useRef(null);
+  const tabsId = useId();
+  const [tab, setTab] = useState('offices');
   const [offices, setOffices] = useState(null); // null while the first load runs
   const [logins, setLogins] = useState(() => new Map()); // office id → login email
   const [heldCounts, setHeldCounts] = useState(() => new Map()); // office id → held items
@@ -128,7 +131,44 @@ export default function AdminOffices() {
             <>
               <StaffBar icon="admin_panel_settings" label="Central admin" />
 
-              <section className="office-admin" aria-label="Participating offices">
+              <div
+                className="admin-tabs"
+                role="tablist"
+                aria-label="Central admin sections"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  id={`${tabsId}-offices`}
+                  className="admin-tabs__tab"
+                  aria-selected={tab === 'offices'}
+                  aria-controls={`${tabsId}-offices-panel`}
+                  onClick={() => setTab('offices')}
+                >
+                  <Icon name="apartment" />
+                  Offices &amp; logins
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id={`${tabsId}-history`}
+                  className="admin-tabs__tab"
+                  aria-selected={tab === 'history'}
+                  aria-controls={`${tabsId}-history-panel`}
+                  onClick={() => setTab('history')}
+                >
+                  <Icon name="schedule" />
+                  Login history
+                </button>
+              </div>
+
+              <section
+                className="office-admin"
+                id={`${tabsId}-offices-panel`}
+                role="tabpanel"
+                aria-labelledby={`${tabsId}-offices`}
+                hidden={tab !== 'offices'}
+              >
                 <div className="admin-toolbar">
                   <button
                     type="button"
@@ -297,6 +337,22 @@ export default function AdminOffices() {
                     </div>
                   </div>
                 )}
+              </section>
+
+              <section
+                className="login-history-view"
+                id={`${tabsId}-history-panel`}
+                role="tabpanel"
+                aria-labelledby={`${tabsId}-history`}
+                hidden={tab !== 'history'}
+              >
+                <h2 className="login-history-view__title">Sign-in activity</h2>
+                <p className="login-history-view__lead">
+                  Every office and central admin sign-in, newest first. Filter
+                  by office, account, status or date range.
+                </p>
+                {/* Only fetches once the tab has been opened. */}
+                <LoginHistoryPanel active={tab === 'history'} />
               </section>
             </>
           </StaffGate>
