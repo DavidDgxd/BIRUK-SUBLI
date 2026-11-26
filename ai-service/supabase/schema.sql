@@ -25,7 +25,7 @@ create sequence if not exists lost_reports_ref_seq start 100;
 -- Connected as the primary foreign key target for all custody transfers.
 -- ============================================================================
 create table if not exists public.offices (
-    id text primary key,                               -- Unique site key (e.g. 'BCPIO', 'CITY_HALL_INFO')
+    id text primary key,                               -- Unique site key (e.g. 'UB_SECURITY', 'UB_INFO_DESK')
     name text not null,                                -- Official public-facing office name
     address text not null,                             -- Physical floor, building, and location details
     counter_hours text not null,                       -- Public operating schedule
@@ -41,6 +41,19 @@ create table if not exists public.offices (
 -- does not have (user_id, office_name), so any matching signup would fail.
 drop trigger if exists on_auth_office_user_created on auth.users;
 drop function if exists public.handle_new_office_user();
+
+-- Seed the University of Baguio campus counters. The migration that introduced
+-- them is supabase/migrations/20261126130000_ub_campus_offices.sql; this copy
+-- keeps a fresh schema.sql at the same campus scope.
+insert into public.offices (id, name, address, counter_hours, status) values
+    ('UB_SECURITY', 'University of Baguio Security Office', 'University of Baguio, Gen. Luna Road, Baguio', 'Mon-Fri, 8:00 AM - 5:00 PM', 'active'),
+    ('UB_INFO_DESK', 'UB Information Desk', 'University of Baguio Main Lobby, Gen. Luna Road, Baguio', 'Mon-Fri, 8:00 AM - 5:00 PM', 'active'),
+    ('UB_LIBRARY', 'University of Baguio Library', 'University of Baguio Library, Gen. Luna Road, Baguio', 'Mon-Fri, 8:00 AM - 5:00 PM', 'active'),
+    ('UB_STUDENT_CENTER', 'UB Student Center', 'University of Baguio Student Center, Gen. Luna Road, Baguio', 'Mon-Sat, 7:00 AM - 7:00 PM', 'active')
+on conflict (id) do update set
+    name = excluded.name,
+    address = excluded.address,
+    counter_hours = excluded.counter_hours;
 
 
 -- ============================================================================

@@ -16,7 +16,7 @@ function seedRows() {
       synonyms: ['wallet', 'purse'],
       enabled: true,
       notes: 'Counter list',
-      updated_by: 'admin@baguio.gov.ph',
+      updated_by: 'admin@ubaguio.edu.ph',
       updated_at: '2026-11-07T00:00:00Z',
       created_at: '2026-11-01T00:00:00Z',
     },
@@ -46,14 +46,14 @@ async function mockVocabulary(page) {
       existing.synonyms = body.p_synonyms;
       existing.enabled = body.p_enabled;
       existing.notes = body.p_notes;
-      existing.updated_by = 'admin@baguio.gov.ph';
+      existing.updated_by = 'admin@ubaguio.edu.ph';
     } else {
       rows.push({
         term: body.p_term,
         synonyms: body.p_synonyms,
         enabled: body.p_enabled,
         notes: body.p_notes,
-        updated_by: 'admin@baguio.gov.ph',
+        updated_by: 'admin@ubaguio.edu.ph',
         updated_at: '2026-11-07T00:00:00Z',
         created_at: '2026-11-07T00:00:00Z',
       });

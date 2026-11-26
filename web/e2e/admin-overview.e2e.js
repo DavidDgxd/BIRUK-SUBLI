@@ -2,8 +2,8 @@ import { test, expect, OFFICE, openRoute } from './fixtures.js';
 
 const SECOND_OFFICE = {
   ...OFFICE,
-  id: 'CITY_HALL_INFO',
-  name: 'City Hall Information Desk',
+  id: 'UB_INFO_DESK',
+  name: 'UB Information Desk',
   auth_user_id: 'user-office-2',
 };
 

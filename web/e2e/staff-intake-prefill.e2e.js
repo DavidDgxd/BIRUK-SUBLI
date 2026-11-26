@@ -182,7 +182,7 @@ test.describe('staff intake prefill (US-10)', () => {
       id: `report-${index + 1}`,
       ref_code: `FR-${String(index + 1).padStart(4, '0')}`,
       short_note: `Pending report ${index + 1}`,
-      found_location: 'City Hall',
+      found_location: 'University of Baguio Main Lobby',
       found_date: '2026-09-30',
       finder_contact: '0917 000 0000',
       image_url: null,

@@ -12,14 +12,14 @@ const ITEMS = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     ref_code: 'BS-0001',
-    title: 'Black Umbrella at BCPIO',
+    title: 'Black Umbrella at UB_SECURITY',
     category: 'General',
     status: 'held',
     image_url: null,
-    holding_office_id: 'BCPIO',
-    holding_office_name: 'Baguio City Public Information Office',
+    holding_office_id: 'UB_SECURITY',
+    holding_office_name: 'University of Baguio Security Office',
     counter_hours: 'Mon–Fri, 8:00–17:00',
-    office_address: 'City Hall, Baguio City',
+    office_address: 'University of Baguio, Gen. Luna Road, Baguio',
     created_at: '2026-09-10T00:00:00Z',
     similarity: 0.7,
     text_similarity: 0.7,
@@ -29,14 +29,14 @@ const ITEMS = [
   {
     id: '22222222-2222-2222-2222-222222222222',
     ref_code: 'BS-0002',
-    title: 'Black Umbrella at City Hall Info',
+    title: 'Black Umbrella at UB Info Desk',
     category: 'General',
     status: 'held',
     image_url: null,
-    holding_office_id: 'CITY_HALL_INFO',
-    holding_office_name: 'City Hall Information Desk',
+    holding_office_id: 'UB_INFO_DESK',
+    holding_office_name: 'UB Information Desk',
     counter_hours: 'Mon–Fri, 8:00–17:00',
-    office_address: 'City Hall, Baguio City',
+    office_address: 'University of Baguio, Gen. Luna Road, Baguio',
     created_at: '2026-08-10T00:00:00Z',
     similarity: 0.68,
     text_similarity: 0.68,
@@ -80,33 +80,33 @@ test('filters results by holding office and receipt-date range', async ({
   await openRoute(page, '/search?q=umbrella');
 
   await expect(
-    page.getByRole('heading', { name: 'Black Umbrella at BCPIO' }),
+    page.getByRole('heading', { name: 'Black Umbrella at UB_SECURITY' }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', {
-      name: 'Black Umbrella at City Hall Info',
+      name: 'Black Umbrella at UB Info Desk',
     }),
   ).toBeVisible();
   await expect(page.getByText('2 matches, best first')).toBeVisible();
 
-  await page.getByLabel('Holding office').selectOption('BCPIO');
+  await page.getByLabel('Holding office').selectOption('UB_SECURITY');
   await page.getByLabel('Received on or after').fill('2026-09-01');
   await page.getByLabel('Received on or before').fill('2026-09-30');
   await page.getByRole('button', { name: 'Apply filters' }).click();
 
   await expect(page.getByText('1 match, best first')).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Black Umbrella at BCPIO' }),
+    page.getByRole('heading', { name: 'Black Umbrella at UB_SECURITY' }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', {
-      name: 'Black Umbrella at City Hall Info',
+      name: 'Black Umbrella at UB Info Desk',
     }),
   ).toHaveCount(0);
 
   const applied = rpcCalls.at(-1);
   expect(applied).toMatchObject({
-    filter_office: 'BCPIO',
+    filter_office: 'UB_SECURITY',
     date_from: '2026-09-01',
     date_to: '2026-09-30',
   });
@@ -174,15 +174,15 @@ test('edits the search text from the results page and keeps filters', async ({
 
   await openRoute(page, '/search?q=umbrella');
 
-  await page.getByLabel('Holding office').selectOption('BCPIO');
+  await page.getByLabel('Holding office').selectOption('UB_SECURITY');
   await page.getByLabel('Received on or after').fill('2026-09-01');
   await page.getByLabel('Received on or before').fill('2026-09-30');
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/office=UB_SECURITY/);
   await expect(page).toHaveURL(/from=2026-09-01/);
   await expect(page).toHaveURL(/to=2026-09-30/);
   await expect.poll(() => rpcCalls.at(-1)).toMatchObject({
-    filter_office: 'BCPIO',
+    filter_office: 'UB_SECURITY',
     date_from: '2026-09-01',
     date_to: '2026-09-30',
   });
@@ -194,12 +194,12 @@ test('edits the search text from the results page and keeps filters', async ({
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
   await expect(page).toHaveURL(/q=wallet/);
-  await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/office=UB_SECURITY/);
   await expect(page).toHaveURL(/from=2026-09-01/);
   await expect(page).toHaveURL(/to=2026-09-30/);
   await expect.poll(() => rpcCalls.length).toBeGreaterThan(rpcCallsBeforeEdit);
   expect(rpcCalls.at(-1)).toMatchObject({
-    filter_office: 'BCPIO',
+    filter_office: 'UB_SECURITY',
     date_from: '2026-09-01',
     date_to: '2026-09-30',
   });
@@ -253,7 +253,7 @@ test('keeps the photo when the query is edited from the results page', async ({
   await expect(page).toHaveURL(/q=umbrella/);
   await expect(page.getByText('Photo attached')).toBeVisible();
 
-  await page.getByLabel('Holding office').selectOption('BCPIO');
+  await page.getByLabel('Holding office').selectOption('UB_SECURITY');
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page.getByText('1 match, best first')).toBeVisible();
   const imageEmbedsBeforeEdit = imageEmbeds;
@@ -266,11 +266,11 @@ test('keeps the photo when the query is edited from the results page', async ({
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
   await expect(page).toHaveURL(/q=wallet/);
-  await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/office=UB_SECURITY/);
   await expect(page.getByText('Photo attached')).toBeVisible();
   await expect.poll(() => rpcCalls.length).toBeGreaterThan(rpcCallsBeforeEdit);
   expect(imageEmbeds).toBeGreaterThan(imageEmbedsBeforeEdit);
-  expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'BCPIO' });
+  expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'UB_SECURITY' });
 });
 
 test('adds a photo from the results page and keeps filters', async ({ page }) => {
@@ -301,9 +301,9 @@ test('adds a photo from the results page and keeps filters', async ({ page }) =>
 
   await openRoute(page, '/search?q=umbrella');
 
-  await page.getByLabel('Holding office').selectOption('BCPIO');
+  await page.getByLabel('Holding office').selectOption('UB_SECURITY');
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/office=UB_SECURITY/);
 
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Add photo' }).click();
@@ -318,9 +318,9 @@ test('adds a photo from the results page and keeps filters', async ({ page }) =>
   await page.getByRole('button', { name: 'Search', exact: true }).click();
 
   await expect(page).toHaveURL(/q=umbrella/);
-  await expect(page).toHaveURL(/office=BCPIO/);
+  await expect(page).toHaveURL(/office=UB_SECURITY/);
   await expect(page.getByText('Photo attached')).toBeVisible();
-  expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'BCPIO' });
+  expect(rpcCalls.at(-1)).toMatchObject({ filter_office: 'UB_SECURITY' });
 });
 
 test('removes a photo carried over from the dashboard', async ({ page }) => {

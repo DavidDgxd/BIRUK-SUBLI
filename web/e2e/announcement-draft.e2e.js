@@ -70,10 +70,10 @@ test('drafts, edits and copies a public announcement without private notes', asy
 
   const textarea = page.getByLabel('English announcement');
   await expect(textarea).toHaveValue(
-    /Found item at Baguio City Public Information Office: Brown leather wallet/,
+    /Found item at University of Baguio Security Office: Brown leather wallet/,
   );
   await expect(page.getByLabel('Filipino announcement')).toHaveValue(
-    /May nakitang bagay sa Baguio City Public Information Office/,
+    /May nakitang bagay sa University of Baguio Security Office/,
   );
 
   const draft = await textarea.inputValue();

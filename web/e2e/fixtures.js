@@ -19,9 +19,9 @@ const TEXT_EMBEDDING = Array.from({ length: 384 }, (_, index) =>
 );
 
 export const OFFICE = {
-  id: 'BCPIO',
-  name: 'Baguio City Public Information Office',
-  address: 'City Hall, Baguio City',
+  id: 'UB_SECURITY',
+  name: 'University of Baguio Security Office',
+  address: 'University of Baguio, Gen. Luna Road, Baguio',
   counter_hours: 'Mon–Fri, 8:00–17:00',
   phone_number: '074 000 0000',
   map_pin: null,
@@ -33,12 +33,12 @@ export const OFFICE = {
 const USERS = {
   office: {
     id: 'user-office',
-    email: 'bcpio@baguio.gov.ph',
+    email: 'security@ubaguio.edu.ph',
     app_metadata: {},
   },
   admin: {
     id: 'user-admin',
-    email: 'admin@baguio.gov.ph',
+    email: 'admin@ubaguio.edu.ph',
     app_metadata: { role: 'central_admin' },
   },
 };

@@ -67,8 +67,8 @@ The Supabase client is created at import time, so the app needs the two
 Optional, for working on the counter pages without a credential:
 
 ```
-VITE_STAFF_DEV_SESSION=true      # acts as BCPIO; labelled "not real auth"
-VITE_STAFF_OFFICE_ID=BCPIO       # office to act as
+VITE_STAFF_DEV_SESSION=true          # acts as UB_SECURITY; labelled "not real auth"
+VITE_STAFF_OFFICE_ID=UB_SECURITY     # office to act as
 VITE_STAFF_OFFICE_NAME=...
 ```
 

@@ -19,8 +19,8 @@ describe('listOfficeHeldCounts', () => {
     rpc.mockReturnValue(
       resolvedRpc({
         data: [
-          { office_id: 'BCPIO', items_currently_held: 3 },
-          { office_id: 'CITY_HALL_INFO', items_currently_held: '0' },
+          { office_id: 'UB_SECURITY', items_currently_held: 3 },
+          { office_id: 'UB_INFO_DESK', items_currently_held: '0' },
         ],
       }),
     );
@@ -28,8 +28,8 @@ describe('listOfficeHeldCounts', () => {
 
     await expect(listOfficeHeldCounts({ signal })).resolves.toEqual(
       new Map([
-        ['BCPIO', 3],
-        ['CITY_HALL_INFO', 0],
+        ['UB_SECURITY', 3],
+        ['UB_INFO_DESK', 0],
       ]),
     );
 

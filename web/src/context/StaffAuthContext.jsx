@@ -35,11 +35,11 @@ import {
  */
 
 const DEV_STAFF_SESSION = import.meta.env.VITE_STAFF_DEV_SESSION === 'true';
-const DEV_OFFICE_ID = import.meta.env.VITE_STAFF_OFFICE_ID || 'BCPIO';
+const DEV_OFFICE_ID = import.meta.env.VITE_STAFF_OFFICE_ID || 'UB_SECURITY';
 const DEV_OFFICE_NAME =
   import.meta.env.VITE_STAFF_OFFICE_NAME ||
-  'Baguio City Public Information Office';
-const DEV_STAFF_EMAIL = 'staff@baguio.gov.ph';
+  'University of Baguio Security Office';
+const DEV_STAFF_EMAIL = 'security@ubaguio.edu.ph';
 const DEV_COUNTER_HOURS = import.meta.env.VITE_STAFF_COUNTER_HOURS || 'Mon-Fri, 8:00 AM - 5:00 PM';
 
 const StaffAuthContext = createContext(null);

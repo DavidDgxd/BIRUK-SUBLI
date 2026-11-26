@@ -38,12 +38,12 @@ TIMEOUT = 120  # the first embedding call can be slow while the model warms up
 # Placeholder offices for local testing only. Replace the addresses and hours with
 # the real counter details before this data is ever shown to the public.
 TEST_OFFICES = [
-    {"id": "BCPIO", "name": "Baguio City Public Information Office",
-     "address": "City Hall, Baguio City (placeholder)", "counter_hours": "Mon-Fri, 8:00 AM - 5:00 PM (placeholder)"},
-    {"id": "CITY_HALL_INFO", "name": "City Hall Information Desk",
-     "address": "City Hall lobby, Baguio City (placeholder)", "counter_hours": "Mon-Fri, 8:00 AM - 5:00 PM (placeholder)"},
-    {"id": "MARKET", "name": "Baguio Market Office",
-     "address": "Public Market, Baguio City (placeholder)", "counter_hours": "Daily, 6:00 AM - 6:00 PM (placeholder)"},
+    {"id": "UB_SECURITY", "name": "University of Baguio Security Office",
+     "address": "University of Baguio, Gen. Luna Road, Baguio (placeholder)", "counter_hours": "Mon-Fri, 8:00 AM - 5:00 PM (placeholder)"},
+    {"id": "UB_INFO_DESK", "name": "UB Information Desk",
+     "address": "University of Baguio Main Lobby, Gen. Luna Road, Baguio (placeholder)", "counter_hours": "Mon-Fri, 8:00 AM - 5:00 PM (placeholder)"},
+    {"id": "UB_LIBRARY", "name": "University of Baguio Library",
+     "address": "University of Baguio Library, Gen. Luna Road, Baguio (placeholder)", "counter_hours": "Mon-Fri, 8:00 AM - 5:00 PM (placeholder)"},
 ]
 
 
@@ -94,7 +94,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Seed a found item with a CLIP embedding.")
     parser.add_argument("--title", help="Short item name, e.g. 'Brown Leather Wallet'")
     parser.add_argument("--description", help="One or two sentences describing the item")
-    parser.add_argument("--office", default="BCPIO", help="holding/logging office id (default BCPIO)")
+    parser.add_argument("--office", default="UB_SECURITY", help="holding/logging office id (default UB_SECURITY)")
     parser.add_argument("--category", default="General", help="General, Cash or Document/ID (default General)")
     parser.add_argument("--image", type=Path, help="Local photo to embed (JPG/PNG/WebP)")
     parser.add_argument("--image-url", help="Public URL of the photo to show in results (optional)")

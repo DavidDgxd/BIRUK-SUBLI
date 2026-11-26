@@ -43,7 +43,7 @@ language sql as $$ select ('[' || a || ',' || b || ',' || repeat('0,', 509) || '
 create function pg_temp.vec384(a float, b float default 0) returns vector(384)
 language sql as $$ select ('[' || a || ',' || b || ',' || repeat('0,', 381) || '0]')::vector(384) $$;
 
-insert into public.offices values ('office-1', 'Central Office', 'Mon-Fri 8-5', 'City Hall');
+insert into public.offices values ('office-1', 'Central Office', 'Mon-Fri 8-5', 'University of Baguio Main Lobby');
 insert into public.items (id, ref_code, title, category, status, image_url, holding_office_id, date_received, created_at, is_cash, embedding, text_embedding, search_text) values
     ('11111111-1111-1111-1111-111111111101', 'REF-GENERAL', 'Blue umbrella', 'General', 'held', 'umbrella.jpg', 'office-1', current_date - 1, now(), false, pg_temp.vec(1, 0), pg_temp.vec384(1, 0), lower('Blue umbrella General')),
     ('11111111-1111-1111-1111-111111111102', 'REF-CASH-CATEGORY', 'Brown envelope', 'Cash', 'held', 'cash-cat.jpg', 'office-1', current_date - 2, now(), false, pg_temp.vec(0.9, 0.43589), pg_temp.vec384(0.9, 0.43589), lower('Brown envelope Cash five thousand pesos inside')),
