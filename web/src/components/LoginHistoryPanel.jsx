@@ -8,9 +8,9 @@ import { fetchLoginHistory } from '../lib/loginHistory.js';
  *
  * Shared by /admin/login-history and the Login history tab on /admin/offices,
  * so the two views cannot drift. The list is newest first and every filter is
- * applied server-side except the central-admin shortcut: admin rows have no
- * office id (they belong to no office), so choosing "Central admin" narrows the
- * returned page by role instead of sending an office filter.
+ * applied server-side. Admin rows have no office id (they belong to no office),
+ * so choosing "Central admin" sends a role filter rather than an office filter;
+ * this keeps older admin rows reachable beyond the first page.
  */
 
 const ALL = '';
@@ -93,16 +93,13 @@ export default function LoginHistoryPanel({ active = true }) {
         status: applied.status,
         dateFrom: applied.from,
         dateTo: applied.to,
+        role: adminOnly ? CENTRAL_ADMIN : null,
       },
       { signal: controller.signal },
     )
       .then((data) => {
         if (!live) return;
-        setRows(
-          adminOnly
-            ? data.filter((row) => row.role === CENTRAL_ADMIN)
-            : data,
-        );
+        setRows(data);
       })
       .catch((error) => {
         if (!live || error.name === 'AbortError') return;

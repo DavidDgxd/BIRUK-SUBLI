@@ -11,7 +11,10 @@ import OfficeActionsMenu from '../components/OfficeActionsMenu.jsx';
 import LoginHistoryPanel from '../components/LoginHistoryPanel.jsx';
 import { listOffices, listOfficeLogins } from '../lib/offices.js';
 import { listOfficeHeldCounts } from '../lib/usageReport.js';
+import { nextTabIndex } from '../lib/rovingTabs.js';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
+
+const TAB_ORDER = ['offices', 'history'];
 
 /** Suspension wins over login state: a suspended office cannot sign in either way. */
 function accountStatus(office) {
@@ -32,6 +35,7 @@ function accountStatus(office) {
 export default function AdminOffices() {
   const { status, isAdmin } = useStaffAuth();
   const headingRef = useRef(null);
+  const tabRefs = useRef({});
   const tabsId = useId();
   const [tab, setTab] = useState('offices');
   const [offices, setOffices] = useState(null); // null while the first load runs
@@ -96,6 +100,18 @@ export default function AdminOffices() {
     setReloadKey((key) => key + 1);
   }
 
+  // WAI-ARIA tabs pattern: arrow keys move the roving tab stop and focus.
+  function handleTabKeyDown(event) {
+    const next = nextTabIndex(
+      TAB_ORDER.indexOf(tab), event.key, TAB_ORDER.length,
+    );
+    if (next === null) return;
+    event.preventDefault();
+    const nextTab = TAB_ORDER[next];
+    setTab(nextTab);
+    tabRefs.current[nextTab]?.focus();
+  }
+
   return (
     <>
       <a className="skip-link" href="#main">
@@ -135,14 +151,18 @@ export default function AdminOffices() {
                 className="admin-tabs"
                 role="tablist"
                 aria-label="Central admin sections"
+                aria-orientation="horizontal"
+                onKeyDown={handleTabKeyDown}
               >
                 <button
                   type="button"
                   role="tab"
                   id={`${tabsId}-offices`}
+                  ref={(node) => { tabRefs.current.offices = node; }}
                   className="admin-tabs__tab"
                   aria-selected={tab === 'offices'}
                   aria-controls={`${tabsId}-offices-panel`}
+                  tabIndex={tab === 'offices' ? 0 : -1}
                   onClick={() => setTab('offices')}
                 >
                   <Icon name="apartment" />
@@ -152,9 +172,11 @@ export default function AdminOffices() {
                   type="button"
                   role="tab"
                   id={`${tabsId}-history`}
+                  ref={(node) => { tabRefs.current.history = node; }}
                   className="admin-tabs__tab"
                   aria-selected={tab === 'history'}
                   aria-controls={`${tabsId}-history-panel`}
+                  tabIndex={tab === 'history' ? 0 : -1}
                   onClick={() => setTab('history')}
                 >
                   <Icon name="schedule" />

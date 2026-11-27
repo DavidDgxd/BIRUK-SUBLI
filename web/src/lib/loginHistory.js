@@ -143,14 +143,28 @@ export async function recordLoginAttempt({
   }
 }
 
-/** A date input value as local start-of-day, or as local end-of-day. */
-function dateBoundary(value, endOfDay) {
+/* The campus calendar is Asia/Manila (UTC+8), never the browser timezone. */
+const MANILA_OFFSET = '+08:00';
+const MANILA_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+/** The Asia/Manila calendar day (YYYY-MM-DD) for a date or timestamp. */
+export function manilaCalendarDay(value) {
   if (!value) return null;
-  const text = String(value);
-  const date = new Date(text.includes('T') ? text : `${text}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return null;
-  if (endOfDay) date.setHours(23, 59, 59, 999);
-  return date.toISOString();
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : MANILA_DATE.format(parsed);
+}
+
+/** A date input value as the start or end of that Manila day, in UTC ISO. */
+export function manilaDateBoundary(value, endOfDay) {
+  const day = manilaCalendarDay(value);
+  if (!day) return null;
+  const clock = endOfDay ? 'T23:59:59.999' : 'T00:00:00.000';
+  const date = new Date(`${day}${clock}${MANILA_OFFSET}`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 /** Maps a row onto the labels the admin table renders. */
@@ -188,6 +202,7 @@ export async function fetchLoginHistory(
     status = null,
     dateFrom = null,
     dateTo = null,
+    role = null,
     limit = 100,
   } = {},
   { signal } = {},
@@ -198,9 +213,14 @@ export async function fetchLoginHistory(
     p_search: clip(search) || null,
     // Only the two status values the table allows; "all" is a null filter.
     p_status: status === 'success' || status === 'failed' ? status : null,
-    p_date_from: dateBoundary(dateFrom, false),
-    p_date_to: dateBoundary(dateTo, true),
+    p_date_from: manilaDateBoundary(dateFrom, false),
+    p_date_to: manilaDateBoundary(dateTo, true),
     p_limit: Math.min(Math.max(requested || 100, 1), 500),
+    // Filtered on the server so older rows are not missed beyond the page.
+    p_role:
+      role === 'office_staff' || role === 'central_admin' || role === 'unknown'
+        ? role
+        : null,
   });
   if (signal) query = query.abortSignal(signal);
 

@@ -174,12 +174,8 @@ test.describe('admin login history', () => {
 
     await expect(accountColumn(page)).toHaveText(['admin@ubaguio.edu.ph']);
     const sent = history.requests.at(-1);
-    expect(Date.parse(sent.p_date_from)).toBe(
-      Date.parse('2026-11-21T00:00:00'),
-    );
-    expect(Date.parse(sent.p_date_to)).toBeGreaterThan(
-      Date.parse('2026-11-21T12:00:00'),
-    );
+    expect(sent.p_date_from).toBe('2026-11-20T16:00:00.000Z');
+    expect(sent.p_date_to).toBe('2026-11-21T15:59:59.999Z');
   });
 
   test('narrows to central admin accounts without an office filter', async ({
@@ -193,6 +189,7 @@ test.describe('admin login history', () => {
 
     await expect(accountColumn(page)).toHaveText(['admin@ubaguio.edu.ph']);
     expect(history.requests.at(-1).p_office_id).toBeNull();
+    expect(history.requests.at(-1).p_role).toBe('central_admin');
   });
 
   test('searches the account label and rejects a reversed date range', async ({

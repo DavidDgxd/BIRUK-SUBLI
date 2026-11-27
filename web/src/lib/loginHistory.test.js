@@ -9,6 +9,8 @@ import {
   describeDevice,
   fetchLoginHistory,
   LoginHistoryError,
+  manilaCalendarDay,
+  manilaDateBoundary,
   mapLoginHistoryRow,
   recordLoginAttempt,
 } from './loginHistory.js';
@@ -96,6 +98,20 @@ describe('coarseFailureReason', () => {
     expect(
       coarseFailureReason(new Error('Invalid login credentials')),
     ).toBe('invalid_credentials');
+  });
+});
+
+describe('Asia/Manila date bounds', () => {
+  it('builds and normalises day bounds on the campus calendar', () => {
+    expect(manilaDateBoundary('2026-11-01', false)).toBe(
+      '2026-10-31T16:00:00.000Z',
+    );
+    expect(manilaDateBoundary('2026-11-01', true)).toBe(
+      '2026-11-01T15:59:59.999Z',
+    );
+    expect(manilaCalendarDay('2026-11-20T16:30:00Z')).toBe('2026-11-21');
+    expect(manilaCalendarDay('2026-11-21T15:30:00Z')).toBe('2026-11-21');
+    expect(manilaDateBoundary('', false)).toBeNull();
   });
 });
 
@@ -216,18 +232,25 @@ describe('fetchLoginHistory', () => {
       limit: 25,
     });
 
-    const from = new Date('2026-11-01T00:00:00');
-    const to = new Date('2026-11-30T00:00:00');
-    to.setHours(23, 59, 59, 999);
-
     expect(rpc).toHaveBeenCalledWith('admin_list_login_history', {
       p_office_id: 'UB_SECURITY',
       p_search: 'public information',
       p_status: 'failed',
-      p_date_from: from.toISOString(),
-      p_date_to: to.toISOString(),
+      p_date_from: '2026-10-31T16:00:00.000Z',
+      p_date_to: '2026-11-30T15:59:59.999Z',
       p_limit: 25,
+      p_role: null,
     });
+  });
+
+  it('passes a valid role filter and drops an unknown one', async () => {
+    rpc.mockReturnValue(resolved({ data: [] }));
+
+    await fetchLoginHistory({ role: 'central_admin' });
+    expect(rpc.mock.calls[0][1].p_role).toBe('central_admin');
+
+    await fetchLoginHistory({ role: 'superuser' });
+    expect(rpc.mock.calls[1][1].p_role).toBeNull();
   });
 
   it('treats an empty office, search and status as unfiltered', async () => {
@@ -242,6 +265,7 @@ describe('fetchLoginHistory', () => {
       p_date_from: null,
       p_date_to: null,
       p_limit: 100,
+      p_role: null,
     });
   });
 

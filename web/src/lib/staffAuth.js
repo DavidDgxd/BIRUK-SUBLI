@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { recordLoginAttempt } from './loginHistory.js';
 
 /*
  * Shared office login (US-02) and central-admin session (US-03).
@@ -144,18 +145,35 @@ export async function signInWithSiteCredentials(email, password) {
     // them — so their session is legitimately office-less.
     if (isCentralAdmin(user)) return sessionFor(null, user);
 
+    // Record while the session still exists, so the server can trust the
+    // inactive_office bucket. The error is marked to avoid a duplicate write
+    // after the caller has been signed out.
+    await recordLoginAttempt({
+      account: user?.email ?? '',
+      status: 'failed',
+      failureReason: 'inactive_office',
+    });
     await supabase.auth.signOut();
-    throw new StaffAuthError(
+    const unlinkedError = new StaffAuthError(
       'unlinked',
       'That login is not linked to an office yet. Ask the central admin to finish setting it up.',
     );
+    unlinkedError.auditRecorded = true;
+    throw unlinkedError;
   }
   if (office.status === 'suspended') {
+    await recordLoginAttempt({
+      account: office.name ?? user?.email ?? '',
+      status: 'failed',
+      failureReason: 'inactive_office',
+    });
     await supabase.auth.signOut();
-    throw new StaffAuthError(
+    const suspendedError = new StaffAuthError(
       'suspended',
       'This office’s counter access is suspended. Contact the central admin.',
     );
+    suspendedError.auditRecorded = true;
+    throw suspendedError;
   }
 
   return sessionFor(office, user);
