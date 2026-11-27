@@ -1306,7 +1306,7 @@ drop function if exists public.match_lost_reports(
 
 create or replace function public.match_lost_reports (
     item_id         uuid,
-    match_threshold float default 0.55,
+    match_threshold float default 0.68,
     match_count     int   default 5
 )
 returns table (
@@ -1345,12 +1345,12 @@ as $$
           select 1 from public.dismissed_matches dm
           where dm.item_id = items.id and dm.lost_report_id = lr.id
       )
-      -- Hard floor: callers may raise the bar but never drop below 0.55. A null
+      -- Hard floor: callers may raise the bar but never drop below 0.68. A null
       -- threshold falls back to the floor instead of bypassing it. The same
       -- `>=` comparison as the search RPCs, so a row exactly at the floor is
       -- treated the same way everywhere.
       and (1 - (lr.embedding <=> items.embedding))
-          >= greatest(coalesce(match_threshold, 0.55), 0.55)
+          >= greatest(coalesce(match_threshold, 0.68), 0.68)
     order by similarity desc
     -- Clamp server-side: a null or oversized match_count cannot widen the
     -- result past the intended 1..25 contact rows.
