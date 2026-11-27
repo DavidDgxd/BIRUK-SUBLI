@@ -1,7 +1,9 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect, OFFICE, openRoute } from './fixtures.js';
 import {
   accountColumn,
   captureAttempts,
+  capturePrunes,
   HISTORY,
   mockHistory,
   mockOfficeSignIn,
@@ -190,6 +192,45 @@ test.describe('admin login history', () => {
     await expect(accountColumn(page)).toHaveText(['admin@ubaguio.edu.ph']);
     expect(history.requests.at(-1).p_office_id).toBeNull();
     expect(history.requests.at(-1).p_role).toBe('central_admin');
+  });
+
+  test('exports only the visible columns as a timestamped CSV', async ({ page }) => {
+    const rows = [{ ...HISTORY[0], user_id: 'secret-user-id' }];
+    await mockHistory(page, { rows });
+    await openRoute(page, '/admin/login-history');
+    await expect(accountColumn(page)).toHaveCount(1);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^login-history-.*\.csv$/);
+
+    const path = await download.path();
+    expect(path).toBeTruthy();
+    const csv = await readFile(path, 'utf8');
+    expect(csv.split('\r\n')[0]).toBe('When,Office or account,Role,Status,Failure reason,Device');
+    expect(csv).toContain(OFFICE.name);
+    expect(csv).toContain('Office staff');
+    expect(csv).not.toContain('secret-user-id');
+    expect(csv).not.toContain('UB_SECURITY');
+  });
+
+  test('prunes a confirmed retention window and reloads the log', async ({ page }) => {
+    const history = await mockHistory(page);
+    const prunes = await capturePrunes(page, { body: 4 });
+    await openRoute(page, '/admin/login-history');
+    await expect(accountColumn(page)).toHaveCount(3);
+    const requestsBefore = history.requests.length;
+
+    await page.getByLabel('Prune rows older than').selectOption('30');
+    await page.getByRole('button', { name: 'Prune login history' }).click();
+    await expect(page.getByText('Delete rows older than 30 days? This cannot be undone.')).toBeVisible();
+    expect(prunes).toHaveLength(0);
+
+    await page.getByRole('button', { name: 'Confirm prune' }).click();
+    await expect.poll(() => prunes.at(-1)?.p_retain_days).toBe(30);
+    await expect(page.getByText('Removed 4 rows older than 30 days.')).toBeVisible();
+    await expect.poll(() => history.requests.length).toBeGreaterThan(requestsBefore);
   });
 
   test('searches the account label and rejects a reversed date range', async ({

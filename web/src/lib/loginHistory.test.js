@@ -5,13 +5,16 @@ const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('./supabase.js', () => ({ supabase: { rpc } }));
 
 import {
+  buildLoginHistoryCsv,
   coarseFailureReason,
   describeDevice,
   fetchLoginHistory,
   LoginHistoryError,
+  loginHistoryCsvFilename,
   manilaCalendarDay,
   manilaDateBoundary,
   mapLoginHistoryRow,
+  pruneLoginHistory,
   recordLoginAttempt,
 } from './loginHistory.js';
 
@@ -225,7 +228,7 @@ describe('fetchLoginHistory', () => {
 
     await fetchLoginHistory({
       officeId: 'UB_SECURITY',
-      search: '  public information  ',
+      search: '  security  ',
       status: 'failed',
       dateFrom: '2026-11-01',
       dateTo: '2026-11-30',
@@ -234,7 +237,7 @@ describe('fetchLoginHistory', () => {
 
     expect(rpc).toHaveBeenCalledWith('admin_list_login_history', {
       p_office_id: 'UB_SECURITY',
-      p_search: 'public information',
+      p_search: 'security',
       p_status: 'failed',
       p_date_from: '2026-10-31T16:00:00.000Z',
       p_date_to: '2026-11-30T15:59:59.999Z',
@@ -356,5 +359,67 @@ describe('fetchLoginHistory', () => {
 
     expect(mapped.roleLabel).toBe('Central admin');
     expect(mapped.failureLabel).toBe('Sign-in error');
+  });
+});
+
+describe('CSV export', () => {
+  const mapped = {
+    occurredAt: '2026-11-20T09:30:00Z',
+    accountLabel: 'University of Baguio Security Office',
+    roleLabel: 'Office staff',
+    statusLabel: 'Success',
+    failureLabel: null,
+    deviceLabel: 'Chrome on Windows',
+    user_id: 'secret-user-id',
+  };
+
+  it('exports only the visible table columns', () => {
+    const csv = buildLoginHistoryCsv([mapped]);
+    expect(csv.split('\r\n')[0]).toBe(
+      'When,Office or account,Role,Status,Failure reason,Device',
+    );
+    expect(csv).toContain('University of Baguio Security Office');
+    expect(csv).toContain('Office staff');
+    expect(csv).not.toContain('secret-user-id');
+    expect(csv).not.toContain('user_id');
+  });
+
+  it('escapes commas, quotes, newlines and formula prefixes', () => {
+    const csv = buildLoginHistoryCsv([{
+      ...mapped,
+      accountLabel: '=SUM(1,2)',
+      deviceLabel: 'Line\nTwo',
+      failureLabel: 'say "hi"',
+    }]);
+    expect(csv).toContain('"\'=SUM(1,2)"');
+    expect(csv).toContain('"Line\nTwo"');
+    expect(csv).toContain('"say ""hi"""');
+  });
+
+  it('builds a timestamped filename', () => {
+    expect(loginHistoryCsvFilename(new Date('2026-11-27T03:04:05Z'))).toBe(
+      'login-history-2026-11-27-03-04.csv',
+    );
+  });
+});
+
+describe('pruneLoginHistory', () => {
+  beforeEach(() => rpc.mockReset());
+
+  it('sends the retention window and returns the deleted count', async () => {
+    rpc.mockReturnValue(resolved({ data: 12 }));
+    await expect(pruneLoginHistory({ retainDays: 30 })).resolves.toBe(12);
+    expect(rpc).toHaveBeenCalledWith('admin_prune_login_history', {
+      p_retain_days: 30,
+    });
+  });
+
+  it('reports a 42501 as forbidden and other failures as db', async () => {
+    rpc.mockReturnValue(
+      resolved({ error: { code: '42501', message: 'admin only' } }),
+    );
+    await expect(pruneLoginHistory()).rejects.toMatchObject({ code: 'forbidden' });
+    rpc.mockReturnValue(resolved({ error: { code: 'XX000', message: 'boom' } }));
+    await expect(pruneLoginHistory()).rejects.toMatchObject({ code: 'db' });
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import Icon from './Icon.jsx';
 import { listOffices } from '../lib/offices.js';
-import { fetchLoginHistory } from '../lib/loginHistory.js';
+import { buildLoginHistoryCsv, fetchLoginHistory, loginHistoryCsvFilename, pruneLoginHistory } from '../lib/loginHistory.js';
 
 /*
  * Login history table and filters (US-37).
@@ -44,6 +44,11 @@ export default function LoginHistoryPanel({ active = true }) {
   const [loadError, setLoadError] = useState('');
   const [formError, setFormError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [retainDays, setRetainDays] = useState('90');
+  const [confirmPrune, setConfirmPrune] = useState(false);
+  const [pruning, setPruning] = useState(false);
+  const [pruneMessage, setPruneMessage] = useState('');
+  const [pruneError, setPruneError] = useState(false);
 
   // The admin tabs keep this panel mounted but hidden, so it must not fetch
   // until its tab has actually been opened.
@@ -54,6 +59,7 @@ export default function LoginHistoryPanel({ active = true }) {
   const statusId = useId();
   const fromId = useId();
   const toId = useId();
+  const retentionId = useId();
 
   // The office picker is a convenience; a failure leaves the account search and
   // the "All offices" option usable.
@@ -138,6 +144,41 @@ export default function LoginHistoryPanel({ active = true }) {
     setDraft(EMPTY_FILTERS);
     setFormError('');
     setApplied({ ...EMPTY_FILTERS });
+  }
+
+  function handleExport() {
+    if (!rows?.length) return;
+    const url = URL.createObjectURL(
+      new Blob([buildLoginHistoryCsv(rows)], { type: 'text/csv;charset=utf-8' }),
+    );
+    const link = Object.assign(document.createElement('a'), {
+      href: url,
+      download: loginHistoryCsvFilename(),
+    });
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handlePrune() {
+    if (!confirmPrune) return setConfirmPrune(true);
+    setConfirmPrune(false); setPruning(true); setPruneError(false); setPruneMessage('');
+    try {
+      const deleted = await pruneLoginHistory({ retainDays: Number(retainDays) });
+      setPruneMessage(
+        `Removed ${deleted} ${deleted === 1 ? 'row' : 'rows'} older than ${retainDays} days.`,
+      );
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('[LoginHistoryPanel]', error);
+      setPruneError(true);
+      setPruneMessage(
+        error?.code === 'forbidden'
+          ? 'Only the central admin can prune login history.'
+          : 'We could not prune login history right now.',
+      );
+    } finally {
+      setPruning(false);
+    }
   }
 
   return (
@@ -246,6 +287,45 @@ export default function LoginHistoryPanel({ active = true }) {
           )}
         </p>
       </form>
+
+      <div className="login-history__tools">
+        <button type="button" className="btn" onClick={handleExport} disabled={!rows?.length}>
+          <Icon name="download" /> Export CSV
+        </button>
+
+        <div className="login-history__retention">
+          <div className="field">
+            <label className="field__label" htmlFor={retentionId}>Prune rows older than</label>
+            <select
+              id={retentionId}
+              className="field__control"
+              value={retainDays}
+              onChange={(event) => {
+                setRetainDays(event.target.value); setConfirmPrune(false); setPruneMessage('');
+              }}
+            >
+              {[30, 90, 180, 365].map((days) => (
+                <option key={days} value={days}>{days} days</option>
+              ))}
+            </select>
+          </div>
+          <button type="button" className="btn btn--quiet" onClick={handlePrune} disabled={pruning}>
+            <Icon name="delete" />
+            {pruning ? 'Pruning…' : confirmPrune ? 'Confirm prune' : 'Prune login history'}
+          </button>
+          {confirmPrune && (
+            <div className="login-history__confirm" role="alert">
+              Delete rows older than {retainDays} days? This cannot be undone.
+              <button type="button" className="btn btn--quiet" onClick={() => setConfirmPrune(false)}>Cancel</button>
+            </div>
+          )}
+          {pruneMessage && (
+            <p className={pruneError ? 'form-error' : 'login-history__feedback'} role={pruneError ? 'alert' : 'status'}>
+              {pruneMessage}
+            </p>
+          )}
+        </div>
+      </div>
 
       {loadError ? (
         <section className="state state--error" role="alert">

@@ -41,9 +41,11 @@ def body(sql, name):
 
 BASE = read(MIGRATIONS / "20261126120000_us37_login_history.sql")
 MIGRATION = read(MIGRATIONS / "20261127150000_us37_login_history_hardening.sql")
+RETENTION = read(MIGRATIONS / "20261127170000_login_history_retention.sql")
 SCHEMA = read(SCHEMA_SQL)
 TABLE_SHIPPED = (BASE, SCHEMA)
 SHIPPED = (MIGRATION, SCHEMA)
+PRUNE_SHIPPED = (RETENTION, SCHEMA)
 FUNCTIONS = ("record_login_attempt", "admin_list_login_history")
 
 
@@ -315,6 +317,38 @@ class ReadRpc(unittest.TestCase):
             self.assertNotIn("user_id", body(sql, "admin_list_login_history"))
 
 
+class RetentionRpc(unittest.TestCase):
+    def test_prune_rpc_is_definer_guarded_and_validated(self):
+        for sql in PRUNE_SHIPPED:
+            signature = header(sql, "admin_prune_login_history")
+            fn = body(sql, "admin_prune_login_history")
+            self.assertIn("returns bigint", signature)
+            self.assertIn("security definer", signature)
+            self.assertIn("set search_path = public, pg_temp", signature)
+            self.assertIn("p_retain_days integer default 90", signature)
+            self.assertIn("errcode = '42501'", fn)
+            self.assertIn(
+                "coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> "
+                "'central_admin'", fn)
+            self.assertIn("p_retain_days is null or p_retain_days < 1", fn)
+            self.assertIn("errcode = '22023'", fn)
+
+    def test_prune_rpc_deletes_and_grants_authenticated_only(self):
+        for sql in PRUNE_SHIPPED:
+            fn = body(sql, "admin_prune_login_history")
+            self.assertIn("delete from public.login_history lh", fn)
+            self.assertIn(
+                "lh.occurred_at < now() - make_interval(days => p_retain_days)",
+                fn)
+            self.assertIn("get diagnostics v_deleted = row_count", fn)
+            self.assertIn("return v_deleted", fn)
+            revoke = sql[sql.index("revoke all on function public.admin_prune_login_history"):].split(";", 1)[0]
+            self.assertIn("from public, anon", revoke)
+            grant = sql[sql.index("grant execute on function public.admin_prune_login_history"):].split(";", 1)[0]
+            self.assertIn("to authenticated", grant)
+            self.assertNotIn("anon", grant)
+
+
 class SchemaMirror(unittest.TestCase):
     def test_ai_service_schema_matches_the_migration(self):
         for name in FUNCTIONS:
@@ -327,6 +361,15 @@ class SchemaMirror(unittest.TestCase):
                 body(MIGRATION, name),
                 body(SCHEMA, name),
                 f"{name} body drifted between the migration and schema.sql",
+            )
+
+    def test_prune_function_matches_the_migration(self):
+        name = "admin_prune_login_history"
+        for part in (header, body):
+            self.assertEqual(
+                part(RETENTION, name),
+                part(SCHEMA, name),
+                f"{name} drifted between the migration and schema.sql",
             )
 
 

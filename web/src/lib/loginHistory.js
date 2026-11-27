@@ -234,3 +234,51 @@ export async function fetchLoginHistory(
 
   return (data ?? []).map(mapLoginHistoryRow);
 }
+
+/** Columns the admin table already shows; never add user_id or hidden data. */
+const CSV_COLUMNS = [
+  ['When', (row) => row.occurredAt],
+  ['Office or account', (row) => row.accountLabel],
+  ['Role', (row) => row.roleLabel],
+  ['Status', (row) => row.statusLabel],
+  ['Failure reason', (row) => row.failureLabel ?? ''],
+  ['Device', (row) => row.deviceLabel],
+];
+
+/** Escapes one CSV cell. Formula prefixes are neutralised with a quote. */
+function csvCell(value) {
+  const text = String(value ?? '');
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+/** CSV for the rows already on screen: visible columns only, no user ids. */
+export function buildLoginHistoryCsv(rows) {
+  const lines = [CSV_COLUMNS.map(([heading]) => csvCell(heading)).join(',')];
+  for (const row of rows ?? []) {
+    lines.push(CSV_COLUMNS.map(([, value]) => csvCell(value(row))).join(','));
+  }
+  return `${lines.join('\r\n')}\r\n`;
+}
+
+/** A timestamped, filesystem-safe .csv name. */
+export function loginHistoryCsvFilename(now = new Date()) {
+  const stamp = now.toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  return `login-history-${stamp}.csv`;
+}
+
+/** Prunes rows older than retainDays; the RPC re-checks the admin claim. */
+export async function pruneLoginHistory({ retainDays = 90 } = {}, { signal } = {}) {
+  const days = Math.trunc(Number(retainDays));
+  let query = supabase.rpc('admin_prune_login_history', {
+    p_retain_days: Number.isFinite(days) ? days : 90,
+  });
+  if (signal) query = query.abortSignal(signal);
+  const { data, error } = await query;
+  if (error) {
+    throw new LoginHistoryError(
+      error.code === '42501' ? 'forbidden' : 'db', error.message,
+    );
+  }
+  return Number(data ?? 0);
+}

@@ -75,12 +75,14 @@ const PATHS = {
       <rect x="3" y="13" width="8" height="8" rx="1" />
     </>
   ),
+  delete: <path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6" />,
   description: (
     <>
       <path d="M6 3h8l4 4v14H6z" />
       <path d="M14 3v5h5M9 12h6M9 16h6" />
     </>
   ),
+  download: <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />,
   error: (
     <>
       <circle cx="12" cy="12" r="9" />

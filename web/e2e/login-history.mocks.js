@@ -103,6 +103,16 @@ export async function captureAttempts(page, { status = 200, body = null } = {}) 
   return attempts;
 }
 
+/** Captures retention prune calls and answers with a deleted row count. */
+export async function capturePrunes(page, { status = 200, body = 0 } = {}) {
+  const requests = [];
+  await page.route('**/rest/v1/rpc/admin_prune_login_history', (route) => {
+    requests.push(route.request().postDataJSON());
+    return json(route, body, status);
+  });
+  return requests;
+}
+
 /** Applies the filter payload the page sends, then answers newest first. */
 export async function mockHistory(
   page,

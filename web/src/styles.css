@@ -3003,6 +3003,29 @@ textarea {
   gap: var(--space-2);
 }
 
+.login-history__tools {
+  display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end;
+  justify-content: space-between; margin-block-start: var(--space-3);
+  padding: var(--space-4); border: var(--border);
+  border-radius: var(--radius-panel); background: var(--inset);
+}
+
+.login-history__retention {
+  display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end;
+}
+
+.login-history__retention .field { flex: 1 1 12rem; }
+
+.login-history__confirm,
+.login-history__feedback { flex-basis: 100%; margin: 0; }
+
+.login-history__confirm {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  align-items: center; color: var(--ink-muted);
+}
+
+.login-history__feedback { color: var(--success); }
+
 .login-history__filters .form-error {
   margin-block-start: 0;
 }
