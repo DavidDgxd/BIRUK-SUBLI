@@ -189,9 +189,10 @@
   --space-8: 4rem;
   --space-9: 6rem;
 
-  /* Shape — two radii, one border */
+  /* Shape — three radii, one border */
   --radius-control: 0.25rem;
   --radius-panel: 0.5rem;
+  --radius-pill: 999px;
   --border: 1px solid var(--rule);
   --border-strong: 1px solid var(--rule-strong);
   --shadow-overlay: 0 8px 24px rgb(12 12 14 / 14%);
@@ -2542,6 +2543,149 @@ textarea {
 
 .staff-item:hover .staff-item__chevron {
   color: var(--primary);
+}
+
+/* Cash six-month reminders (US-28) --------------------------------------- */
+
+.cash-reminders {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+  max-inline-size: 46rem;
+  padding: var(--space-4);
+  border: var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-elevated);
+}
+
+.cash-reminders__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-title);
+}
+
+.cash-reminders__lead,
+.cash-reminders__empty {
+  color: var(--ink-muted);
+}
+
+.cash-reminders__error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  color: var(--error);
+}
+
+.cash-reminders__group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cash-reminders__group-title {
+  font-size: var(--text-lead);
+}
+
+.cash-reminders__list {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.cash-reminder {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-control);
+  background: var(--surface-canvas);
+}
+
+.cash-reminder--due {
+  border-inline-start-color: var(--warning);
+}
+
+.cash-reminder--approaching {
+  border-inline-start-color: var(--rule-strong);
+}
+
+.cash-reminder__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.cash-reminder__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 3rem;
+  color: var(--ink);
+  font-size: var(--text-lead);
+  font-weight: var(--weight-strong);
+}
+
+.cash-reminder__link:hover {
+  color: var(--primary);
+}
+
+.cash-reminder__status {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--lost-wash);
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+}
+
+.cash-reminder--due .cash-reminder__status {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.cash-reminder__facts {
+  display: grid;
+  gap: var(--space-2) var(--space-4);
+}
+
+.cash-reminder__facts dt {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+
+.cash-reminder__facts dd {
+  overflow-wrap: anywhere;
+}
+
+.cash-reminder__ref {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+}
+
+@media (min-width: 600px) {
+  .cash-reminders {
+    padding: var(--space-5);
+  }
+
+  .cash-reminder__facts {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
+}
+
+.cash-release-note {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--warning-wash);
+  color: var(--ink);
+}
+
+.cash-release-note .icon {
+  flex: none;
+  color: var(--warning);
 }
 
 /* Counter lost-report closure (US-33) ------------------------------------ */

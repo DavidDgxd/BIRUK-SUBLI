@@ -6,6 +6,12 @@ import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { fetchPublicItem } from '../lib/itemDetails.js';
 import { releaseItemAtCounter } from '../lib/itemRelease.js';
+import {
+  fetchCashHolding,
+  finderRewardOnOwnerClaim,
+  formatPeso,
+  withOwnerClaimRewardNote,
+} from '../lib/cashReminders.js';
 import { transferItemCustody } from '../lib/itemTransfer.js';
 import { listOfficeOptions } from '../lib/offices.js';
 import { calibrateMatchScore } from '../lib/searchItems.js';
@@ -83,6 +89,7 @@ export default function ItemDetails() {
   const [releaseStatus, setReleaseStatus] = useState('idle');
   const [releaseError, setReleaseError] = useState('');
   const [releasedTo, setReleasedTo] = useState('');
+  const [cashHolding, setCashHolding] = useState(null); // { itemId, isCash, cashAmount, failed }
   const headingRef = useRef(null);
   const transferSelectId = useId();
   const releaseNameRef = useRef(null);
@@ -154,6 +161,37 @@ export default function ItemDetails() {
     item.status === 'held' &&
     item.holding_office_id === staffOffice.id,
   );
+
+  // Cash released to its owner owes the finder one-tenth (Civil Code Art. 720,
+  // US-28). The public projection leaves the amount out, so the holding office
+  // reads it from the items table only when it can release the item.
+  useEffect(() => {
+    if (!canRelease) return undefined;
+
+    const controller = new AbortController();
+    fetchCashHolding(id, controller.signal)
+      .then((holding) => {
+        if (!controller.signal.aborted) {
+          setCashHolding({ itemId: id, ...holding });
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || error.name === 'AbortError') return;
+        if (import.meta.env.DEV) console.error('[ItemDetails] cash', error);
+        setCashHolding({ itemId: id, isCash: false, failed: true });
+      });
+
+    return () => controller.abort();
+  }, [canRelease, id]);
+
+  const releasingCash = cashHolding?.itemId === id && cashHolding.isCash;
+  const cashCheckFailed = cashHolding?.itemId === id && cashHolding.failed;
+  // The cash check for this item has loaded or failed; handleRelease runs it
+  // itself when a confirm arrives first.
+  const cashChecked = cashHolding?.itemId === id;
+  const ownerFinderReward = releasingCash
+    ? formatPeso(finderRewardOnOwnerClaim(cashHolding.cashAmount))
+    : null;
 
   useEffect(() => {
     if (!canTransfer) return undefined;
@@ -232,13 +270,34 @@ export default function ItemDetails() {
     setReleaseError('');
     setReleaseStatus('saving');
 
+    // A confirm that beats the cash check waits for it here instead of being
+    // blocked up front, so non-cash releases never sit behind a disabled
+    // button and a cash release still cannot skip the Art. 720 line.
+    let holding = cashChecked ? cashHolding : null;
+    if (!holding) {
+      try {
+        holding = { itemId: id, ...(await fetchCashHolding(id)) };
+        setCashHolding(holding);
+      } catch (cashFailure) {
+        if (import.meta.env.DEV) console.error('[ItemDetails] cash', cashFailure);
+        setCashHolding({ itemId: id, isCash: false, failed: true });
+        setReleaseStatus('idle');
+        setReleaseError(
+          'We could not check whether this item is cash. Review the note above, then confirm again.',
+        );
+        return;
+      }
+    }
+
     try {
       const released = await releaseItemAtCounter({
         itemId: item.id,
         officeId: staffOffice.id,
         claimantName: cleanName,
         claimantIdRef: cleanIdRef,
-        releaseNotes,
+        releaseNotes: holding.isCash
+          ? withOwnerClaimRewardNote(releaseNotes, holding.cashAmount)
+          : releaseNotes,
       });
       setReleasedTo(released.claimantName);
       setClaimantName('');
@@ -469,6 +528,33 @@ export default function ItemDetails() {
                         ID. Recording the release removes the item from public
                         search and keeps the counter record traceable.
                       </p>
+
+                      {releasingCash && (
+                        <p className="cash-release-note">
+                          <Icon name="info" />
+                          <span>
+                            This is cash. When the owner claims it, the owner
+                            gives the finder a reward of one-tenth of the amount
+                            (Civil Code Art. 720)
+                            {ownerFinderReward
+                              ? `: ${ownerFinderReward} of ${formatPeso(cashHolding.cashAmount)}.`
+                              : '.'}{' '}
+                            This is added to the release notes when you confirm.
+                          </span>
+                        </p>
+                      )}
+
+                      {cashCheckFailed && (
+                        <p className="cash-release-note" role="status">
+                          <Icon name="warning" />
+                          <span>
+                            We could not check whether this item is cash. If it
+                            is, the owner gives the finder a reward of one-tenth
+                            of the amount (Civil Code Art. 720). Add that to the
+                            release notes.
+                          </span>
+                        </p>
+                      )}
 
                       <div className="field">
                         <label className="field__label" htmlFor={releaseNameId}>

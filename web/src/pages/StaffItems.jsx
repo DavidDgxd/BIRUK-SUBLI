@@ -5,6 +5,7 @@ import SiteFooter from '../components/SiteFooter.jsx';
 import StaffGate from '../components/StaffGate.jsx';
 import StaffBar from '../components/StaffBar.jsx';
 import CloseLostReportPanel from '../components/CloseLostReportPanel.jsx';
+import CashReminders from '../components/CashReminders.jsx';
 import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { listHeldItems } from '../lib/staffItems.js';
@@ -101,6 +102,8 @@ export default function StaffItems() {
           >
             <>
               <StaffBar />
+
+              <CashReminders reloadKey={reloadKey} />
 
               {loadError && (
                 <section className="state state--error" role="alert">
