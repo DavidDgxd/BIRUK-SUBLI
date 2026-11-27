@@ -3,11 +3,19 @@
 -- `match_lost_reports` flags open lost reports on the custody receipt at intake
 -- using the legacy 512-dim CLIP-blended vectors. CLIP text-to-text similarity is
 -- compressed: unrelated pairs reach 0.55-0.58, so the old 0.55 floor flagged
--- junk reports and the staff saw "everything shows". The search side already
--- calibrates this same legacy blended-vector space at
--- `LEGACY_BEST_FLOOR = 0.68` (web/src/lib/searchItems.js:25), so the hard floor
--- moves to 0.68 to match. Callers may still raise the bar; a null threshold
--- falls back to the floor instead of bypassing it.
+-- junk reports and the staff saw "everything shows". The floor is set from the
+-- measurements: across 45 unrelated item/report pairs the junk ceiling measured
+-- 0.581, while genuine photo-backed pairs measure 0.79-0.82, so 0.68 sits clear
+-- of the measured junk ceiling and still keeps photo-backed matches. The value
+-- coincides with the search side's `LEGACY_BEST_FLOOR = 0.68`
+-- (web/src/lib/searchItems.js:25), but the calibrations differ: search's 0.68 is
+-- a top-tier floor on a blended (text + image + lexical) score with a 0.55
+-- "possible" tier below it, while reverse match is a single raw-cosine floor
+-- with no lower tier. This trades recall for precision on purpose: genuine
+-- text-only pairs measure 0.50-0.66, so a report filed without a photo rarely
+-- flags, and only photo-backed reports flag. The two-tower port that restores
+-- text-only recall is tracked in issue #151. Callers may still raise the bar; a
+-- null threshold falls back to the floor instead of bypassing it.
 --
 -- US-16 re-created this function without the `lr.closed_at is null` guard that
 -- the US-33 staff-closure migration added, while
@@ -53,9 +61,10 @@ as $$
       and items.embedding is not null
       -- A zero-norm embedding makes every cosine NaN, and NaN compares above
       -- any floor and sorts first, so a row written by direct RPC probing that
-      -- never went through the AI service would flag on every intake. A healthy
-      -- vector sits at distance 0 from itself, a zero vector at NaN, and NaN
-      -- fails the `<` comparison, so both sides require a healthy self-distance.
+      -- never went through the AI service would flag on every intake. The 0.5
+      -- bound is not a semantic threshold: a healthy vector's self-distance is
+      -- exactly 0, a zero vector's is NaN, and NaN fails the `<` comparison, so
+      -- any small bound rejects only NaN on both sides.
       and (items.embedding <=> items.embedding) < 0.5
       and lr.status = 'open'
       and lr.closed_at is null

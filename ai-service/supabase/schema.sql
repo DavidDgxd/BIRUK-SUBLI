@@ -1341,9 +1341,10 @@ as $$
       and items.embedding is not null
       -- A zero-norm embedding makes every cosine NaN, and NaN compares above
       -- any floor and sorts first, so a row written by direct RPC probing that
-      -- never went through the AI service would flag on every intake. A healthy
-      -- vector sits at distance 0 from itself, a zero vector at NaN, and NaN
-      -- fails the `<` comparison, so both sides require a healthy self-distance.
+      -- never went through the AI service would flag on every intake. The 0.5
+      -- bound is not a semantic threshold: a healthy vector's self-distance is
+      -- exactly 0, a zero vector's is NaN, and NaN fails the `<` comparison, so
+      -- any small bound rejects only NaN on both sides.
       and (items.embedding <=> items.embedding) < 0.5
       and lr.status = 'open'
       and lr.closed_at is null
