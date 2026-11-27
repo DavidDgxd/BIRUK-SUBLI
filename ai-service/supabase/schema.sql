@@ -622,6 +622,16 @@ create table if not exists public.items (
     finder_contact text,
     finder_address text,
 
+    -- US-27: a cash row must identify who handed it in and how to reach them.
+    -- The RPC normalises blank values to null, so this catches a direct insert.
+    constraint items_cash_finder_required check (
+        not is_cash
+        or (
+            nullif(btrim(finder_name), '') is not null
+            and nullif(btrim(finder_contact), '') is not null
+        )
+    ),
+
     -- In-Person Counter Release Verification:
     -- Retains traceability without storing sensitive identity document images.
     releasing_office_id text references public.offices(id) on delete restrict,
@@ -664,8 +674,13 @@ returns trigger language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-    if new.is_cash = true and new.reward_date is null then
+    -- US-27: always derive the reward date from date_received. Recomputing on
+    -- update keeps it correct when the counter corrects the receipt date, and
+    -- non-cash rows never carry a cash-only date.
+    if new.is_cash = true then
         new.reward_date := new.date_received + interval '6 months';
+    else
+        new.reward_date := null;
     end if;
     return new;
 end;
