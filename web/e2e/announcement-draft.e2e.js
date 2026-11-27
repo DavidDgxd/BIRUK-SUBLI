@@ -209,7 +209,7 @@ test('posts Documents / IDs without the photo, title or caption (#106)', async (
 
   const draft = page.getByRole('region', { name: 'Announcement draft' });
   await expect(draft.getByLabel('English announcement')).toHaveValue(
-    /Found item at University of Baguio Security Office: Documents \/ IDs/,
+    /Found a document or ID at University of Baguio Security Office/,
   );
   await expect(draft.locator('img')).toHaveCount(0);
   await expect(draft.getByRole('button', { name: /Copy photo/ })).toHaveCount(0);
@@ -217,5 +217,7 @@ test('posts Documents / IDs without the photo, title or caption (#106)', async (
   for (const label of ['English announcement', 'Filipino announcement']) {
     await expect(draft.getByLabel(label)).not.toHaveValue(/juan|dela cruz/i);
   }
+  // Let any caption request the draft would have started reach the route.
+  await page.waitForLoadState('networkidle');
   expect(captioned).toHaveLength(intakeCaptions);
 });

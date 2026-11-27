@@ -65,7 +65,7 @@ export function sanitizeAnnouncementText(
 const TEMPLATES = {
   en: {
     place: 'a participating office',
-    heading: (p, t, c) => c ? `Found cash at ${p}` : `Found item at ${p}${t ? `: ${t}` : ''}`,
+    heading: (p, t, c, d) => c ? `Found cash at ${p}` : d ? `Found a document or ID at ${p}` : `Found item at ${p}${t ? `: ${t}` : ''}`,
     caption: (c, d) => c ? 'Cash has been handed in. Please describe it at the counter.' : d ? 'A document or ID has been handed in. Please describe it at the counter.' : 'See the photo for details.',
     category: (v) => `Category: ${v}`,
     hours: (v) => `Counter hours: ${v}`,
@@ -73,7 +73,7 @@ const TEMPLATES = {
   },
   tl: {
     place: 'isang kalahok na opisina',
-    heading: (p, t, c) => c ? `May nakitang pera sa ${p}` : `May nakitang bagay sa ${p}${t ? `: ${t}` : ''}`,
+    heading: (p, t, c, d) => c ? `May nakitang pera sa ${p}` : d ? `May nakitang dokumento o ID sa ${p}` : `May nakitang bagay sa ${p}${t ? `: ${t}` : ''}`,
     caption: (c, d) => c ? 'May isinuling pera. Pakilarawan ito sa counter.' : d ? 'May isinuling dokumento o ID. Pakilarawan ito sa counter.' : 'Tingnan ang larawan para sa detalye.',
     category: (v) => `Kategorya: ${v}`,
     hours: (v) => `Oras ng counter: ${v}`,
@@ -107,7 +107,7 @@ export function buildAnnouncementDraft({
   const cleanHours = sanitizeAnnouncementText(counterHours, { maxLength: 100 });
   if (!cleanOffice && !cleanTitle) return '';
   const place = cleanOffice || template.place;
-  const heading = template.heading(place, cleanTitle, cash);
+  const heading = template.heading(place, cleanTitle, cash, isDocument);
   const tail = [
     '',
     template.category(cleanCategory),

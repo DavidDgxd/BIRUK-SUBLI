@@ -221,10 +221,13 @@ describe('Cash and Documents / IDs announcements (#106)', () => {
       const drafts = buildAnnouncementDrafts({ ...DOC_ITEM, category });
       for (const text of [drafts.en, drafts.tl]) {
         expect(text).not.toMatch(/juan|dela cruz/i);
-        expect(text).toContain('Documents / IDs');
         expect(text).not.toMatch(/see the photo|tingnan ang larawan/i);
+        // The category line names it once; the heading doesn't repeat it.
+        expect(text.match(/documents \/ ids|document\/id/gi)).toHaveLength(1);
       }
+      expect(drafts.en).toContain('Found a document or ID at University of Baguio Security Office');
       expect(drafts.en).toContain('A document or ID has been handed in.');
+      expect(drafts.tl).toContain('May nakitang dokumento o ID sa University of Baguio Security Office');
       expect(drafts.tl).toContain('May isinuling dokumento o ID.');
     },
   );
