@@ -43,7 +43,7 @@ drop trigger if exists on_auth_office_user_created on auth.users;
 drop function if exists public.handle_new_office_user();
 
 -- Seed the University of Baguio campus counters. The migration that introduced
--- them is supabase/migrations/20261126130000_ub_campus_offices.sql; this copy
+-- them is supabase/migrations/20261127130000_ub_campus_offices.sql; this copy
 -- keeps a fresh schema.sql at the same campus scope.
 insert into public.offices (id, name, address, counter_hours, status) values
     ('UB_SECURITY', 'University of Baguio Security Office', 'University of Baguio, Gen. Luna Road, Baguio', 'Mon-Fri, 8:00 AM - 5:00 PM', 'active'),

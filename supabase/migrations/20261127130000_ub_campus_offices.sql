@@ -8,7 +8,9 @@
 -- Items still point at a legacy office with ON DELETE RESTRICT, so they are
 -- reassigned to the Security Office before the delete. login_history.office_id
 -- is ON DELETE SET NULL, so deleting the old offices only clears the stale
--- reference and keeps the audit row.
+-- reference and keeps the audit row. In non-production environments, a legacy
+-- office with a linked staff login (auth_user_id) is left unlinked until
+-- reassigned.
 
 -- Canonical campus offices. Status is not overwritten, so a counter that was
 -- deliberately suspended stays suspended.

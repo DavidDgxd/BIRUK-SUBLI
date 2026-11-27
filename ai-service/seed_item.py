@@ -19,7 +19,7 @@ Usage:
     python seed_item.py --title "Brown Leather Wallet" \
         --description "Brown leather bifold wallet with a green keychain"
     python seed_item.py --title "Blue Hydro Flask" --description "Blue insulated bottle" \
-        --image bottle.jpg --office CITY_HALL_INFO
+        --image bottle.jpg --office UB_INFO_DESK
 
 How the embeddings are chosen:
     text_embedding  -> BGE-small over "title. category" (public-safe, two-tower index)
