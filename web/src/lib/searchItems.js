@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { embedImage, embedQuery, embedText, SearchError } from './aiService.js';
+import { DOCUMENT_TITLE, isCashItem, isDocumentCategory } from './publicMasking.js';
 
 // Confidence tiers passed to match_items_two_tower, plus the best/possible
 // split. `score` is the RPC's blended vector + lexical score. A row only counts
@@ -65,12 +66,9 @@ export function isSearchableItemStatus(status) {
   );
 }
 
-const DOCUMENT_CATEGORIES = ['documents / ids', 'document/id'];
-
 /** True when the RPC masks this row's title, image and vector scores. */
 function isMaskedCategory(category) {
-  const value = String(category ?? '').trim().toLowerCase();
-  return value === 'cash' || DOCUMENT_CATEGORIES.includes(value);
+  return isCashItem({ category }) || isDocumentCategory(category);
 }
 
 /**
@@ -79,13 +77,11 @@ function isMaskedCategory(category) {
  * the response has no is_cash column and the category is the only signal here.
  */
 export function maskSearchItem(item) {
-  const category = String(item?.category ?? '').trim().toLowerCase();
-  const cash = category === 'cash';
-  const document = DOCUMENT_CATEGORIES.includes(category);
-  if (!cash && !document) return item;
+  const cash = isCashItem({ category: item?.category });
+  if (!cash && !isDocumentCategory(item?.category)) return item;
   return {
     ...item,
-    title: cash ? 'Cash' : 'Documents / IDs',
+    title: cash ? 'Cash' : DOCUMENT_TITLE,
     category: cash ? 'Cash' : item.category,
     image_url: null,
   };

@@ -170,3 +170,52 @@ test('copies the photo separately as a PNG for Facebook', async ({ page }) => {
   expect(copied.types).toContain('image/png');
   expect(copied.blobType).toBe('image/png');
 });
+
+test('posts Documents / IDs without the photo, title or caption (#106)', async ({
+  page,
+}) => {
+  const captioned = [];
+  await page.route('**/caption/image', (route) => {
+    captioned.push(route.request().url());
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ caption: 'A UB ID card showing Juan Dela Cruz.' }),
+    });
+  });
+  await page.route('**/rest/v1/rpc/submit_staff_custody', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ ref_code: 'BS-0124', item_id: 'e2e-item-document' }]),
+    }),
+  );
+
+  await openRoute(page, '/staff/intake');
+  await page.locator('form input[type=file]').setInputFiles({
+    name: 'id.png',
+    mimeType: 'image/png',
+    buffer: PNG_1PX,
+  });
+  // The intake suggestion is staff-only; only the receipt draft must not caption.
+  await expect(
+    page.getByText('Suggested description from the photo'),
+  ).toBeVisible();
+  const intakeCaptions = captioned.length;
+  await page.getByLabel('Item title').fill('Juan Dela Cruz UB ID');
+  await page.getByLabel('Category').selectOption('Documents / IDs');
+  await page.getByLabel('Storage location').fill('Locker 3, Bin C');
+  await page.getByRole('button', { name: 'Take into custody' }).click();
+
+  const draft = page.getByRole('region', { name: 'Announcement draft' });
+  await expect(draft.getByLabel('English announcement')).toHaveValue(
+    /Found item at University of Baguio Security Office: Documents \/ IDs/,
+  );
+  await expect(draft.locator('img')).toHaveCount(0);
+  await expect(draft.getByRole('button', { name: /Copy photo/ })).toHaveCount(0);
+  await expect(draft).toContainText('posted without a photo');
+  for (const label of ['English announcement', 'Filipino announcement']) {
+    await expect(draft.getByLabel(label)).not.toHaveValue(/juan|dela cruz/i);
+  }
+  expect(captioned).toHaveLength(intakeCaptions);
+});

@@ -12,6 +12,8 @@
  * name, ID number and face.
  */
 
+import { DOCUMENT_TITLE, isCashItem, isDocumentCategory } from './publicMasking.js';
+
 /* The Filipino caption is machine-translated, so the markers include the
  * Tagalog words the translation produces as well as the English originals. */
 const MONEY_MARKER =
@@ -22,23 +24,11 @@ const CONTACT_MARKER =
   /(?:\bhttps?:\/\/\S+|\bwww\.\S+|\b\S+@\S+\.\S+|\b(?:\+?63[\s-]?|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b(?:[a-z0-9-]+\.)+(?:com|net|org|ph|io|gov)\b(?:\/\S*)?)/i;
 
 export const MAX_ANNOUNCEMENT_LENGTH = 600;
-export const DOCUMENT_TITLE = 'Documents / IDs';
-const DOCUMENT_CATEGORIES = ['documents / ids', 'document/id'];
-
-const categoryKey = (category) => String(category ?? '').trim().toLowerCase();
-
-/** True for both the current and the legacy Documents / IDs spelling. */
-export const isDocumentCategory = (category) =>
-  DOCUMENT_CATEGORIES.includes(categoryKey(category));
-
-/** True when the item is cash, by flag or by category. */
-export const isCashItem = ({ category, isCash } = {}) =>
-  isCash === true || categoryKey(category) === 'cash';
+export const MAX_CAPTION_LENGTH = 220;
 
 /** Cash and Documents / IDs are posted without their photo or caption. */
 export const hidesAnnouncementPhoto = (item = {}) =>
   isCashItem(item) || isDocumentCategory(item.category);
-export const MAX_CAPTION_LENGTH = 220;
 
 const normalise = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
