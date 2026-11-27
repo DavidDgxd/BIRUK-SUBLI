@@ -27,9 +27,9 @@ describe('listPublicOffices', () => {
 
   it('selects only public fields and filters active offices in the database', async () => {
     const office = {
-      id: 'BCPIO',
-      name: 'Baguio City Public Information Office',
-      address: 'City Hall, Baguio City',
+      id: 'UB_SECURITY',
+      name: 'University of Baguio Security Office',
+      address: 'University of Baguio, Gen. Luna Road, Baguio',
       counter_hours: '8:00 AM - 5:00 PM',
     };
     const query = queryResult({ data: [office] });
@@ -68,8 +68,8 @@ describe('listOfficeOptions', () => {
 
   it('selects only the picker fields and filters active offices in the database', async () => {
     const office = {
-      id: 'BCPIO',
-      name: 'Baguio City Public Information Office',
+      id: 'UB_SECURITY',
+      name: 'University of Baguio Security Office',
     };
     const query = queryResult({ data: [office] });
     from.mockReturnValue(query);
@@ -105,8 +105,8 @@ describe('listOffices', () => {
 
   it('reads the public office directory, ordered by name', async () => {
     const office = {
-      id: 'BCPIO',
-      name: 'Baguio City Public Information Office',
+      id: 'UB_SECURITY',
+      name: 'University of Baguio Security Office',
     };
     const query = queryResult({ data: [office] });
     from.mockReturnValue(query);

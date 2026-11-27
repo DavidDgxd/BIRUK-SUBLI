@@ -12,7 +12,7 @@ function resolvedRpc(error = null) {
 
 const baseRelease = {
   itemId: ' 11111111-1111-1111-1111-111111111111 ',
-  officeId: ' BCPIO ',
+  officeId: ' UB_SECURITY ',
   claimantName: '  Maria Santos  ',
   claimantIdRef: ' UMID-4921 ',
   releaseNotes: '  Authorization letter on file.  ',
@@ -34,7 +34,7 @@ describe('releaseItemAtCounter', () => {
 
     expect(rpc).toHaveBeenCalledWith('release_item_at_counter', {
       p_item_id: '11111111-1111-1111-1111-111111111111',
-      p_releasing_office_id: 'BCPIO',
+      p_releasing_office_id: 'UB_SECURITY',
       p_claimant_name: 'Maria Santos',
       p_claimant_id_ref: 'UMID-4921',
       p_release_notes: 'Authorization letter on file.',

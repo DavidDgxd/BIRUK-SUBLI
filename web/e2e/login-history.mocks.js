@@ -12,7 +12,7 @@ const OFFICE_USER = {
   id: 'user-office',
   aud: 'authenticated',
   role: 'authenticated',
-  email: 'bcpio@baguio.gov.ph',
+  email: 'security@ubaguio.edu.ph',
   app_metadata: {},
   user_metadata: {},
 };
@@ -31,7 +31,7 @@ export const HISTORY = [
   {
     id: '11111111-1111-1111-1111-111111111102',
     occurred_at: '2026-11-21T10:15:00Z',
-    account_label: 'admin@baguio.gov.ph',
+    account_label: 'admin@ubaguio.edu.ph',
     office_id: null,
     role: 'central_admin',
     status: 'success',

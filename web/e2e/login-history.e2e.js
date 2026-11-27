@@ -19,7 +19,7 @@ import {
 
 async function submitLogin(
   page,
-  { email = 'bcpio@baguio.gov.ph', password = 'counter-secret' } = {},
+  { email = 'security@ubaguio.edu.ph', password = 'counter-secret' } = {},
 ) {
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
@@ -70,7 +70,7 @@ test.describe('staff sign-in recording', () => {
       }),
     ).toBeVisible();
     await expect.poll(() => attempts.at(-1)?.p_status).toBe('failed');
-    expect(attempts.at(-1).p_account).toBe('bcpio@baguio.gov.ph');
+    expect(attempts.at(-1).p_account).toBe('security@ubaguio.edu.ph');
     expect(attempts.at(-1).p_failure_reason).toBe('invalid_credentials');
     await expect(page).toHaveURL(/\/staff\/login/);
   });
@@ -131,7 +131,7 @@ test.describe('admin login history', () => {
     ).toBeVisible();
     await expect(accountColumn(page)).toHaveText([
       'unknown@example.test',
-      'admin@baguio.gov.ph',
+      'admin@ubaguio.edu.ph',
       OFFICE.name,
     ]);
 
@@ -141,7 +141,7 @@ test.describe('admin login history', () => {
     await expect(failed).toContainText('Invalid credentials');
     await expect(failed).toContainText('Firefox on Linux');
 
-    const admin = rowFor(page, 'admin@baguio.gov.ph');
+    const admin = rowFor(page, 'admin@ubaguio.edu.ph');
     await expect(admin).toContainText('Central admin');
     await expect(admin).toContainText('Safari on iOS');
 
@@ -172,7 +172,7 @@ test.describe('admin login history', () => {
     await page.getByLabel('To', { exact: true }).fill('2026-11-21');
     await page.getByRole('button', { name: 'Apply filters' }).click();
 
-    await expect(accountColumn(page)).toHaveText(['admin@baguio.gov.ph']);
+    await expect(accountColumn(page)).toHaveText(['admin@ubaguio.edu.ph']);
     const sent = history.requests.at(-1);
     expect(Date.parse(sent.p_date_from)).toBe(
       Date.parse('2026-11-21T00:00:00'),
@@ -191,7 +191,7 @@ test.describe('admin login history', () => {
     await page.getByLabel('Office or account').selectOption('central_admin');
     await page.getByRole('button', { name: 'Apply filters' }).click();
 
-    await expect(accountColumn(page)).toHaveText(['admin@baguio.gov.ph']);
+    await expect(accountColumn(page)).toHaveText(['admin@ubaguio.edu.ph']);
     expect(history.requests.at(-1).p_office_id).toBeNull();
   });
 
@@ -260,7 +260,7 @@ test.describe('login history tab on the office directory', () => {
 
     await expect(accountColumn(page)).toHaveText([
       'unknown@example.test',
-      'admin@baguio.gov.ph',
+      'admin@ubaguio.edu.ph',
       OFFICE.name,
     ]);
     expect(await horizontalOverflow(page)).toBe(0);

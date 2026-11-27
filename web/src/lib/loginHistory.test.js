@@ -110,14 +110,14 @@ describe('recordLoginAttempt', () => {
 
     await expect(
       recordLoginAttempt({
-        account: '  bcpio@baguio.gov.ph ',
+        account: '  security@ubaguio.edu.ph ',
         status: 'success',
         deviceInfo: 'Chrome on Windows',
       }),
     ).resolves.toBe(true);
 
     expect(rpc).toHaveBeenCalledWith('record_login_attempt', {
-      p_account: 'bcpio@baguio.gov.ph',
+      p_account: 'security@ubaguio.edu.ph',
       p_status: 'success',
       p_failure_reason: null,
       p_device_info: 'Chrome on Windows',
@@ -173,7 +173,7 @@ describe('recordLoginAttempt', () => {
     rpc.mockReturnValue(resolved({ error: { message: 'database unavailable' } }));
 
     await expect(
-      recordLoginAttempt({ account: 'bcpio@baguio.gov.ph' }),
+      recordLoginAttempt({ account: 'security@ubaguio.edu.ph' }),
     ).resolves.toBe(false);
   });
 
@@ -183,7 +183,7 @@ describe('recordLoginAttempt', () => {
     });
 
     await expect(
-      recordLoginAttempt({ account: 'bcpio@baguio.gov.ph' }),
+      recordLoginAttempt({ account: 'security@ubaguio.edu.ph' }),
     ).resolves.toBe(false);
   });
 });
@@ -192,8 +192,8 @@ describe('fetchLoginHistory', () => {
   const row = {
     id: '11111111-1111-1111-1111-111111111111',
     occurred_at: '2026-11-20T08:15:00Z',
-    account_label: 'Baguio City Public Information Office',
-    office_id: 'BCPIO',
+    account_label: 'University of Baguio Security Office',
+    office_id: 'UB_SECURITY',
     role: 'office_staff',
     status: 'success',
     failure_reason: null,
@@ -208,7 +208,7 @@ describe('fetchLoginHistory', () => {
     rpc.mockReturnValue(resolved({ data: [row] }));
 
     await fetchLoginHistory({
-      officeId: 'BCPIO',
+      officeId: 'UB_SECURITY',
       search: '  public information  ',
       status: 'failed',
       dateFrom: '2026-11-01',
@@ -221,7 +221,7 @@ describe('fetchLoginHistory', () => {
     to.setHours(23, 59, 59, 999);
 
     expect(rpc).toHaveBeenCalledWith('admin_list_login_history', {
-      p_office_id: 'BCPIO',
+      p_office_id: 'UB_SECURITY',
       p_search: 'public information',
       p_status: 'failed',
       p_date_from: from.toISOString(),
@@ -264,7 +264,7 @@ describe('fetchLoginHistory', () => {
       id: row.id,
       occurredAt: row.occurred_at,
       accountLabel: row.account_label,
-      officeId: 'BCPIO',
+      officeId: 'UB_SECURITY',
       roleLabel: 'Office staff',
       statusLabel: 'Success',
       failureLabel: null,

@@ -427,7 +427,7 @@ describe('searchItems confidence tiers', () => {
 
     await searchItems({
       text: 'wallet',
-      office: 'BCPIO',
+      office: 'UB_SECURITY',
       dateFrom: '2026-09-01',
       dateTo: '2026-09-30',
       signal: new AbortController().signal,
@@ -436,7 +436,7 @@ describe('searchItems confidence tiers', () => {
     expect(rpc).toHaveBeenCalledWith(
       'match_items_two_tower',
       expect.objectContaining({
-        filter_office: 'BCPIO',
+        filter_office: 'UB_SECURITY',
         date_from: '2026-09-01',
         date_to: '2026-09-30',
       }),
@@ -447,9 +447,9 @@ describe('searchItems confidence tiers', () => {
     rpc.mockReturnValue(
       resolvedRpc({
         data: [
-          row('kept', 0.8, { holding_office_id: 'BCPIO', lexical_score: 1 }),
+          row('kept', 0.8, { holding_office_id: 'UB_SECURITY', lexical_score: 1 }),
           row('elsewhere', 0.8, {
-            holding_office_id: 'CITY_HALL_INFO',
+            holding_office_id: 'UB_INFO_DESK',
             lexical_score: 1,
           }),
         ],
@@ -458,7 +458,7 @@ describe('searchItems confidence tiers', () => {
 
     const result = await searchItems({
       text: 'wallet',
-      office: 'BCPIO',
+      office: 'UB_SECURITY',
       signal: new AbortController().signal,
     });
 

@@ -12,7 +12,7 @@ const ITEM = {
   title: 'Brown leather wallet',
   category: 'Bags & Wallets',
   aiCaption: 'A brown leather wallet sitting on a wooden table.',
-  officeName: 'Baguio City Public Information Office',
+  officeName: 'University of Baguio Security Office',
   refCode: 'BS-0115',
 };
 
@@ -27,7 +27,7 @@ describe('buildAnnouncementDraft', () => {
     });
 
     expect(draft).toContain(
-      'Found item at Baguio City Public Information Office: Brown leather wallet',
+      'Found item at University of Baguio Security Office: Brown leather wallet',
     );
     expect(draft).toContain(ITEM.aiCaption);
     expect(draft).toContain('Category: Bags & Wallets');
@@ -48,7 +48,7 @@ describe('buildAnnouncementDraft', () => {
       aiCaption: 'Cash amounting to PHP 12,500 in an envelope.',
     });
 
-    expect(draft).toContain('Found cash at Baguio City Public Information Office');
+    expect(draft).toContain('Found cash at University of Baguio Security Office');
     expect(draft).toContain('Cash has been handed in.');
     expect(draft).not.toMatch(
       /12,500|12500|php|Juan|juan@example|2026-07-15/i,
@@ -121,7 +121,7 @@ describe('buildAnnouncementDraft length budget', () => {
     const draft = buildAnnouncementDraft({
       ...ITEM,
       title: 'Brown leather wallet with a long description'.repeat(4),
-      officeName: 'Baguio City Public Information Office '.repeat(4),
+      officeName: 'University of Baguio Security Office '.repeat(4),
       aiCaption:
         'A brown leather wallet sitting on a wooden table. '.repeat(8),
     });
@@ -131,7 +131,7 @@ describe('buildAnnouncementDraft length budget', () => {
   });
 });
 
-const EN = 'Found item at BCPIO.', TL = 'May nakitang bagay sa BCPIO.';
+const EN = 'Found item at UB_SECURITY.', TL = 'May nakitang bagay sa UB_SECURITY.';
 describe('US-25 bilingual drafts and copy', () => {
   it('builds, edits and copies both languages privately', async () => {
     const original = buildAnnouncementDrafts({
