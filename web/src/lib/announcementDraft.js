@@ -12,7 +12,7 @@
  * name, ID number and face.
  */
 
-import { DOCUMENT_TITLE, isCashItem, isDocumentCategory } from './publicMasking.js';
+import { isCashItem, isDocumentCategory } from './publicMasking.js';
 
 /* The Filipino caption is machine-translated, so the markers include the
  * Tagalog words the translation produces as well as the English originals. */
@@ -96,9 +96,9 @@ export function buildAnnouncementDraft({
   const cleanOffice = sanitizeAnnouncementText(officeName, { maxLength: 100 });
   const cash = isCashItem({ category, isCash });
   const isDocument = !cash && isDocumentCategory(category);
-  const cleanTitle = isDocument
-    ? DOCUMENT_TITLE
-    : sanitizeAnnouncementText(title, { maxLength: 120 });
+  // Cash and document headings never print the title; it only decides below
+  // whether there is anything to post at all.
+  const cleanTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
   const cleanCategory =
     sanitizeAnnouncementText(category, { maxLength: 40 }) || 'General';
   const cleanCaption = cash || isDocument

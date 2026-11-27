@@ -57,6 +57,9 @@ describe('buildAnnouncementDraft', () => {
 
   it('returns an empty draft when there is no safe text to publish', () => {
     expect(buildAnnouncementDraft({ title: '', officeName: '' })).toBe('');
+    for (const category of ['Documents / IDs', 'Document/ID', 'Cash']) {
+      expect(buildAnnouncementDraft({ title: '', officeName: '', category })).toBe('');
+    }
   });
 });
 
