@@ -186,6 +186,9 @@ export default function ItemDetails() {
 
   const releasingCash = cashHolding?.itemId === id && cashHolding.isCash;
   const cashCheckFailed = cashHolding?.itemId === id && cashHolding.failed;
+  // Release waits for the cash check so a quick confirm cannot skip the
+  // Art. 720 line on a cash item.
+  const cashChecked = cashHolding?.itemId === id;
   const ownerFinderReward = releasingCash
     ? formatPeso(finderRewardOnOwnerClaim(cashHolding.cashAmount))
     : null;
@@ -248,7 +251,7 @@ export default function ItemDetails() {
 
   async function handleRelease(event) {
     event.preventDefault();
-    if (releaseStatus === 'saving') return;
+    if (releaseStatus === 'saving' || !cashChecked) return;
 
     const cleanName = claimantName.trim();
     const cleanIdRef = claimantIdRef.trim();
@@ -622,18 +625,20 @@ export default function ItemDetails() {
                       <button
                         type="submit"
                         className="btn btn--primary"
-                        disabled={releaseStatus === 'saving'}
+                        disabled={releaseStatus === 'saving' || !cashChecked}
                       >
                         <Icon
                           name={
-                            releaseStatus === 'saving'
+                            releaseStatus === 'saving' || !cashChecked
                               ? 'hourglass_top'
                               : 'assignment_turned_in'
                           }
                         />
                         {releaseStatus === 'saving'
                           ? 'Releasing…'
-                          : 'Confirm release'}
+                          : cashChecked
+                            ? 'Confirm release'
+                            : 'Checking item…'}
                       </button>
                     </form>
                   )}

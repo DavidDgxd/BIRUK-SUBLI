@@ -225,6 +225,51 @@ test.describe('cash release note (Art. 720)', () => {
     expect(notes[1]).toContain('Civil Code Art. 720');
   });
 
+  test('waits for the cash check before allowing a release', async ({
+    page,
+  }) => {
+    let answerCashCheck;
+    const cashCheck = new Promise((resolve) => {
+      answerCashCheck = resolve;
+    });
+    await page.route('**/rest/v1/rpc/get_item_public', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: DUE_ID,
+            ref_code: 'BS-0101',
+            title: 'Envelope of cash',
+            category: 'Cash',
+            status: 'held',
+            image_url: null,
+            date_received: '2026-05-20',
+            holding_office_id: OFFICE.id,
+            holding_office_name: OFFICE.name,
+          },
+        ]),
+      }),
+    );
+    await page.route('**/rest/v1/items?**', async (route) => {
+      await cashCheck;
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ is_cash: true, cash_amount: 1500 }),
+      });
+    });
+
+    await page.goto(`/items/${DUE_ID}`);
+    const form = page.getByRole('form', { name: 'Release item to claimant' });
+    const pending = form.getByRole('button', { name: 'Checking item…' });
+    await expect(pending).toBeDisabled();
+
+    answerCashCheck();
+    await expect(
+      form.getByRole('button', { name: 'Confirm release' }),
+    ).toBeEnabled();
+    await expect(form).toContainText('Civil Code Art. 720');
+  });
+
   test('tells staff about Art. 720 when the cash check fails', async ({
     page,
   }) => {
