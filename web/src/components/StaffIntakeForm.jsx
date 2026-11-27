@@ -10,7 +10,7 @@ import {
   shouldApplyCaption,
   truncateAtWordBoundary,
 } from '../lib/captionSuggestion.js';
-import { submitStaffCustody } from '../lib/staffIntake.js';
+import { submitStaffCustody, validateCashFinderDetails, cashRewardDate } from '../lib/staffIntake.js';
 import { intakePrefillFromReport } from '../lib/foundReports.js';
 import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from '../lib/storage.js';
 
@@ -97,6 +97,7 @@ export default function StaffIntakeForm({
   const [cashAmount, setCashAmount] = useState('');
   const [finderName, setFinderName] = useState('');
   const [finderContact, setFinderContact] = useState('');
+  const [cashErrors, setCashErrors] = useState({});
   const [photo, setPhoto] = useState(null); // { file, url, existingUrl, label }
   const [prefill, setPrefill] = useState(null);
   const [captionSuggestion, setCaptionSuggestion] = useState(null);
@@ -115,6 +116,7 @@ export default function StaffIntakeForm({
   const dateRef = useRef(null);
   const cashRef = useRef(null);
   const finderRef = useRef(null);
+  const finderContactRef = useRef(null);
   const fileInputRef = useRef(null);
   const uploadButtonRef = useRef(null);
   const receiptRef = useRef(null);
@@ -137,7 +139,10 @@ export default function StaffIntakeForm({
   const cashHintId = useId();
   const finderId = useId();
   const finderHintId = useId();
+  const finderErrorId = useId();
   const finderContactId = useId();
+  const finderContactHintId = useId();
+  const finderContactErrorId = useId();
   const photoId = useId();
   const errorId = useId();
 
@@ -145,6 +150,13 @@ export default function StaffIntakeForm({
   const suggestionApplied =
     captionSuggestion?.status === 'ready' &&
     description.trim() === captionSuggestion.text.trim();
+
+  function clearCashError(field) {
+    setCashErrors((current) => {
+      if (!current[field]) return current;
+      return { ...current, [field]: '' };
+    });
+  }
 
   // Release the preview URL when the photo is replaced, removed or unmounted.
   useEffect(() => {
@@ -271,6 +283,7 @@ export default function StaffIntakeForm({
     setPrefill({ reportId: values.reportId, refCode: values.refCode });
     setReceipt(null);
     setError('');
+    setCashErrors({});
     setCopied(false);
     setCopyNote('');
     setStatus('idle');
@@ -356,10 +369,20 @@ export default function StaffIntakeForm({
       dateRef.current?.focus();
       return;
     }
-    if (isCash && !finderName.trim()) {
-      setError('Record the finder’s name so the cash reward can be claimed.');
-      finderRef.current?.focus();
-      return;
+    if (isCash) {
+      const finderErrors = validateCashFinderDetails({
+        category,
+        finderName,
+        finderContact,
+      });
+      if (Object.keys(finderErrors).length) {
+        setCashErrors(finderErrors);
+        setError('Complete the finder details required for cash.');
+        (finderErrors.finderName ? finderRef : finderContactRef).current?.focus();
+        return;
+      }
+    } else {
+      setCashErrors({});
     }
     if (!photo) {
       setError('Add a photo of the item.');
@@ -368,6 +391,7 @@ export default function StaffIntakeForm({
     }
 
     setError('');
+    setCashErrors({});
     setStatus('submitting');
 
     const controller = new AbortController();
@@ -400,6 +424,7 @@ export default function StaffIntakeForm({
         category,
         storageLocation: trimmedStorage,
         dateReceived,
+        rewardDate: isCash ? cashRewardDate(dateReceived) : null,
         officeName: office.name,
         counterHours: office.counterHours ?? '',
         staffEmail,
@@ -443,6 +468,7 @@ export default function StaffIntakeForm({
     setCashAmount('');
     setFinderName('');
     setFinderContact('');
+    setCashErrors({});
     setPhoto(null);
     setPrefill(null);
     setReceipt(null);
@@ -484,6 +510,9 @@ export default function StaffIntakeForm({
       ['Category', current.category],
       ['Stored at', current.storageLocation],
       ['Received', current.dateReceived],
+      ...(current.isCash && current.rewardDate
+        ? [['Reward date', current.rewardDate]]
+        : []),
       ['Office', current.officeName],
       ['Logged by', current.staffEmail],
     ]
@@ -547,13 +576,38 @@ export default function StaffIntakeForm({
             <dt>Received</dt>
             <dd>{receipt.dateReceived}</dd>
           </div>
+          {receipt.isCash && receipt.rewardDate && (
+            <div className="receipt-details__row">
+              <dt>Reward date</dt>
+              <dd>
+                {receipt.rewardDate}
+                <span className="field__hint">
+                  Six months after the date received.
+                </span>
+              </dd>
+            </div>
+          )}
           <div className="receipt-details__row">
             <dt>Logged by</dt>
             <dd>{receipt.staffEmail}</dd>
           </div>
         </dl>
         <LostReportFlags itemId={receipt.itemId} />
-        <AnnouncementDraft key={receipt.refCode} item={receipt} />
+        <AnnouncementDraft
+          key={receipt.refCode}
+          item={{
+            title: receipt.title,
+            category: receipt.category,
+            aiCaption: receipt.aiCaption,
+            aiCaptionTl: receipt.aiCaptionTl,
+            officeName: receipt.officeName,
+            counterHours: receipt.counterHours,
+            isCash: receipt.isCash,
+            imageUrl: receipt.imageUrl,
+            photoFile: receipt.photoFile,
+            photoUrl: receipt.photoUrl,
+          }}
+        />
         {!receipt.usedPhoto && (
           <p className="state__text">
             The photo was saved, but we could not read it for matching — this
@@ -665,6 +719,7 @@ export default function StaffIntakeForm({
           aria-invalid={error && !category ? 'true' : undefined}
           onChange={(event) => {
             setCategory(event.target.value);
+            setCashErrors({});
             if (error) setError('');
           }}
         >
@@ -854,36 +909,66 @@ export default function StaffIntakeForm({
               placeholder="Juan dela Cruz"
               required={isCash}
               value={finderName}
-              aria-describedby={
-                error ? `${finderHintId} ${errorId}` : finderHintId
-              }
-              aria-invalid={
-                error && isCash && !finderName.trim() ? 'true' : undefined
-              }
+              aria-describedby={[
+                finderHintId,
+                cashErrors.finderName ? finderErrorId : null,
+                error ? errorId : null,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              aria-invalid={cashErrors.finderName ? 'true' : undefined}
               onChange={(event) => {
                 setFinderName(event.target.value);
+                clearCashError('finderName');
                 if (error) setError('');
               }}
             />
             <p className="field__hint" id={finderHintId}>
               Required for cash — the finder needs this to claim the reward.
             </p>
+            {cashErrors.finderName && (
+              <p className="field__error" id={finderErrorId} role="alert">
+                {cashErrors.finderName}
+              </p>
+            )}
           </div>
 
           <div className="field">
             <label className="field__label" htmlFor={finderContactId}>
-              Finder&rsquo;s contact{' '}
-              <span className="field__optional">Optional</span>
+              Finder&rsquo;s contact
             </label>
             <input
               id={finderContactId}
+              ref={finderContactRef}
               className="field__control"
               type="text"
               maxLength={MAX_SHORT_LENGTH}
               placeholder="Phone number or email"
+              required={isCash}
               value={finderContact}
-              onChange={(event) => setFinderContact(event.target.value)}
+              aria-describedby={[
+                finderContactHintId,
+                cashErrors.finderContact ? finderContactErrorId : null,
+                error ? errorId : null,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              aria-invalid={cashErrors.finderContact ? 'true' : undefined}
+              onChange={(event) => {
+                setFinderContact(event.target.value);
+                clearCashError('finderContact');
+                if (error) setError('');
+              }}
             />
+            <p className="field__hint" id={finderContactHintId}>
+              Required for cash — staff-only, never added to the public
+              announcement.
+            </p>
+            {cashErrors.finderContact && (
+              <p className="field__error" id={finderContactErrorId} role="alert">
+                {cashErrors.finderContact}
+              </p>
+            )}
           </div>
         </>
       )}

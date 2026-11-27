@@ -35,19 +35,24 @@ describe('buildAnnouncementDraft', () => {
     expect(draft.length).toBeLessThanOrEqual(MAX_ANNOUNCEMENT_LENGTH);
   });
 
-  it('keeps cash generic so no monetary figure reaches the post', () => {
+  it('keeps cash generic so no monetary figure or finder detail reaches the post', () => {
     const draft = buildAnnouncementDraft({
       ...ITEM,
       title: 'Cash',
       category: 'Cash',
       isCash: true,
       cashAmount: 12500,
+      finderName: 'Juan dela Cruz',
+      finderContact: 'juan@example.com',
+      rewardDate: '2026-07-15',
       aiCaption: 'Cash amounting to PHP 12,500 in an envelope.',
     });
 
     expect(draft).toContain('Found cash at Baguio City Public Information Office');
     expect(draft).toContain('Cash has been handed in.');
-    expect(draft).not.toMatch(/12,500|12500|php/i);
+    expect(draft).not.toMatch(
+      /12,500|12500|php|Juan|juan@example|2026-07-15/i,
+    );
   });
 
   it('returns an empty draft when there is no safe text to publish', () => {

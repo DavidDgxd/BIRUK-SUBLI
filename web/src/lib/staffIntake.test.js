@@ -39,7 +39,7 @@ vi.mock('./aiService.js', () => ({
 
 vi.mock('./searchItems.js', () => ({ combineEmbeddings }));
 
-import { submitStaffCustody } from './staffIntake.js';
+import { cashRewardDate, submitStaffCustody, validateCashFinderDetails } from './staffIntake.js';
 
 function resolvedRpc({
   data = [
@@ -390,5 +390,80 @@ describe('submitStaffCustody submit result', () => {
       name: 'SearchError',
       code: 'db',
     });
+  });
+});
+
+describe('US-27 cash finder details', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    uploadItemImage.mockReset();
+    embedText.mockReset();
+    embedItemText.mockReset();
+    embedImageOrNull.mockReset();
+    embedImageFromUrlOrNull.mockReset();
+    combineEmbeddings.mockReset();
+
+    rpc.mockReturnValue(resolvedRpc());
+    uploadItemImage.mockResolvedValue('https://example.test/photo.webp');
+    embedText.mockResolvedValue({ embedding: [1, 0] });
+    embedItemText.mockResolvedValue({ embedding: [2, 0] });
+    embedImageOrNull.mockResolvedValue(null);
+    combineEmbeddings.mockImplementation((vectors) => vectors[0]);
+  });
+
+  it('requires both finder name and contact for a cash item', () => {
+    const missing = validateCashFinderDetails({
+      category: 'Cash',
+      finderName: '   ',
+      finderContact: '',
+    });
+
+    expect(missing).toEqual({
+      finderName: expect.stringContaining('finder’s name'),
+      finderContact: expect.stringContaining('finder’s phone number'),
+    });
+    expect(
+      validateCashFinderDetails({
+        category: 'Cash',
+        finderName: 'Juan dela Cruz',
+        finderContact: '0917 555 1234',
+      }),
+    ).toEqual({});
+    expect(
+      validateCashFinderDetails({
+        category: 'General',
+        finderName: '',
+        finderContact: '',
+      }),
+    ).toEqual({});
+  });
+
+  it('adds six months to the receipt date with a month-end clamp', () => {
+    expect(cashRewardDate('2026-01-15')).toBe('2026-07-15');
+    expect(cashRewardDate('2026-08-31')).toBe('2027-02-28');
+    expect(cashRewardDate('2023-08-31')).toBe('2024-02-29');
+    expect(cashRewardDate('2025-12-31')).toBe('2026-06-30');
+    expect(cashRewardDate('')).toBeNull();
+  });
+
+  it('sends trimmed finder details and a two-decimal amount to the RPC', async () => {
+    await submitStaffCustody({
+      ...CUSTODY,
+      category: 'Cash',
+      title: 'Brown envelope with cash',
+      cashAmount: '1250.506',
+      finderName: '  Juan dela Cruz  ',
+      finderContact: ' 0917 555 1234 ',
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'submit_staff_custody',
+      expect.objectContaining({
+        p_category: 'Cash',
+        p_cash_amount: 1250.51,
+        p_finder_name: 'Juan dela Cruz',
+        p_finder_contact: '0917 555 1234',
+      }),
+    );
   });
 });
