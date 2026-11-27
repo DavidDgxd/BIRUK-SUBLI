@@ -12,9 +12,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MIGRATION_SQL = (
-    ROOT / "supabase" / "migrations" / "20261126120000_us37_login_history.sql"
-)
+MIGRATIONS = ROOT / "supabase" / "migrations"
 SCHEMA_SQL = ROOT / "ai-service" / "supabase" / "schema.sql"
 
 
@@ -25,26 +23,33 @@ def read(path):
     return re.sub(r"\s+", " ", body).strip().lower()
 
 
+def definition_start(sql, name):
+    # Skip a leading `drop function` when a later migration replaces the RPC.
+    return sql.index(f"create or replace function public.{name}")
+
+
 def header(sql, name):
-    start = sql.index(f"function public.{name}")
+    start = definition_start(sql, name)
     return sql[start : sql.index("as $$", start)]
 
 
 def body(sql, name):
-    start = sql.index(f"function public.{name}")
+    start = definition_start(sql, name)
     opening = sql.index("$$", start) + 2
     return sql[opening : sql.index("$$", opening)].strip()
 
 
-MIGRATION = read(MIGRATION_SQL)
+BASE = read(MIGRATIONS / "20261126120000_us37_login_history.sql")
+MIGRATION = read(MIGRATIONS / "20261127150000_us37_login_history_hardening.sql")
 SCHEMA = read(SCHEMA_SQL)
+TABLE_SHIPPED = (BASE, SCHEMA)
 SHIPPED = (MIGRATION, SCHEMA)
 FUNCTIONS = ("record_login_attempt", "admin_list_login_history")
 
 
 class TableShape(unittest.TestCase):
     def test_table_carries_the_audit_columns_and_checks(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             self.assertIn(
                 "create table if not exists public.login_history", sql
             )
@@ -70,7 +75,7 @@ class TableShape(unittest.TestCase):
             )
 
     def test_office_id_matches_the_text_offices_key(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             self.assertIn(
                 "office_id text null references public.offices(id) "
                 "on delete set null",
@@ -78,14 +83,14 @@ class TableShape(unittest.TestCase):
             )
 
     def test_rows_survive_a_deleted_office_or_user(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             self.assertIn(
                 "user_id uuid null references auth.users(id) on delete set null",
                 sql,
             )
 
     def test_indexes_cover_newest_first_office_and_status(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             for index, columns in (
                 ("login_history_occurred_at_idx", "(occurred_at desc)"),
                 (
@@ -104,7 +109,7 @@ class TableShape(unittest.TestCase):
                 )
 
     def test_rls_is_enabled(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             self.assertIn(
                 "alter table public.login_history enable row level security",
                 sql,
@@ -115,7 +120,7 @@ class TablePrivileges(unittest.TestCase):
     """No browser role may touch rows, so PostgREST has nothing to expose."""
 
     def test_every_direct_privilege_is_revoked_from_client_roles(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             self.assertIn(
                 "revoke all on table public.login_history from public, anon, "
                 "authenticated",
@@ -123,7 +128,7 @@ class TablePrivileges(unittest.TestCase):
             )
 
     def test_no_table_grant_is_issued_to_a_client_role(self):
-        for sql in SHIPPED:
+        for sql in TABLE_SHIPPED:
             for command in ("select", "insert", "update", "delete", "all"):
                 for role in ("public", "anon", "authenticated"):
                     self.assertNotIn(
@@ -160,7 +165,7 @@ class WriteRpc(unittest.TestCase):
             fn = body(sql, "record_login_attempt")
             failed = fn[
                 fn.index("if p_status is distinct from 'success' then") :
-                fn.index("if v_user_id is null then")
+                fn.index("if v_user_id is null then return; end if;")
             ]
             # No lookup of a user or office row: the write path cannot depend on
             # whether the account exists.
@@ -168,9 +173,10 @@ class WriteRpc(unittest.TestCase):
             self.assertNotIn("auth.users", failed)
             self.assertNotIn("auth.jwt()", failed)
             self.assertIn(
-                "when p_failure_reason in ( 'invalid_credentials', "
-                "'inactive_office', 'auth_error' ) then p_failure_reason "
-                "else 'auth_error'",
+                "when p_failure_reason = 'inactive_office' and "
+                "v_user_id is null then 'auth_error' when p_failure_reason in "
+                "( 'invalid_credentials', 'inactive_office', 'auth_error' ) "
+                "then p_failure_reason else 'auth_error'",
                 failed,
             )
             self.assertIn(
@@ -178,6 +184,22 @@ class WriteRpc(unittest.TestCase):
                 "null, 'unknown', 'failed', v_reason, v_device",
                 failed,
             )
+
+    def test_inactive_office_and_anonymous_writes_are_hardened(self):
+        for sql in SHIPPED:
+            failed = body(sql, "record_login_attempt")
+            self.assertIn(
+                "when p_failure_reason = 'inactive_office' and "
+                "v_user_id is null then 'auth_error'",
+                failed,
+            )
+            self.assertIn(
+                "select count(*) into v_recent from public.login_history lh "
+                "where lh.user_id is null and lh.occurred_at > now() - "
+                "interval '1 minute'",
+                failed,
+            )
+            self.assertIn("if v_recent >= 120 then return; end if;", failed)
 
     def test_one_uniform_void_answer(self):
         for sql in SHIPPED:
@@ -265,6 +287,18 @@ class ReadRpc(unittest.TestCase):
                 "and (p_date_to is null or lh.occurred_at <= p_date_to)", fn
             )
             self.assertIn("order by lh.occurred_at desc", fn)
+
+    def test_role_filter_is_a_server_side_parameter(self):
+        for sql in SHIPPED:
+            self.assertIn(
+                "p_role text default null",
+                header(sql, "admin_list_login_history"),
+            )
+            self.assertIn(
+                "and (p_role is null or lh.role = p_role)",
+                body(sql, "admin_list_login_history"),
+            )
+            self.assertIn("timestamptz, timestamptz, int, text", sql)
 
     def test_the_limit_is_clamped(self):
         for sql in SHIPPED:

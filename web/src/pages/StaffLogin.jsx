@@ -94,12 +94,15 @@ export default function StaffLogin() {
     } catch (signInError) {
       if (import.meta.env.DEV) console.error('[StaffLogin]', signInError);
       // Not awaited: the officer needs the error immediately, and the helper
-      // already swallows every network or RPC failure.
-      void recordLoginAttempt({
-        account: trimmedEmail,
-        status: 'failed',
-        failureReason: coarseFailureReason(signInError),
-      });
+      // already swallows every network or RPC failure. An inactive office was
+      // already recorded while its session still existed.
+      if (!signInError?.auditRecorded) {
+        void recordLoginAttempt({
+          account: trimmedEmail,
+          status: 'failed',
+          failureReason: coarseFailureReason(signInError),
+        });
+      }
       setSubmitting(false);
       setFormError(
         signInError?.message ??

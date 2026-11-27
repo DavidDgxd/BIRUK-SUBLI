@@ -123,6 +123,9 @@ export async function mockHistory(
     if (body.p_office_id) {
       visible = visible.filter((row) => row.office_id === body.p_office_id);
     }
+    if (body.p_role) {
+      visible = visible.filter((row) => row.role === body.p_role);
+    }
     if (body.p_search) {
       const needle = body.p_search.toLowerCase();
       visible = visible.filter((row) =>

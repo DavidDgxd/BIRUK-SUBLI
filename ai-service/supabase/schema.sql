@@ -1768,6 +1768,7 @@ declare
     v_account   text;
     v_device    text;
     v_reason    text;
+    v_recent    bigint;
 begin
     -- Both free-text fields are bounded so a scripted caller cannot bloat the
     -- table or smuggle a long payload into the admin view.
@@ -1775,10 +1776,27 @@ begin
     v_device  := left(btrim(coalesce(p_device_info, '')), 200);
 
     if p_status is distinct from 'success' then
+        -- A signed-out caller has no session to attribute the row to. Cap the
+        -- anonymous rows in a short sliding window so a scripted caller cannot
+        -- bloat the audit table; when the cap trips the RPC still returns void.
+        if v_user_id is null then
+            select count(*)
+              into v_recent
+              from public.login_history lh
+             where lh.user_id is null
+               and lh.occurred_at > now() - interval '1 minute';
+            if v_recent >= 120 then
+                return;
+            end if;
+        end if;
+
         -- The failure branch touches no user or office row. Whatever the caller
         -- claimed is reduced to one coarse bucket, and the row is written the
-        -- same way for an unknown account as for a real one.
+        -- same way for an unknown account as for a real one. `inactive_office`
+        -- is only trusted with a session, so an anonymous caller cannot spoof it.
         v_reason := case
+            when p_failure_reason = 'inactive_office' and v_user_id is null
+                then 'auth_error'
             when p_failure_reason in (
                 'invalid_credentials', 'inactive_office', 'auth_error'
             ) then p_failure_reason
@@ -1854,7 +1872,8 @@ create or replace function public.admin_list_login_history(
     p_status    text default null,
     p_date_from timestamptz default null,
     p_date_to   timestamptz default null,
-    p_limit     int default 100
+    p_limit     int default 100,
+    p_role      text default null
 )
 returns table (
     id             uuid,
@@ -1892,6 +1911,7 @@ begin
                lh.device_info
         from public.login_history lh
         where (p_office_id is null or lh.office_id = p_office_id)
+          and (p_role is null or lh.role = p_role)
           -- position() keeps a typed % or _ literal instead of a wildcard.
           and (v_search is null
                or position(lower(v_search) in lower(lh.account_label)) > 0)
@@ -1904,10 +1924,10 @@ end;
 $$;
 
 revoke all on function public.admin_list_login_history(
-    text, text, text, timestamptz, timestamptz, int
+    text, text, text, timestamptz, timestamptz, int, text
 ) from public, anon;
 grant execute on function public.admin_list_login_history(
-    text, text, text, timestamptz, timestamptz, int
+    text, text, text, timestamptz, timestamptz, int, text
 ) to authenticated;
 
 
