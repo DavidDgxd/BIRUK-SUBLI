@@ -225,6 +225,15 @@ class MatchingExclusion(unittest.TestCase):
             )
             self.assertIn("from public.items", fn)
 
+    def test_degenerate_embeddings_never_flag(self):
+        # A zero-norm embedding makes every cosine NaN, and NaN compares above
+        # any floor and sorts first, so the self-distance check is what keeps
+        # probed or degenerate rows from flagging on every intake.
+        for sql in (MIGRATION_FLOOR, SCHEMA):
+            fn = body(sql, "match_lost_reports")
+            self.assertIn("(items.embedding <=> items.embedding) < 0.5", fn)
+            self.assertIn("(lr.embedding <=> lr.embedding) < 0.5", fn)
+
 
 class SchemaMirror(unittest.TestCase):
     def test_ai_service_schema_matches_the_migrations(self):
