@@ -67,15 +67,20 @@ export function finderRewardOnOwnerClaim(amount) {
 
 export const ART_720_MARKER = 'Civil Code Art. 720';
 
+// "Art. 720", "art 720", "ART.720", "Article 720": any way an officer might
+// already have written the reference. The word boundary keeps "7200" out.
+const ART_720_MENTION = /\bart(?:icle|\.)?\s*720\b/i;
+
 /**
  * Release notes for cash handed to its owner, with the Art. 720 finder reward
  * recorded. The line goes through the existing p_release_notes parameter, so
  * the release RPC is unchanged (US-34 owns the full payout record). Notes that
- * already mention Art. 720 are left as the officer wrote them.
+ * already mention Art. 720, in any spelling or case, are left as the officer
+ * wrote them.
  */
 export function withOwnerClaimRewardNote(notes, amount) {
   const clean = (notes ?? '').trim();
-  if (clean.includes(ART_720_MARKER)) return clean;
+  if (ART_720_MENTION.test(clean)) return clean;
 
   const reward = formatPeso(finderRewardOnOwnerClaim(amount));
   const total = formatPeso(amount);

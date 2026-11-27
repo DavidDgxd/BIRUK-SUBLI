@@ -133,9 +133,20 @@ describe('withOwnerClaimRewardNote', () => {
     expect(lines[1]).toContain('Civil Code Art. 720');
   });
 
-  it('leaves notes that already mention Art. 720 unchanged', () => {
-    const typed = 'Finder paid per Civil Code Art. 720.';
+  it.each([
+    'Finder paid per Civil Code Art. 720.',
+    'finder reward given per art. 720',
+    'ART 720 reward settled',
+    'Art.720 done',
+    'Owner paid finder under Article 720.',
+  ])('leaves "%s" unchanged', (typed) => {
     expect(withOwnerClaimRewardNote(typed, 800)).toBe(typed);
+  });
+
+  it('does not mistake other numbers for Art. 720', () => {
+    expect(withOwnerClaimRewardNote('Receipt art 7200', 800)).toContain(
+      '\nCash released to owner:',
+    );
   });
 
   it('still records the rule when the amount is unknown', () => {

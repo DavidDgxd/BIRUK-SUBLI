@@ -186,8 +186,8 @@ export default function ItemDetails() {
 
   const releasingCash = cashHolding?.itemId === id && cashHolding.isCash;
   const cashCheckFailed = cashHolding?.itemId === id && cashHolding.failed;
-  // Release waits for the cash check so a quick confirm cannot skip the
-  // Art. 720 line on a cash item.
+  // The cash check for this item has loaded or failed; handleRelease runs it
+  // itself when a confirm arrives first.
   const cashChecked = cashHolding?.itemId === id;
   const ownerFinderReward = releasingCash
     ? formatPeso(finderRewardOnOwnerClaim(cashHolding.cashAmount))
@@ -251,7 +251,7 @@ export default function ItemDetails() {
 
   async function handleRelease(event) {
     event.preventDefault();
-    if (releaseStatus === 'saving' || !cashChecked) return;
+    if (releaseStatus === 'saving') return;
 
     const cleanName = claimantName.trim();
     const cleanIdRef = claimantIdRef.trim();
@@ -270,14 +270,33 @@ export default function ItemDetails() {
     setReleaseError('');
     setReleaseStatus('saving');
 
+    // A confirm that beats the cash check waits for it here instead of being
+    // blocked up front, so non-cash releases never sit behind a disabled
+    // button and a cash release still cannot skip the Art. 720 line.
+    let holding = cashChecked ? cashHolding : null;
+    if (!holding) {
+      try {
+        holding = { itemId: id, ...(await fetchCashHolding(id)) };
+        setCashHolding(holding);
+      } catch (cashFailure) {
+        if (import.meta.env.DEV) console.error('[ItemDetails] cash', cashFailure);
+        setCashHolding({ itemId: id, isCash: false, failed: true });
+        setReleaseStatus('idle');
+        setReleaseError(
+          'We could not check whether this item is cash. Review the note above, then confirm again.',
+        );
+        return;
+      }
+    }
+
     try {
       const released = await releaseItemAtCounter({
         itemId: item.id,
         officeId: staffOffice.id,
         claimantName: cleanName,
         claimantIdRef: cleanIdRef,
-        releaseNotes: releasingCash
-          ? withOwnerClaimRewardNote(releaseNotes, cashHolding.cashAmount)
+        releaseNotes: holding.isCash
+          ? withOwnerClaimRewardNote(releaseNotes, holding.cashAmount)
           : releaseNotes,
       });
       setReleasedTo(released.claimantName);
@@ -625,20 +644,18 @@ export default function ItemDetails() {
                       <button
                         type="submit"
                         className="btn btn--primary"
-                        disabled={releaseStatus === 'saving' || !cashChecked}
+                        disabled={releaseStatus === 'saving'}
                       >
                         <Icon
                           name={
-                            releaseStatus === 'saving' || !cashChecked
+                            releaseStatus === 'saving'
                               ? 'hourglass_top'
                               : 'assignment_turned_in'
                           }
                         />
                         {releaseStatus === 'saving'
                           ? 'Releasing…'
-                          : cashChecked
-                            ? 'Confirm release'
-                            : 'Checking item…'}
+                          : 'Confirm release'}
                       </button>
                     </form>
                   )}

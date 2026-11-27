@@ -225,9 +225,14 @@ test.describe('cash release note (Art. 720)', () => {
     expect(notes[1]).toContain('Civil Code Art. 720');
   });
 
-  test('waits for the cash check before allowing a release', async ({
+  test('a confirm that beats the cash check still records Art. 720', async ({
     page,
   }) => {
+    const calls = [];
+    await page.route('**/rest/v1/rpc/release_item_at_counter', (route) => {
+      calls.push(route.request().postDataJSON());
+      return route.fulfill({ contentType: 'application/json', body: 'null' });
+    });
     let answerCashCheck;
     const cashCheck = new Promise((resolve) => {
       answerCashCheck = resolve;
@@ -260,14 +265,25 @@ test.describe('cash release note (Art. 720)', () => {
 
     await page.goto(`/items/${DUE_ID}`);
     const form = page.getByRole('form', { name: 'Release item to claimant' });
-    const pending = form.getByRole('button', { name: 'Checking item…' });
-    await expect(pending).toBeDisabled();
+    const confirm = form.getByRole('button', { name: 'Confirm release' });
+
+    // The button is usable before the check returns: nothing is held up.
+    await expect(confirm).toBeEnabled();
+    await form.getByLabel('Claimant name').fill('Maria Santos');
+    await form.getByLabel('ID reference').fill('UBID-4921');
+    await confirm.click();
+
+    // The release waits for the cash check instead of going out without it.
+    await expect(
+      form.getByRole('button', { name: 'Releasing…' }),
+    ).toBeDisabled();
+    expect(calls).toHaveLength(0);
 
     answerCashCheck();
-    await expect(
-      form.getByRole('button', { name: 'Confirm release' }),
-    ).toBeEnabled();
-    await expect(form).toContainText('Civil Code Art. 720');
+    await expect.poll(() => calls.length).toBe(1);
+    expect(calls[0].p_release_notes).toMatch(
+      /^Cash released to owner: .*Civil Code Art\. 720/,
+    );
   });
 
   test('tells staff about Art. 720 when the cash check fails', async ({
