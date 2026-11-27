@@ -1831,6 +1831,12 @@ input[type='search']::-webkit-search-decoration {
   max-inline-size: 66ch;
 }
 
+.field__error {
+  margin-block-start: var(--space-2);
+  color: var(--error);
+  font-weight: var(--weight-strong);
+}
+
 input[type='date'],
 input[type='file'],
 input[type='number'],
@@ -2038,6 +2044,7 @@ textarea {
 }
 
 .receipt-details dd .field__hint {
+  display: block;
   margin-block-start: var(--space-1);
 }
 

@@ -122,7 +122,7 @@ describe('fetchLostReportMatches', () => {
 
   it('calls match_lost_reports with only the item id and no vector or floor arguments', async () => {
     // [REQ-007 | FR-002 | NFR-001] Valid: the request carries the item id and
-    // nothing else. The 0.55 floor and limit 5 are server defaults, so passing
+    // nothing else. The 0.68 floor and limit 5 are server defaults, so passing
     // them here would be a contract violation.
     rpc.mockReturnValue(rpcResult({ data: [] }));
 

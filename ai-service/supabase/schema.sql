@@ -635,6 +635,16 @@ create table if not exists public.items (
     finder_contact text,
     finder_address text,
 
+    -- US-27: a cash row must identify who handed it in and how to reach them.
+    -- The RPC normalises blank values to null, so this catches a direct insert.
+    constraint items_cash_finder_required check (
+        not is_cash
+        or (
+            nullif(btrim(finder_name), '') is not null
+            and nullif(btrim(finder_contact), '') is not null
+        )
+    ),
+
     -- In-Person Counter Release Verification:
     -- Retains traceability without storing sensitive identity document images.
     releasing_office_id text references public.offices(id) on delete restrict,
@@ -677,8 +687,13 @@ returns trigger language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-    if new.is_cash = true and new.reward_date is null then
+    -- US-27: always derive the reward date from date_received. Recomputing on
+    -- update keeps it correct when the counter corrects the receipt date, and
+    -- non-cash rows never carry a cash-only date.
+    if new.is_cash = true then
         new.reward_date := new.date_received + interval '6 months';
+    else
+        new.reward_date := null;
     end if;
     return new;
 end;
@@ -1359,7 +1374,7 @@ drop function if exists public.match_lost_reports(
 
 create or replace function public.match_lost_reports (
     item_id         uuid,
-    match_threshold float default 0.55,
+    match_threshold float default 0.68,
     match_count     int   default 5
 )
 returns table (
@@ -1392,18 +1407,26 @@ as $$
       -- is no longer a match target. Empty result, never an error.
       and items.status not in ('released', 'resolved', 'transferred', 'disposed')
       and items.embedding is not null
+      -- A zero-norm embedding makes every cosine NaN, and NaN compares above
+      -- any floor and sorts first, so a row written by direct RPC probing that
+      -- never went through the AI service would flag on every intake. The 0.5
+      -- bound is not a semantic threshold: a healthy vector's self-distance is
+      -- exactly 0, a zero vector's is NaN, and NaN fails the `<` comparison, so
+      -- any small bound rejects only NaN on both sides.
+      and (items.embedding <=> items.embedding) < 0.5
       and lr.status = 'open'
       and lr.closed_at is null
+      and (lr.embedding <=> lr.embedding) < 0.5
       and not exists (
           select 1 from public.dismissed_matches dm
           where dm.item_id = items.id and dm.lost_report_id = lr.id
       )
-      -- Hard floor: callers may raise the bar but never drop below 0.55. A null
+      -- Hard floor: callers may raise the bar but never drop below 0.68. A null
       -- threshold falls back to the floor instead of bypassing it. The same
       -- `>=` comparison as the search RPCs, so a row exactly at the floor is
       -- treated the same way everywhere.
       and (1 - (lr.embedding <=> items.embedding))
-          >= greatest(coalesce(match_threshold, 0.55), 0.55)
+          >= greatest(coalesce(match_threshold, 0.68), 0.68)
     order by similarity desc
     -- Clamp server-side: a null or oversized match_count cannot widen the
     -- result past the intended 1..25 contact rows.

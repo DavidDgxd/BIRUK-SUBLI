@@ -43,6 +43,58 @@ import { uploadItemImage } from './storage.js';
  * verification notes in items.ai_caption.
  */
 
+/* Cash is the only category that asks for finder details (US-27). The same
+ * checks run in the form, and the server enforces them with
+ * items_cash_finder_required so a direct RPC call cannot skip them. */
+const CASH_FINDER_MESSAGES = {
+  finderName: 'Enter the finder’s name so the reward can be claimed.',
+  finderContact:
+    'Enter the finder’s phone number or email so they can be reached.',
+};
+
+/** Returns per-field messages; empty for non-cash items or complete details. */
+export function validateCashFinderDetails({
+  category,
+  finderName,
+  finderContact,
+}) {
+  if (category !== 'Cash') return {};
+  const errors = {};
+  if (!String(finderName ?? '').trim()) {
+    errors.finderName = CASH_FINDER_MESSAGES.finderName;
+  }
+  if (!String(finderContact ?? '').trim()) {
+    errors.finderContact = CASH_FINDER_MESSAGES.finderContact;
+  }
+  return errors;
+}
+
+/**
+ * date_received + 6 months as YYYY-MM-DD, matching PostgreSQL's
+ * `date + interval '6 months'` month-end clamp. Computed without a Date
+ * timezone round-trip so the receipt shows the same calendar date the database
+ * stores for the reward clock.
+ */
+export function cashRewardDate(dateReceived) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+    String(dateReceived ?? '').trim(),
+  );
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const targetMonth = monthIndex + 6;
+  const targetYear = year + Math.floor(targetMonth / 12);
+  const targetMonthIndex = ((targetMonth % 12) + 12) % 12;
+  const lastDay = new Date(
+    Date.UTC(targetYear, targetMonthIndex + 1, 0),
+  ).getUTCDate();
+  const targetDay = Math.min(day, lastDay);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${targetYear}-${pad(targetMonthIndex + 1)}-${pad(targetDay)}`;
+}
+
 /**
  * Uploads the photo, embeds the intake text and the photo concurrently, averages
  * the vectors, and opens the custody record.
@@ -107,6 +159,11 @@ export async function submitStaffCustody({
     [legacyTextResult.embedding, photoEmbedding].filter(Boolean),
   );
 
+  const amount = Number(cashAmount);
+  const cleanAmount = Number.isFinite(amount)
+    ? Math.round(amount * 100) / 100
+    : 0;
+
   let query = supabase.rpc('submit_staff_custody', {
     p_office_id: officeId,
     p_title: cleanTitle,
@@ -118,7 +175,7 @@ export async function submitStaffCustody({
     p_text_embedding: itemTextResult.embedding,
     p_image_embedding: photoEmbedding,
     p_date_received: dateReceived,
-    p_cash_amount: isCash ? Number(cashAmount) || 0 : null,
+    p_cash_amount: isCash ? cleanAmount : null,
     p_finder_name: isCash ? finderName?.trim() || null : null,
     p_finder_contact: finderContact?.trim() || null,
     p_found_report_id: foundReportId || null,

@@ -21,17 +21,21 @@ then apply the migration; a plain `supabase db reset` applies only
     supabase start
     psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \\
         -f ai-service/supabase/schema.sql \\
-        -f supabase/migrations/20261119120000_us16_reverse_match_intake.sql
+        -f supabase/migrations/20261119120000_us16_reverse_match_intake.sql \\
+        -f supabase/migrations/20261127120000_reverse_match_floor_closed_guard.sql
 
 The suite skips cleanly when the stack is not reachable, and the parity test's
 database half additionally skips when no `psql` client can read `pg_proc`
 (set `PSQL_BIN` to point at one).
 
 Requirement coverage (traceable to docs/requirements and the spec):
-  [REQ-001 -> FR-003]  match returns only open reports at or above the 0.55
+  [REQ-001 -> FR-003]  match returns only open reports at or above the 0.68
                        floor with ordering, limit, and the eight-column
                        projection; missing, embedding-less, and
                        terminal-status items match empty without an error
+  [REQ-001 -> FR-003]  a degenerate (zero-norm) embedding on either the item
+                       or the report is excluded, because its cosine is NaN
+                       and NaN would pass every floor
   [REQ-002 -> FR-001]  submit_staff_custody returns ref_code and item_id
   [REQ-003 -> FR-006]  dismissals persist idempotently; unknown ids fail on
                        the foreign key and write nothing
@@ -48,7 +52,7 @@ Requirement coverage (traceable to docs/requirements and the spec):
                        eligible for another item
   clamp bounds (supabase/migrations/20261119120000_us16_reverse_match_intake.sql:68-75)
                        default count 5, explicit counts clamped to 1..25,
-                       a null threshold falling back to the 0.55 floor
+                       a null threshold falling back to the 0.68 floor
 
 Standard library only: no dependency outside Python itself is required.
 """
@@ -72,6 +76,12 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCHEMA_SQL = os.path.join(REPO_ROOT, "ai-service", "supabase", "schema.sql")
 MIGRATION_SQL = os.path.join(
     REPO_ROOT, "supabase", "migrations", "20261119120000_us16_reverse_match_intake.sql"
+)
+FLOOR_MIGRATION_SQL = os.path.join(
+    REPO_ROOT,
+    "supabase",
+    "migrations",
+    "20261127120000_reverse_match_floor_closed_guard.sql",
 )
 FUNCTIONS = (
     "match_lost_reports",
@@ -112,10 +122,13 @@ def _vec512(components):
 
 
 # Cosine similarity against SAME: 1.0, against HALF: ~0.707, against
-# ORTHOGONAL: 0.0. All but ORTHOGONAL clear the 0.55 floor.
+# ORTHOGONAL: 0.0. All but ORTHOGONAL clear the 0.68 floor.
 SAME = _vec512(((0, 1.0),))
 HALF = _vec512(((0, _HALF), (1, _HALF)))
 ORTHOGONAL = _vec512(((1, 1.0),))
+# All-zero vector: cosine against it is NaN, so it must be excluded on either
+# side instead of passing the floor.
+ZERO = _vec512(())
 
 
 def _normalize(text):
@@ -225,7 +238,9 @@ def setUpModule():
         raise unittest.SkipTest(
             "local Supabase stack not reachable: run `supabase start`, load "
             "ai-service/supabase/schema.sql, then apply "
-            "supabase/migrations/20261119120000_us16_reverse_match_intake.sql; "
+            "supabase/migrations/20261119120000_us16_reverse_match_intake.sql "
+            "and "
+            "supabase/migrations/20261127120000_reverse_match_floor_closed_guard.sql; "
             "or export SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, and "
             "SUPABASE_JWT_SECRET"
         )
@@ -470,7 +485,7 @@ class ReverseMatchRpcTests(unittest.TestCase):
         self.assertEqual(rows[0]["contact_info"], "0917 000 0001")
         self.assertEqual(rows[1]["ref_code"], mid["ref_code"])
         self.assertGreater(float(rows[0]["similarity"]), float(rows[1]["similarity"]))
-        self.assertGreater(float(rows[1]["similarity"]), 0.55)
+        self.assertGreater(float(rows[1]["similarity"]), 0.68)
         self.assertEqual(rows[0]["area_route"], "Session Road")
         self.assertEqual(rows[0]["date_lost"], "2026-09-28")
 
@@ -495,6 +510,32 @@ class ReverseMatchRpcTests(unittest.TestCase):
         )
         self.assertEqual(terminal[0], 200)
         self.assertEqual(terminal[1], [])
+
+    # [REQ-001 -> FR-003]
+    def test_degenerate_report_embedding_never_matches(self):
+        item = _seed_item(self.office_id, SAME)
+        healthy = _seed_lost_report(SAME)
+        _seed_lost_report(ZERO)
+
+        status, rows = _rpc(
+            "match_lost_reports", {"item_id": item["id"]}, self.auth_key
+        )
+
+        # NaN would pass the floor and sort first; the guard drops the row.
+        self.assertEqual(status, 200)
+        self.assertEqual([row["ref_code"] for row in rows], [healthy["ref_code"]])
+
+    # [REQ-001 -> FR-003]
+    def test_degenerate_item_embedding_matches_empty(self):
+        item = _seed_item(self.office_id, ZERO)
+        _seed_lost_report(SAME)
+
+        status, rows = _rpc(
+            "match_lost_reports", {"item_id": item["id"]}, self.auth_key
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(rows, [])
 
     # [REQ-002 -> FR-001]
     def test_custody_submit_returns_ref_code_and_item_id(self):
@@ -742,10 +783,14 @@ class ReverseMatchRpcTests(unittest.TestCase):
 
     # [REQ-006 -> FR-001, FR-003, FR-006, FR-008]
     def test_schema_parity_matches_canonical_sql(self):
-        # File level: the migration's three blocks are identical to the
-        # canonical schema's, so a reset database and schema.sql agree.
+        # File level: the migration that installed each function is identical
+        # to the canonical schema's, so a reset database and schema.sql agree.
+        # US-16 owns dismiss and submit; the floor migration owns match.
         for name in FUNCTIONS:
-            migration = _normalize(_function_block(MIGRATION_SQL, name))
+            source = (
+                FLOOR_MIGRATION_SQL if name == "match_lost_reports" else MIGRATION_SQL
+            )
+            migration = _normalize(_function_block(source, name))
             canonical = _normalize(_function_block(SCHEMA_SQL, name))
             self.assertEqual(
                 migration,
