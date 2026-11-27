@@ -6,7 +6,10 @@
  * sanitiser is a second line of defence for staff-typed titles and the caption
  * model's text: sentences with money, serial/ID references, phone numbers,
  * emails or links are dropped whole. Cash is announced by category, never by
- * value.
+ * value. Cash and Documents / IDs are announced by category, without the
+ * photo or caption, matching public browse and search (#106): a cash photo
+ * shows what the claimant must describe, and a document shows the owner's
+ * name, ID number and face.
  */
 
 /* The Filipino caption is machine-translated, so the markers include the
@@ -19,6 +22,22 @@ const CONTACT_MARKER =
   /(?:\bhttps?:\/\/\S+|\bwww\.\S+|\b\S+@\S+\.\S+|\b(?:\+?63[\s-]?|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}\b|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b(?:[a-z0-9-]+\.)+(?:com|net|org|ph|io|gov)\b(?:\/\S*)?)/i;
 
 export const MAX_ANNOUNCEMENT_LENGTH = 600;
+export const DOCUMENT_TITLE = 'Documents / IDs';
+const DOCUMENT_CATEGORIES = ['documents / ids', 'document/id'];
+
+const categoryKey = (category) => String(category ?? '').trim().toLowerCase();
+
+/** True for both the current and the legacy Documents / IDs spelling. */
+export const isDocumentCategory = (category) =>
+  DOCUMENT_CATEGORIES.includes(categoryKey(category));
+
+/** True when the item is cash, by flag or by category. */
+export const isCashItem = ({ category, isCash } = {}) =>
+  isCash === true || categoryKey(category) === 'cash';
+
+/** Cash and Documents / IDs are posted without their photo or caption. */
+export const hidesAnnouncementPhoto = (item = {}) =>
+  isCashItem(item) || isDocumentCategory(item.category);
 export const MAX_CAPTION_LENGTH = 220;
 
 const normalise = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -57,7 +76,7 @@ const TEMPLATES = {
   en: {
     place: 'a participating office',
     heading: (p, t, c) => c ? `Found cash at ${p}` : `Found item at ${p}${t ? `: ${t}` : ''}`,
-    caption: (c) => c ? 'Cash has been handed in. Please describe it at the counter.' : 'See the photo for details.',
+    caption: (c, d) => c ? 'Cash has been handed in. Please describe it at the counter.' : d ? 'A document or ID has been handed in. Please describe it at the counter.' : 'See the photo for details.',
     category: (v) => `Category: ${v}`,
     hours: (v) => `Counter hours: ${v}`,
     closing: (p) => `If this belongs to you, visit ${p} and describe the item at the counter. Bring a valid ID.`,
@@ -65,7 +84,7 @@ const TEMPLATES = {
   tl: {
     place: 'isang kalahok na opisina',
     heading: (p, t, c) => c ? `May nakitang pera sa ${p}` : `May nakitang bagay sa ${p}${t ? `: ${t}` : ''}`,
-    caption: (c) => c ? 'May isinuling pera. Pakilarawan ito sa counter.' : 'Tingnan ang larawan para sa detalye.',
+    caption: (c, d) => c ? 'May isinuling pera. Pakilarawan ito sa counter.' : d ? 'May isinuling dokumento o ID. Pakilarawan ito sa counter.' : 'Tingnan ang larawan para sa detalye.',
     category: (v) => `Kategorya: ${v}`,
     hours: (v) => `Oras ng counter: ${v}`,
     closing: (p) => `Kung ito ay sa iyo, pumunta sa ${p} at ilarawan ang bagay sa counter. Magdala ng valid ID.`,
@@ -85,14 +104,20 @@ export function buildAnnouncementDraft({
   const isFilipino = language === 'tl' || language === 'fil';
   const template = TEMPLATES[isFilipino ? 'tl' : 'en'];
   const cleanOffice = sanitizeAnnouncementText(officeName, { maxLength: 100 });
-  const cleanTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
+  const cash = isCashItem({ category, isCash });
+  const isDocument = !cash && isDocumentCategory(category);
+  const cleanTitle = isDocument
+    ? DOCUMENT_TITLE
+    : sanitizeAnnouncementText(title, { maxLength: 120 });
   const cleanCategory =
     sanitizeAnnouncementText(category, { maxLength: 40 }) || 'General';
-  const cleanCaption = sanitizeAnnouncementText(isFilipino ? aiCaptionTl : aiCaption);
+  const cleanCaption = cash || isDocument
+    ? ''
+    : sanitizeAnnouncementText(isFilipino ? aiCaptionTl : aiCaption);
   const cleanHours = sanitizeAnnouncementText(counterHours, { maxLength: 100 });
   if (!cleanOffice && !cleanTitle) return '';
   const place = cleanOffice || template.place;
-  const heading = template.heading(place, cleanTitle, isCash);
+  const heading = template.heading(place, cleanTitle, cash);
   const tail = [
     '',
     template.category(cleanCategory),
@@ -102,7 +127,7 @@ export function buildAnnouncementDraft({
   ].join('\n');
   if (!cleanCaption) {
     return truncate(
-      `${heading}\n\n${template.caption(isCash)}${tail}`,
+      `${heading}\n\n${template.caption(cash, isDocument)}${tail}`,
       MAX_ANNOUNCEMENT_LENGTH,
     );
   }

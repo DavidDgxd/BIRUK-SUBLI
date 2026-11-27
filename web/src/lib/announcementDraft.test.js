@@ -206,3 +206,67 @@ describe('US-26 copy text and photo', () => {
     await expect(copyAnnouncement('both', { en: '', tl: '', clipboard: clipboard() })).rejects.toThrow('There is nothing to copy yet.');
   });
 });
+
+describe('Cash and Documents / IDs announcements (#106)', () => {
+  const DOC_ITEM = {
+    ...ITEM,
+    title: 'Juan Dela Cruz UB ID',
+    aiCaption: 'A UB ID card showing Juan Dela Cruz.',
+    aiCaptionTl: 'Isang UB ID card ni Juan Dela Cruz.',
+  };
+
+  it.each(['Documents / IDs', 'Document/ID', ' documents / ids '])(
+    'masks the title and drops the photo caption for %s',
+    (category) => {
+      const drafts = buildAnnouncementDrafts({ ...DOC_ITEM, category });
+      for (const text of [drafts.en, drafts.tl]) {
+        expect(text).not.toMatch(/juan|dela cruz/i);
+        expect(text).toContain('Documents / IDs');
+        expect(text).not.toMatch(/see the photo|tingnan ang larawan/i);
+      }
+      expect(drafts.en).toContain('A document or ID has been handed in.');
+      expect(drafts.tl).toContain('May isinuling dokumento o ID.');
+    },
+  );
+
+  it.each([
+    ['the cash flag', { category: 'General', isCash: true }],
+    ['the Cash category', { category: ' cash ', isCash: false }],
+  ])('posts cash by %s without a photo caption', (_, extra) => {
+    const drafts = buildAnnouncementDrafts({
+      ...ITEM, ...extra, title: 'Blue envelope',
+      aiCaption: 'Three blue bills folded in a white envelope.',
+      aiCaptionTl: 'Tatlong asul na papel na pera sa puting sobre.',
+    });
+    expect(drafts.en).toContain('Found cash at');
+    expect(drafts.en).toContain('Cash has been handed in.');
+    expect(drafts.tl).toContain('May isinuling pera.');
+    for (const text of [drafts.en, drafts.tl]) {
+      expect(text).not.toMatch(/blue|bills|envelope|asul|sobre/i);
+    }
+  });
+
+  it('renders no photo preview or photo copy button', async () => {
+    const { createElement } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { default: AnnouncementDraft } = await import('../components/AnnouncementDraft.jsx');
+    const render = (category, isCash = false) => renderToStaticMarkup(createElement(AnnouncementDraft, {
+      item: {
+        ...DOC_ITEM, category, isCash,
+        imageUrl: 'https://example.test/id.jpg', photoUrl: 'https://example.test/id.jpg',
+      },
+    }));
+
+    for (const [category, isCash] of [['Documents / IDs'], ['Document/ID'], ['Cash', true], ['Cash'], ['General', true]]) {
+      const html = render(category, isCash);
+      expect(html).not.toContain('<img');
+      expect(html).not.toContain('id.jpg');
+      expect(html).not.toContain('Copy photo');
+      expect(html).not.toMatch(/juan|dela cruz/i);
+      expect(html).toContain('posted without a photo');
+    }
+    const general = render('Bags & Wallets');
+    expect(general).toContain('<img');
+    expect(general).toContain('Copy photo');
+  });
+});

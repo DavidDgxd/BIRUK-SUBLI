@@ -8,6 +8,9 @@ import { captionSource } from '../lib/captionSuggestion.js';
 import {
   buildAnnouncementDrafts,
   copyAnnouncement,
+  DOCUMENT_TITLE,
+  hidesAnnouncementPhoto,
+  isDocumentCategory,
   sanitizeAnnouncementText,
   updateAnnouncementDraft,
 } from '../lib/announcementDraft.js';
@@ -42,13 +45,21 @@ const buildFor = (item, caption) => {
 };
 
 /* Editable public announcement on the custody receipt (US-24). Private notes,
- * cash amounts and finder/claimant fields are never passed to the generator. */
+ * cash amounts and finder/claimant fields are never passed to the generator.
+ * Cash and Documents / IDs photos are never previewed, copied or captioned,
+ * matching public browse and search (#106). */
 export default function AnnouncementDraft({ item }) {
   const {
-    title, category, aiCaption, aiCaptionTl, officeName, counterHours,
-    isCash, imageUrl, photoFile, photoUrl,
+    title, category, aiCaption, aiCaptionTl, officeName, counterHours, isCash,
   } = item ?? {};
-  const safeTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
+  const isDocument = isDocumentCategory(category);
+  const hidePhoto = hidesAnnouncementPhoto({ category, isCash });
+  const imageUrl = hidePhoto ? null : item?.imageUrl;
+  const photoFile = hidePhoto ? null : item?.photoFile;
+  const photoUrl = hidePhoto ? null : item?.photoUrl;
+  const safeTitle = isDocument
+    ? DOCUMENT_TITLE
+    : sanitizeAnnouncementText(title, { maxLength: 120 });
   const englishId = useId();
   const filipinoId = useId();
   const hintId = useId();
@@ -217,8 +228,9 @@ export default function AnnouncementDraft({ item }) {
             ))}
           </div>
           <p className="field__hint" id={hintId}>
-            Edit either version before posting. Copy the text, then copy the
-            photo separately to paste both into Facebook.
+            {hidePhoto
+              ? 'Edit either version before posting. Cash, documents and IDs are posted without a photo to protect the owner.'
+              : 'Edit either version before posting. Copy the text, then copy the photo separately to paste both into Facebook.'}
           </p>
 
           {notice && (
@@ -233,7 +245,7 @@ export default function AnnouncementDraft({ item }) {
               ['en', 'Copy English', 'English copied'],
               ['tl', 'Copy Filipino', 'Filipino copied'],
               ['both', 'Copy both', 'Both copied'],
-              ['photo', 'Copy photo (PNG)', 'Photo copied'],
+              ...(hidePhoto ? [] : [['photo', 'Copy photo (PNG)', 'Photo copied']]),
             ].map(([action, idle, copied]) => {
               const busy = copyState === `${action}-copying`;
               const done = copyState === `${action}-copied`;
