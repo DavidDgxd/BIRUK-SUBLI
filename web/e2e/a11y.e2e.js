@@ -161,6 +161,49 @@ test.describe('a11y /staff/intake receipt with lost-report flags', () => {
   }
 });
 
+test.describe('a11y /staff/intake receipt for Documents / IDs', () => {
+  test.use({ signedInAs: 'office' });
+
+  for (const theme of ['light', 'dark']) {
+    test(`${theme} theme`, async ({ page }) => {
+      // #106: this receipt's announcement draft has no photo or photo button.
+      await page.emulateMedia({ colorScheme: theme });
+      await page.route('**/caption/image', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ caption: 'A UB ID card.' }),
+        }),
+      );
+      await page.route('**/rest/v1/rpc/submit_staff_custody', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            { ref_code: 'BS-0312', item_id: 'e2e-item-a11y-document' },
+          ]),
+        }),
+      );
+
+      await openRoute(page, '/staff/intake');
+      await page.locator('form input[type=file]').setInputFiles({
+        name: 'id.png',
+        mimeType: 'image/png',
+        buffer: PNG_1PX,
+      });
+      await page.getByLabel('Item title').fill('Juan Dela Cruz UB ID');
+      await page.getByLabel('Category').selectOption('Documents / IDs');
+      await page.getByLabel('Storage location').fill('Locker 3, Bin C');
+      await page.getByRole('button', { name: 'Take into custody' }).click();
+      await expect(page.getByLabel('English announcement')).toHaveValue(
+        /Found a document or ID at/,
+      );
+
+      await expectNoA11yViolations(page);
+    });
+  }
+});
+
 test.describe('a11y /staff/login errors', () => {
   for (const theme of ['light', 'dark']) {
     test(`${theme} theme`, async ({ page }) => {

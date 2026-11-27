@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { DOCUMENT_TITLE, isCashItem, isDocumentCategory } from './publicMasking.js';
 
 export const BROWSE_PAGE_SIZE = 12, RECENT_ITEM_LIMIT = 6;
 export class PublicItemsError extends Error {
@@ -10,11 +11,10 @@ export function browseOffset(page, pageSize = BROWSE_PAGE_SIZE) {
   return (safePage - 1) * size;
 }
 export function normalizePublicItem(row) {
-  const category = String(row?.category ?? '').trim().toLowerCase();
-  const cash = row?.is_cash === true || category === 'cash';
-  const secret = cash || category === 'documents / ids' || category === 'document/id';
+  const cash = isCashItem({ category: row?.category, isCash: row?.is_cash });
+  const secret = cash || isDocumentCategory(row?.category);
   return {
-    id: row.id, title: cash ? 'Cash' : secret ? 'Documents / IDs' : row.title,
+    id: row.id, title: cash ? 'Cash' : secret ? DOCUMENT_TITLE : row.title,
     category: cash ? 'Cash' : row.category, status: row.status ?? 'held',
     image_url: secret ? null : row.image_url ?? null,
     date_received: row.date_received ?? null,

@@ -83,4 +83,10 @@ test('cash intake requires finder details and shows the six-month reward date', 
   expect(english).toContain('Found cash at');
   expect(english).toContain('Category: Cash');
   expect(english).not.toMatch(/1,?250|1250|Juan|0917|juan@/i);
+
+  // #106: like public browse, the cash photo and its caption stay off the post.
+  expect(english).not.toContain('brown envelope on a counter');
+  const draft = page.getByRole('region', { name: 'Announcement draft' });
+  await expect(draft.locator('img')).toHaveCount(0);
+  await expect(draft.getByRole('button', { name: /Copy photo/ })).toHaveCount(0);
 });

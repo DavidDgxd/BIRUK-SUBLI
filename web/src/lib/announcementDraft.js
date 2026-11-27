@@ -6,8 +6,13 @@
  * sanitiser is a second line of defence for staff-typed titles and the caption
  * model's text: sentences with money, serial/ID references, phone numbers,
  * emails or links are dropped whole. Cash is announced by category, never by
- * value.
+ * value. Cash and Documents / IDs are announced by category, without the
+ * photo or caption, matching public browse and search (#106): a cash photo
+ * shows what the claimant must describe, and a document shows the owner's
+ * name, ID number and face.
  */
+
+import { isCashItem, isDocumentCategory } from './publicMasking.js';
 
 /* The Filipino caption is machine-translated, so the markers include the
  * Tagalog words the translation produces as well as the English originals. */
@@ -20,6 +25,10 @@ const CONTACT_MARKER =
 
 export const MAX_ANNOUNCEMENT_LENGTH = 600;
 export const MAX_CAPTION_LENGTH = 220;
+
+/** Cash and Documents / IDs are posted without their photo or caption. */
+export const hidesAnnouncementPhoto = (item = {}) =>
+  isCashItem(item) || isDocumentCategory(item.category);
 
 const normalise = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -56,16 +65,16 @@ export function sanitizeAnnouncementText(
 const TEMPLATES = {
   en: {
     place: 'a participating office',
-    heading: (p, t, c) => c ? `Found cash at ${p}` : `Found item at ${p}${t ? `: ${t}` : ''}`,
-    caption: (c) => c ? 'Cash has been handed in. Please describe it at the counter.' : 'See the photo for details.',
+    heading: (p, t, c, d) => c ? `Found cash at ${p}` : d ? `Found a document or ID at ${p}` : `Found item at ${p}${t ? `: ${t}` : ''}`,
+    caption: (c, d) => c ? 'Cash has been handed in. Please describe it at the counter.' : d ? 'A document or ID has been handed in. Please describe it at the counter.' : 'See the photo for details.',
     category: (v) => `Category: ${v}`,
     hours: (v) => `Counter hours: ${v}`,
     closing: (p) => `If this belongs to you, visit ${p} and describe the item at the counter. Bring a valid ID.`,
   },
   tl: {
     place: 'isang kalahok na opisina',
-    heading: (p, t, c) => c ? `May nakitang pera sa ${p}` : `May nakitang bagay sa ${p}${t ? `: ${t}` : ''}`,
-    caption: (c) => c ? 'May isinuling pera. Pakilarawan ito sa counter.' : 'Tingnan ang larawan para sa detalye.',
+    heading: (p, t, c, d) => c ? `May nakitang pera sa ${p}` : d ? `May nakitang dokumento o ID sa ${p}` : `May nakitang bagay sa ${p}${t ? `: ${t}` : ''}`,
+    caption: (c, d) => c ? 'May isinuling pera. Pakilarawan ito sa counter.' : d ? 'May isinuling dokumento o ID. Pakilarawan ito sa counter.' : 'Tingnan ang larawan para sa detalye.',
     category: (v) => `Kategorya: ${v}`,
     hours: (v) => `Oras ng counter: ${v}`,
     closing: (p) => `Kung ito ay sa iyo, pumunta sa ${p} at ilarawan ang bagay sa counter. Magdala ng valid ID.`,
@@ -85,14 +94,20 @@ export function buildAnnouncementDraft({
   const isFilipino = language === 'tl' || language === 'fil';
   const template = TEMPLATES[isFilipino ? 'tl' : 'en'];
   const cleanOffice = sanitizeAnnouncementText(officeName, { maxLength: 100 });
+  const cash = isCashItem({ category, isCash });
+  const isDocument = !cash && isDocumentCategory(category);
+  // Cash and document headings never print the title; it only decides below
+  // whether there is anything to post at all.
   const cleanTitle = sanitizeAnnouncementText(title, { maxLength: 120 });
   const cleanCategory =
     sanitizeAnnouncementText(category, { maxLength: 40 }) || 'General';
-  const cleanCaption = sanitizeAnnouncementText(isFilipino ? aiCaptionTl : aiCaption);
+  const cleanCaption = cash || isDocument
+    ? ''
+    : sanitizeAnnouncementText(isFilipino ? aiCaptionTl : aiCaption);
   const cleanHours = sanitizeAnnouncementText(counterHours, { maxLength: 100 });
   if (!cleanOffice && !cleanTitle) return '';
   const place = cleanOffice || template.place;
-  const heading = template.heading(place, cleanTitle, isCash);
+  const heading = template.heading(place, cleanTitle, cash, isDocument);
   const tail = [
     '',
     template.category(cleanCategory),
@@ -102,7 +117,7 @@ export function buildAnnouncementDraft({
   ].join('\n');
   if (!cleanCaption) {
     return truncate(
-      `${heading}\n\n${template.caption(isCash)}${tail}`,
+      `${heading}\n\n${template.caption(cash, isDocument)}${tail}`,
       MAX_ANNOUNCEMENT_LENGTH,
     );
   }
