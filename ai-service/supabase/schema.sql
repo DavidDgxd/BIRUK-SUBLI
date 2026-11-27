@@ -1602,39 +1602,46 @@ revoke all on function public.transfer_item_custody(uuid, text) from public, ano
 grant execute on function public.transfer_item_custody(uuid, text) to authenticated;
 
 -- ============================================================================
--- 10. STAFF ACTION VIEW
--- Aggregates approaching 6-month statutory deadlines for currency items.
+-- 10. STAFF ACTION VIEW (US-28)
+-- Cash held by the signed-in office that is due, or due within 14 days, for
+-- the finder payout. Listed once each, judged by the Asia/Manila date.
 -- ============================================================================
-create or replace view public.staff_reminders_view
+-- The column list changes, which CREATE OR REPLACE VIEW cannot do.
+drop view if exists public.staff_reminders_view;
+
+create view public.staff_reminders_view
 with (security_invoker = true)
 as
-select 
-    id,
-    ref_code,
-    holding_office_id,
-    'cash_due_6mo' as reminder_type,
-    'Six months held. Contact finder for reward under current policy.' as message,
-    reward_date
-from public.items
-where is_cash = true 
-  and status = 'held' 
-  and reward_date <= current_date
+with campus as (
+    select (now() at time zone 'Asia/Manila')::date as today
+)
+select
+    i.id,
+    i.ref_code,
+    i.title,
+    i.holding_office_id,
+    case
+        when i.reward_date <= campus.today then 'due'
+        else 'approaching'
+    end as reminder_type,
+    i.reward_date,
+    (i.reward_date - campus.today) as days_until_reward,
+    i.cash_amount,
+    i.finder_name,
+    i.finder_contact
+from public.items i
+cross join campus
+join public.offices o
+  on o.id = i.holding_office_id
+ and o.auth_user_id = auth.uid()
+ and o.status = 'active'
+where i.is_cash = true
+  and i.status = 'held'
+  and i.reward_date is not null
+  and i.reward_date <= campus.today + 14;
 
-union all
-
-select 
-    id,
-    ref_code,
-    holding_office_id,
-    'cash_warning_3wk' as reminder_type,
-    'Reward date in 3 weeks.' as message,
-    reward_date
-from public.items
-where is_cash = true 
-  and status = 'held' 
-  and reward_date between current_date and (current_date + interval '21 days');
-
--- Restrict reminders to authenticated counter staff
+-- Counter sessions only. The office join above already returns nothing for
+-- an admin or any session without an active office row.
 revoke all on public.staff_reminders_view from anon, public;
 grant select on public.staff_reminders_view to authenticated;
 

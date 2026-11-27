@@ -6,6 +6,11 @@ import Icon from '../components/Icon.jsx';
 import { useStaffAuth } from '../context/StaffAuthContext.jsx';
 import { fetchPublicItem } from '../lib/itemDetails.js';
 import { releaseItemAtCounter } from '../lib/itemRelease.js';
+import {
+  fetchCashHolding,
+  finderRewardOnOwnerClaim,
+  formatPeso,
+} from '../lib/cashReminders.js';
 import { transferItemCustody } from '../lib/itemTransfer.js';
 import { listOfficeOptions } from '../lib/offices.js';
 import { calibrateMatchScore } from '../lib/searchItems.js';
@@ -83,6 +88,7 @@ export default function ItemDetails() {
   const [releaseStatus, setReleaseStatus] = useState('idle');
   const [releaseError, setReleaseError] = useState('');
   const [releasedTo, setReleasedTo] = useState('');
+  const [cashHolding, setCashHolding] = useState(null); // { itemId, isCash, cashAmount }
   const headingRef = useRef(null);
   const transferSelectId = useId();
   const releaseNameRef = useRef(null);
@@ -154,6 +160,32 @@ export default function ItemDetails() {
     item.status === 'held' &&
     item.holding_office_id === staffOffice.id,
   );
+
+  // Cash released to its owner owes the finder one-tenth (Civil Code Art. 720,
+  // US-28). The public projection leaves the amount out, so the holding office
+  // reads it from the items table only when it can release the item.
+  useEffect(() => {
+    if (!canRelease) return undefined;
+
+    const controller = new AbortController();
+    fetchCashHolding(id, controller.signal)
+      .then((holding) => {
+        if (!controller.signal.aborted) {
+          setCashHolding({ itemId: id, ...holding });
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || error.name === 'AbortError') return;
+        if (import.meta.env.DEV) console.error('[ItemDetails] cash', error);
+      });
+
+    return () => controller.abort();
+  }, [canRelease, id]);
+
+  const releasingCash = cashHolding?.itemId === id && cashHolding.isCash;
+  const ownerFinderReward = releasingCash
+    ? formatPeso(finderRewardOnOwnerClaim(cashHolding.cashAmount))
+    : null;
 
   useEffect(() => {
     if (!canTransfer) return undefined;
@@ -469,6 +501,21 @@ export default function ItemDetails() {
                         ID. Recording the release removes the item from public
                         search and keeps the counter record traceable.
                       </p>
+
+                      {releasingCash && (
+                        <p className="cash-release-note">
+                          <Icon name="info" />
+                          <span>
+                            This is cash. When the owner claims it, the owner
+                            gives the finder a reward of one-tenth of the amount
+                            (Civil Code Art. 720)
+                            {ownerFinderReward
+                              ? `: ${ownerFinderReward} of ${formatPeso(cashHolding.cashAmount)}.`
+                              : '.'}{' '}
+                            Note it in the release notes.
+                          </span>
+                        </p>
+                      )}
 
                       <div className="field">
                         <label className="field__label" htmlFor={releaseNameId}>
