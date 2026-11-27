@@ -230,11 +230,18 @@ the receipt valid. The officer calls the contact outside the system.
 
 The panel calls `match_lost_reports` with the item id only, so the vector stays
 in the database and only a signed-in session can run the check. The floor is
-0.55 cosine similarity and cannot be lowered (a caller may raise it); at most
-five reports come back, highest similarity first. Only `open` reports are
-considered, an item that has left custody matches nothing, and a pairing already
-dismissed for this item is left out. Dismissal is scoped to the one item, so the
-same report stays eligible for a different item.
+0.68 cosine similarity and cannot be lowered (a caller may raise it); at most
+five reports come back, highest similarity first. The floor is above the CLIP
+text-only band (genuine text-only pairs measure 0.50-0.66), so a report filed
+without a photo rarely flags; a report that carries a photo flags when the
+object genuinely matches. Porting reverse match to the two-tower index so
+text-only reports can flag again is tracked in issue #151. Only `open` reports
+are considered (a report closed through the staff close path is excluded by its
+`closed_at` guard), an item that has left custody matches nothing, a report
+whose stored vector is degenerate (zero) is skipped because its similarity is
+undefined, and a pairing already dismissed for this item is left out. Dismissal
+is scoped to the one item, so the same report stays eligible for a different
+item.
 
 The panel shows a loading state while the check runs; rows with description,
 area, date lost, contact detail and similarity; a no-close-reports message when
