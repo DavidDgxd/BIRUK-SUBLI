@@ -215,8 +215,9 @@ in the database and only a signed-in session can run the check. The floor is
 0.68 cosine similarity and cannot be lowered (a caller may raise it); at most
 five reports come back, highest similarity first. Only `open` reports are
 considered (a report closed through the staff close path is excluded by its
-`closed_at` guard), an item that has left custody matches nothing, and a pairing
-already dismissed for this item is left out. Dismissal is scoped to the one
+`closed_at` guard), an item that has left custody matches nothing, a report
+whose stored vector is degenerate (zero) is skipped because its similarity is
+undefined, and a pairing already dismissed for this item is left out. Dismissal is scoped to the one
 item, so the same report stays eligible for a different item.
 
 The panel shows a loading state while the check runs; rows with description,

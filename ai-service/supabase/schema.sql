@@ -1339,8 +1339,15 @@ as $$
       -- is no longer a match target. Empty result, never an error.
       and items.status not in ('released', 'resolved', 'transferred', 'disposed')
       and items.embedding is not null
+      -- A zero-norm embedding makes every cosine NaN, and NaN compares above
+      -- any floor and sorts first, so a row written by direct RPC probing that
+      -- never went through the AI service would flag on every intake. A healthy
+      -- vector sits at distance 0 from itself, a zero vector at NaN, and NaN
+      -- fails the `<` comparison, so both sides require a healthy self-distance.
+      and (items.embedding <=> items.embedding) < 0.5
       and lr.status = 'open'
       and lr.closed_at is null
+      and (lr.embedding <=> lr.embedding) < 0.5
       and not exists (
           select 1 from public.dismissed_matches dm
           where dm.item_id = items.id and dm.lost_report_id = lr.id

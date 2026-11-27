@@ -33,6 +33,9 @@ Requirement coverage (traceable to docs/requirements and the spec):
                        floor with ordering, limit, and the eight-column
                        projection; missing, embedding-less, and
                        terminal-status items match empty without an error
+  [REQ-001 -> FR-003]  a degenerate (zero-norm) embedding on either the item
+                       or the report is excluded, because its cosine is NaN
+                       and NaN would pass every floor
   [REQ-002 -> FR-001]  submit_staff_custody returns ref_code and item_id
   [REQ-003 -> FR-006]  dismissals persist idempotently; unknown ids fail on
                        the foreign key and write nothing
@@ -123,6 +126,9 @@ def _vec512(components):
 SAME = _vec512(((0, 1.0),))
 HALF = _vec512(((0, _HALF), (1, _HALF)))
 ORTHOGONAL = _vec512(((1, 1.0),))
+# All-zero vector: cosine against it is NaN, so it must be excluded on either
+# side instead of passing the floor.
+ZERO = _vec512(())
 
 
 def _normalize(text):
@@ -504,6 +510,32 @@ class ReverseMatchRpcTests(unittest.TestCase):
         )
         self.assertEqual(terminal[0], 200)
         self.assertEqual(terminal[1], [])
+
+    # [REQ-001 -> FR-003]
+    def test_degenerate_report_embedding_never_matches(self):
+        item = _seed_item(self.office_id, SAME)
+        healthy = _seed_lost_report(SAME)
+        _seed_lost_report(ZERO)
+
+        status, rows = _rpc(
+            "match_lost_reports", {"item_id": item["id"]}, self.auth_key
+        )
+
+        # NaN would pass the floor and sort first; the guard drops the row.
+        self.assertEqual(status, 200)
+        self.assertEqual([row["ref_code"] for row in rows], [healthy["ref_code"]])
+
+    # [REQ-001 -> FR-003]
+    def test_degenerate_item_embedding_matches_empty(self):
+        item = _seed_item(self.office_id, ZERO)
+        _seed_lost_report(SAME)
+
+        status, rows = _rpc(
+            "match_lost_reports", {"item_id": item["id"]}, self.auth_key
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(rows, [])
 
     # [REQ-002 -> FR-001]
     def test_custody_submit_returns_ref_code_and_item_id(self):
