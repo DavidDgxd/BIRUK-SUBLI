@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CLOSE_KEY_SQL = ROOT / "supabase" / "migrations" / "20261115120000_lost_report_close_key.sql"
 STAFF_SQL = ROOT / "supabase" / "migrations" / "20261115120100_lost_report_staff_closure.sql"
+FLOOR_SQL = ROOT / "supabase" / "migrations" / "20261127120000_reverse_match_floor_closed_guard.sql"
 SCHEMA_SQL = ROOT / "ai-service" / "supabase" / "schema.sql"
 
 
@@ -35,8 +36,22 @@ def body(sql, name):
     return sql[opening : sql.index("$$", opening)].strip()
 
 
+DEFINITION = re.compile(r"create (?:or replace )?function public\.(\w+)")
+
+
+def last_body(sql, name):
+    # A function re-created by a later migration ships with its last body, so
+    # the mirror must read the last definition. Grant and revoke lines also name
+    # the function, so match the definition form only.
+    starts = [m.end() for m in DEFINITION.finditer(sql) if m.group(1) == name]
+    start = starts[-1]
+    opening = sql.index("$$", start) + 2
+    return sql[opening : sql.index("$$", opening)].strip()
+
+
 MIGRATION_CLOSE_KEY = read(CLOSE_KEY_SQL)
 MIGRATION_STAFF = read(STAFF_SQL)
+MIGRATION_FLOOR = read(FLOOR_SQL)
 SCHEMA = read(SCHEMA_SQL)
 SHIPPED_SQL = (MIGRATION_CLOSE_KEY, MIGRATION_STAFF, SCHEMA)
 FUNCTIONS = (
@@ -188,36 +203,36 @@ class StaffCloseRpc(unittest.TestCase):
 
 class MatchingExclusion(unittest.TestCase):
     def test_closed_reports_are_never_candidates(self):
-        for sql in (MIGRATION_STAFF, SCHEMA):
+        for sql in (MIGRATION_STAFF, MIGRATION_FLOOR, SCHEMA):
             fn = body(sql, "match_lost_reports")
             self.assertIn("lr.status = 'open'", fn)
             self.assertIn("lr.closed_at is null", fn)
 
     def test_existing_safety_floor_and_custody_guard_are_kept(self):
-        for sql in (MIGRATION_STAFF, SCHEMA):
+        for sql in (MIGRATION_FLOOR, SCHEMA):
             signature = header(sql, "match_lost_reports")
             fn = body(sql, "match_lost_reports")
             self.assertIn("security definer", signature)
             self.assertIn("item_id uuid", signature)
-            self.assertIn("match_threshold float default 0.55", signature)
+            self.assertIn("match_threshold float default 0.68", signature)
             self.assertIn(
                 "items.status not in ('released', 'resolved', 'transferred', "
                 "'disposed')",
                 fn,
             )
             self.assertIn(
-                ">= greatest(coalesce(match_threshold, 0.55), 0.55)", fn
+                ">= greatest(coalesce(match_threshold, 0.68), 0.68)", fn
             )
             self.assertIn("from public.items", fn)
 
 
 class SchemaMirror(unittest.TestCase):
     def test_ai_service_schema_matches_the_migrations(self):
-        migrations = MIGRATION_CLOSE_KEY + " " + MIGRATION_STAFF
+        migrations = MIGRATION_CLOSE_KEY + " " + MIGRATION_STAFF + " " + MIGRATION_FLOOR
         for name in FUNCTIONS:
             self.assertEqual(
-                body(migrations, name),
-                body(SCHEMA, name),
+                last_body(migrations, name),
+                last_body(SCHEMA, name),
                 f"{name} drifted between the migrations and schema.sql",
             )
 
