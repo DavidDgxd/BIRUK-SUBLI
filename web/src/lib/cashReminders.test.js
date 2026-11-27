@@ -9,6 +9,7 @@ import {
   finderRewardOnOwnerClaim,
   formatPeso,
   listCashReminders,
+  withOwnerClaimRewardNote,
 } from './cashReminders.js';
 
 function chain(result) {
@@ -113,5 +114,33 @@ describe('formatPeso', () => {
 
   it('returns null for no amount', () => {
     expect(formatPeso(null)).toBeNull();
+  });
+});
+
+describe('withOwnerClaimRewardNote', () => {
+  it('records the one-tenth reward when there are no notes', () => {
+    const note = withOwnerClaimRewardNote('', 1500);
+    expect(note).toMatch(/^Cash released to owner: owner gives the finder /);
+    expect(note).toMatch(/150\.00, one-tenth of .*1,500\.00/);
+    expect(note).toContain('(Civil Code Art. 720).');
+  });
+
+  it('keeps the officer notes and adds the reward on a new line', () => {
+    const note = withOwnerClaimRewardNote('  Letter on file.  ', 800);
+    const lines = note.split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe('Letter on file.');
+    expect(lines[1]).toContain('Civil Code Art. 720');
+  });
+
+  it('leaves notes that already mention Art. 720 unchanged', () => {
+    const typed = 'Finder paid per Civil Code Art. 720.';
+    expect(withOwnerClaimRewardNote(typed, 800)).toBe(typed);
+  });
+
+  it('still records the rule when the amount is unknown', () => {
+    expect(withOwnerClaimRewardNote(null, null)).toBe(
+      'Cash released to owner: owner gives the finder one-tenth of the amount (Civil Code Art. 720).',
+    );
   });
 });

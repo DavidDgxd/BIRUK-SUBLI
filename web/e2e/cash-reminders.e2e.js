@@ -163,7 +163,7 @@ test.describe('cash reminders on /staff/items', () => {
 test.describe('cash release note (Art. 720)', () => {
   test.use({ signedInAs: 'office' });
 
-  async function openHeldItem(page, { isCash, cashAmount }) {
+  async function openHeldItem(page, { isCash, cashAmount, cashStatus = 200 }) {
     await page.route('**/rest/v1/rpc/get_item_public', (route) =>
       route.fulfill({
         contentType: 'application/json',
@@ -184,8 +184,13 @@ test.describe('cash release note (Art. 720)', () => {
     );
     await page.route('**/rest/v1/items?**', (route) =>
       route.fulfill({
+        status: cashStatus,
         contentType: 'application/json',
-        body: JSON.stringify({ is_cash: isCash, cash_amount: cashAmount }),
+        body: JSON.stringify(
+          cashStatus === 200
+            ? { is_cash: isCash, cash_amount: cashAmount }
+            : { message: 'boom' },
+        ),
       }),
     );
     await openRoute(page, `/items/${DUE_ID}`);
@@ -197,6 +202,38 @@ test.describe('cash release note (Art. 720)', () => {
 
     await expect(form).toContainText('Civil Code Art. 720');
     await expect(form).toContainText(/150\.00 of .*1,500\.00/);
+  });
+
+  test('records the Art. 720 reward in the release notes', async ({ page }) => {
+    const calls = [];
+    await page.route('**/rest/v1/rpc/release_item_at_counter', (route) => {
+      calls.push(route.request().postDataJSON());
+      return route.fulfill({ contentType: 'application/json', body: 'null' });
+    });
+    const form = await openHeldItem(page, { isCash: true, cashAmount: 1500 });
+    await expect(form).toContainText('added to the release notes');
+
+    await form.getByLabel('Claimant name').fill('Maria Santos');
+    await form.getByLabel('ID reference').fill('UBID-4921');
+    await form.getByLabel(/Release notes/).fill('Letter on file.');
+    await form.getByRole('button', { name: 'Confirm release' }).click();
+
+    await expect.poll(() => calls.length).toBe(1);
+    const notes = calls[0].p_release_notes.split('\n');
+    expect(notes[0]).toBe('Letter on file.');
+    expect(notes[1]).toMatch(/150\.00, one-tenth of .*1,500\.00/);
+    expect(notes[1]).toContain('Civil Code Art. 720');
+  });
+
+  test('tells staff about Art. 720 when the cash check fails', async ({
+    page,
+  }) => {
+    const form = await openHeldItem(page, { cashStatus: 500 });
+
+    await expect(form.getByRole('status')).toContainText(
+      'We could not check whether this item is cash.',
+    );
+    await expect(form).toContainText('Civil Code Art. 720');
   });
 
   test('shows no note for an item that is not cash', async ({ page }) => {

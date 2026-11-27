@@ -65,6 +65,27 @@ export function finderRewardOnOwnerClaim(amount) {
   return Math.round(value * 10) / 100;
 }
 
+export const ART_720_MARKER = 'Civil Code Art. 720';
+
+/**
+ * Release notes for cash handed to its owner, with the Art. 720 finder reward
+ * recorded. The line goes through the existing p_release_notes parameter, so
+ * the release RPC is unchanged (US-34 owns the full payout record). Notes that
+ * already mention Art. 720 are left as the officer wrote them.
+ */
+export function withOwnerClaimRewardNote(notes, amount) {
+  const clean = (notes ?? '').trim();
+  if (clean.includes(ART_720_MARKER)) return clean;
+
+  const reward = formatPeso(finderRewardOnOwnerClaim(amount));
+  const total = formatPeso(amount);
+  const line = reward
+    ? `Cash released to owner: owner gives the finder ${reward}, one-tenth of ${total} (${ART_720_MARKER}).`
+    : `Cash released to owner: owner gives the finder one-tenth of the amount (${ART_720_MARKER}).`;
+
+  return clean ? `${clean}\n${line}` : line;
+}
+
 const PESO = new Intl.NumberFormat('en-PH', {
   style: 'currency',
   currency: 'PHP',

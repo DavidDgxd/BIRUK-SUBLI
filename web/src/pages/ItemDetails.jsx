@@ -10,6 +10,7 @@ import {
   fetchCashHolding,
   finderRewardOnOwnerClaim,
   formatPeso,
+  withOwnerClaimRewardNote,
 } from '../lib/cashReminders.js';
 import { transferItemCustody } from '../lib/itemTransfer.js';
 import { listOfficeOptions } from '../lib/offices.js';
@@ -88,7 +89,7 @@ export default function ItemDetails() {
   const [releaseStatus, setReleaseStatus] = useState('idle');
   const [releaseError, setReleaseError] = useState('');
   const [releasedTo, setReleasedTo] = useState('');
-  const [cashHolding, setCashHolding] = useState(null); // { itemId, isCash, cashAmount }
+  const [cashHolding, setCashHolding] = useState(null); // { itemId, isCash, cashAmount, failed }
   const headingRef = useRef(null);
   const transferSelectId = useId();
   const releaseNameRef = useRef(null);
@@ -177,12 +178,14 @@ export default function ItemDetails() {
       .catch((error) => {
         if (controller.signal.aborted || error.name === 'AbortError') return;
         if (import.meta.env.DEV) console.error('[ItemDetails] cash', error);
+        setCashHolding({ itemId: id, isCash: false, failed: true });
       });
 
     return () => controller.abort();
   }, [canRelease, id]);
 
   const releasingCash = cashHolding?.itemId === id && cashHolding.isCash;
+  const cashCheckFailed = cashHolding?.itemId === id && cashHolding.failed;
   const ownerFinderReward = releasingCash
     ? formatPeso(finderRewardOnOwnerClaim(cashHolding.cashAmount))
     : null;
@@ -270,7 +273,9 @@ export default function ItemDetails() {
         officeId: staffOffice.id,
         claimantName: cleanName,
         claimantIdRef: cleanIdRef,
-        releaseNotes,
+        releaseNotes: releasingCash
+          ? withOwnerClaimRewardNote(releaseNotes, cashHolding.cashAmount)
+          : releaseNotes,
       });
       setReleasedTo(released.claimantName);
       setClaimantName('');
@@ -512,7 +517,19 @@ export default function ItemDetails() {
                             {ownerFinderReward
                               ? `: ${ownerFinderReward} of ${formatPeso(cashHolding.cashAmount)}.`
                               : '.'}{' '}
-                            Note it in the release notes.
+                            This is added to the release notes when you confirm.
+                          </span>
+                        </p>
+                      )}
+
+                      {cashCheckFailed && (
+                        <p className="cash-release-note" role="status">
+                          <Icon name="warning" />
+                          <span>
+                            We could not check whether this item is cash. If it
+                            is, the owner gives the finder a reward of one-tenth
+                            of the amount (Civil Code Art. 720). Add that to the
+                            release notes.
                           </span>
                         </p>
                       )}
