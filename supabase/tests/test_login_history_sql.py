@@ -41,7 +41,7 @@ def body(sql, name):
 
 BASE = read(MIGRATIONS / "20261126120000_us37_login_history.sql")
 MIGRATION = read(MIGRATIONS / "20261127150000_us37_login_history_hardening.sql")
-RETENTION = read(MIGRATIONS / "20261127140000_login_history_retention.sql")
+RETENTION = read(MIGRATIONS / "20261127170000_login_history_retention.sql")
 SCHEMA = read(SCHEMA_SQL)
 TABLE_SHIPPED = (BASE, SCHEMA)
 SHIPPED = (MIGRATION, SCHEMA)
