@@ -228,7 +228,7 @@ describe('fetchLoginHistory', () => {
 
     await fetchLoginHistory({
       officeId: 'UB_SECURITY',
-      search: '  public information  ',
+      search: '  security  ',
       status: 'failed',
       dateFrom: '2026-11-01',
       dateTo: '2026-11-30',
@@ -237,7 +237,7 @@ describe('fetchLoginHistory', () => {
 
     expect(rpc).toHaveBeenCalledWith('admin_list_login_history', {
       p_office_id: 'UB_SECURITY',
-      p_search: 'public information',
+      p_search: 'security',
       p_status: 'failed',
       p_date_from: '2026-10-31T16:00:00.000Z',
       p_date_to: '2026-11-30T15:59:59.999Z',
@@ -365,7 +365,7 @@ describe('fetchLoginHistory', () => {
 describe('CSV export', () => {
   const mapped = {
     occurredAt: '2026-11-20T09:30:00Z',
-    accountLabel: 'Baguio City Public Information Office',
+    accountLabel: 'University of Baguio Security Office',
     roleLabel: 'Office staff',
     statusLabel: 'Success',
     failureLabel: null,
@@ -378,7 +378,7 @@ describe('CSV export', () => {
     expect(csv.split('\r\n')[0]).toBe(
       'When,Office or account,Role,Status,Failure reason,Device',
     );
-    expect(csv).toContain('Baguio City Public Information Office');
+    expect(csv).toContain('University of Baguio Security Office');
     expect(csv).toContain('Office staff');
     expect(csv).not.toContain('secret-user-id');
     expect(csv).not.toContain('user_id');

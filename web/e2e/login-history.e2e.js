@@ -212,7 +212,7 @@ test.describe('admin login history', () => {
     expect(csv).toContain(OFFICE.name);
     expect(csv).toContain('Office staff');
     expect(csv).not.toContain('secret-user-id');
-    expect(csv).not.toContain('BCPIO');
+    expect(csv).not.toContain('UB_SECURITY');
   });
 
   test('prunes a confirmed retention window and reloads the log', async ({ page }) => {
